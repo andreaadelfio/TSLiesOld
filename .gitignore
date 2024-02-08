@@ -3,3 +3,6 @@
 
 # Extensions
 *.pyc
+
+# Files
+sc_meta.txt

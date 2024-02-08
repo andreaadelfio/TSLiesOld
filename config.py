@@ -6,7 +6,7 @@ import os
 USER = os.environ.get('USERNAME')
 DIR = os.path.dirname(os.path.realpath(__file__))
 
-DATA_REL_FOLDER_PATH = '/data/nfs/farm/g/glast/g/CRE/test_sm/BATgrbs'
+DATA_REL_FOLDER_PATH = 'data/BATgrbs'
 DATA_FOLDER_PATH = os.path.join(os.getcwd(), DIR, DATA_REL_FOLDER_PATH)
 
 LOGGING_FILE_NAME = 'acnbkg.log'
