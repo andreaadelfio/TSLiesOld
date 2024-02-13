@@ -91,7 +91,7 @@ class SpacecraftOpener:
         """
         return pd.DataFrame({name: data_to_df.field(name).tolist() for name in data_to_df.names})
 
-    def get_masked_dataframe(self, start, stop):
+    def get_masked_dataframe(self, start, stop, data = None):
         """
         Returns the masked data within the specified time range.
         
@@ -102,11 +102,28 @@ class SpacecraftOpener:
         Returns:
             numpy.ndarray: The masked data within the specified time range.
         """
-        mask = (self.data['START'] >= start) & (self.data['START'] <= stop)
-        masked_data = self.data[mask]
+        if data is None:
+            data = self.data
+        mask = (data['START'] >= start) & (data['START'] <= stop)
+        masked_data = data[mask]
         masked_data = {name: masked_data.field(name).tolist() for name in masked_data.names}
         return pd.DataFrame(masked_data)
     
+    def get_excluded_dataframes(self, data, start, stop):
+        """
+        Returns the excluded dataframes within the specified time range.
+        
+        Args:
+            start (float): The start time of the desired data range.
+            stop (float): The stop time of the desired data range.
+        
+        Returns:
+            list: The excluded dataframes within the specified time range.
+        """
+        mask = (data['START'] < start) | (data['START'] > stop)
+        excluded_data = data[mask]
+        return excluded_data
+
     def get_masked_data(self, start, stop):
         """
         Returns the masked data within the specified time range.
@@ -127,20 +144,4 @@ if __name__ == '__main__':
     sc.open()
     print(sc.get_tstart())
     print(sc.get_tstop())
-    #print(sc.get_data())
-    #print(sc.get_dataframe(sc.get_data()))
     print(sc.get_masked_data(239557417, 239557500))
-# with fits.open(SC_FILE_PATH) as hdulist:
-#     sc_tstart = hdulist[0].header['TSTART']
-#     sc_tstop = hdulist[0].header['TSTOP']
-#     print(sc_tstart, sc_tstop)
-#     data = hdulist[1].data
-#     mask = (data['START'] >= 239557417) & (data['START'] <= 239557500)
-#     data = data[mask]
-#     data = {name: data.field(name).tolist() for name in data.names}
-#     df = pd.DataFrame(data)
-#     print(df)
-    # for name in data.names:
-    #     print(len(data.field(name)))
-    # for name in data.columns:
-    #     print(name)

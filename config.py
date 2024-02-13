@@ -15,6 +15,6 @@ LOGGING_FILE_REL_PATH = os.path.join(DIR, LOGGING_FOLDER_NAME, LOGGING_FILE_NAME
 LOGGING_FILE_PATH = os.path.join(os.getcwd(), LOGGING_FILE_REL_PATH)
 
 SC_FILENAME = 'lat_spacecraft_merged.fits'
-SC_FOLDER_NAME = 'spacecraft'
+SC_FOLDER_NAME = 'data/spacecraft'
 SC_FILE_REL_PATH = os.path.join(DIR, SC_FOLDER_NAME, SC_FILENAME)
 SC_FILE_PATH = os.path.join(os.getcwd(), SC_FILE_REL_PATH)

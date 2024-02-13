@@ -1,14 +1,24 @@
-# from astropy.io import fits
 import pandas as pd
-# import numpy as np
 from spacecraftopener import SpacecraftOpener
+from catalogreader import CatalogReader
+from plotter import Plotter
 
+
+cr = CatalogReader(start = 0, end = 20)
+grbs_dirs = cr.get_grbs_dirs()
+grb_dict = cr.get_grb_dict(grbs_dirs, smooth = True)
+for key, signals in grb_dict.items():
+    label = f'{key}, met {cr.get_grb_times()[key][0]}'
+    # Plotter(xy = signals, label = label).plot_tiles(lw = 0.5, with_smooth = True)
 
 sco = SpacecraftOpener()
 sco.open()
+data = sco.get_data()
+for met, start, end in cr.get_grb_times().values():
+    print(met, met - start, met + end)
+    # masked_df = pd.concat([masked_df, sco.get_masked_dataframe(met - start, met + end)], ignore_index=True)
+    data = sco.get_excluded_dataframes(data, met - start, met + end)
 
-masked_df1 = sco.get_masked_dataframe(239557417, 239557500)
-masked_df2 = sco.get_masked_dataframe(239557500, 239558800)
-masked_df = pd.concat([masked_df1, masked_df2])
-print(sco.get_data_columns()) # https://fermi.gsfc.nasa.gov/ssc/data/p7rep/analysis/documentation/Cicerone/Cicerone_Data/LAT_Data_Columns.html#SpacecraftFile
-print(masked_df[['START', 'STOP', 'SC_POSITION']])
+data = sco.get_masked_dataframe(data = data, start = data['START'][0], stop = met + 50000)
+Y_KEY = 'IN_SAA'
+Plotter(x = data['START'], y = data[Y_KEY], label = f'spacecraft {Y_KEY}').plot(marker = ',')
