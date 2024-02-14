@@ -2,25 +2,40 @@ import os
 import argparse
 import ROOT
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import fftpack
 from config import DATA_FOLDER_PATH
 
 class CatalogReader():
-    """Class to read the catalog of GRBs and their properties"""
+    """Class to read the catalog of events and their properties"""
     
     def __init__(self, data_dir = DATA_FOLDER_PATH, start = 0, end = -1):
+        """
+        Initialize the CatalogReader object.
+
+        Parameters:
+        - data_dir (str): The directory path where the catalog data is stored.
+        - start (int): The index of the first event directory to consider.
+        - end (int): The index of the last event directory to consider.
+        """
         self.data_dir = data_dir
-        self.grbs_dirs = os.listdir(data_dir)
-        self.grbs_dirs.sort()
-        self.grbs_dirs = self.grbs_dirs[start:end]
+        self.events_dirs = os.listdir(data_dir)
+        self.events_dirs.sort()
+        self.events_dirs = self.events_dirs[start:end]
 
         self.h_names_norm = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
         self.h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
-        self.grb_times = {}
-        self.grb_dict = {}
+        self.event_times = {}
+        self.event_dict = {}
 
     def parse_arguments(self):
+        """
+        Parse the command line arguments.
+
+        Returns:
+        - args (argparse.Namespace): The parsed command line arguments.
+        """
         parser = argparse.ArgumentParser(description='Apply FFT selection to ACD rates', add_help=True)
         parser.add_argument('--fft_plot', action='store_true', default=True, help='Plot FFT analysis result for selected histograms')
         parser.add_argument('--running_plot', action='store_true', default=True, help='Plot running mean  for selected histograms')
@@ -28,26 +43,51 @@ class CatalogReader():
 
         return args
 
-    def get_grbs_dirs(self):
-        return self.grbs_dirs
-    
-    def get_grb_times(self):
-        return self.grb_times
+    def get_events_dirs(self):
+        """
+        Get the list of event directories.
 
-    def get_grb_dict(self, grbs_dirs, binning = None, smooth = False):
-        for grb_dir in grbs_dirs:
-            fname = f'{self.data_dir}/{grb_dir}/ACDrates_{grb_dir}_bin0.1.root'
+        Returns:
+        - events_dirs (list): The list of event directories.
+        """
+        return self.events_dirs
+    
+    def get_event_times(self):
+        """
+        Get the dictionary of event times.
+
+        Returns:
+        - event_times (dict): The dictionary of event times.
+        """
+        return self.event_times
+
+    def get_event_dict(self, events_dirs, binning = None, smooth = False):
+        """
+        Get the dictionary of events and their properties.
+
+        Parameters:
+        - events_dirs (list): The list of event directories to consider.
+        - binning (int): The binning factor for the histograms (optional).
+        - smooth (bool): Flag indicating whether to apply smoothing to the histograms (optional).
+
+        Returns:
+        - event_dict (dict): The dictionary of events and their properties.
+        """
+        for event_dir in events_dirs:
+            fname = f'{self.data_dir}/{event_dir}/ACDrates_{event_dir}_bin0.1.root'
             froot = ROOT.TFile.Open(fname, 'read')
             hist = froot.Get(self.h_names[0])
             histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
-            self.grb_times[grb_dir] = (float(hist.GetXaxis().GetTitle().split('-')[-1]), histx[0], histx[-1]) # get the GRB time from the histogram title ????
-            self.grb_dict[grb_dir] = {}
+            self.event_times[event_dir] = (float(hist.GetXaxis().GetTitle().split('-')[-1]), histx[0], histx[-1]) # get the event time from the histogram title ????
+            self.event_dict[event_dir] = {}
             for h_name in self.h_names:
                 hist = froot.Get(h_name)
                 if binning:
+                    print(hist.GetNbinsX())
                     hist.Rebin(binning)
+                    print(hist.GetNbinsX())
                 histc = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX() + 1)])
-                self.grb_dict[grb_dir][h_name] = (histx, histc)
+                self.event_dict[event_dir][h_name] = (histx, histc)
                 if smooth:
                     freq_cut1 = 0.001
                     time_step = histx[2] - histx[1]
@@ -56,15 +96,38 @@ class CatalogReader():
                     low_freq_fft1  = sig_fft.copy()
                     low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
                     filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
-                    self.grb_dict[grb_dir][h_name] = (histx, histc, filtered_sig1)
+                    self.event_dict[event_dir][h_name] = (histx, histc, filtered_sig1)
             froot.Close()
-        return self.grb_dict
+        return self.event_dict
     
+    def get_signal_df_from_catalog(self, event_dict):
+        """
+        Get the signal dataframe from the catalog.
+
+        Parameters:
+        - event_dict (dict): The dictionary of events and their properties.
+
+        Returns:
+        - signal_dataframe (pd.DataFrame): The signal dataframe.
+        """
+        signal_dataframe = pd.DataFrame()
+        for event, hist_dict in event_dict.items():
+            event_signal = {'time': self.event_times[event][0] + hist_dict['hist_top'][0]}
+            for tile, signal in hist_dict.items():
+                event_signal[tile] = signal[1]
+            event_dataframe = pd.DataFrame(event_signal)
+            signal_dataframe = pd.concat([signal_dataframe, event_dataframe], ignore_index=True)
+        return signal_dataframe
+
+
     def main(self):
+        """
+        The main function of the CatalogReader class.
+        """
         args = self.parse_arguments()
 
         if args.fft_plot or args.running_plot:
-            for ddir in self.grbs_dirs:
+            for ddir in self.events_dirs:
                 fname = f'{self.data_dir}/{ddir}/ACDrates_{ddir}_bin0.1.root'
                 print(fname)
 
@@ -149,5 +212,5 @@ class CatalogReader():
 
 if __name__ == '__main__':
     cr = CatalogReader(DATA_FOLDER_PATH, 0, 2)
-    grb_dirs = cr.get_grbs_dirs()
-    cr.get_grb_dict(grb_dirs)
+    event_dirs = cr.get_events_dirs()
+    cr.get_event_dict(event_dirs)

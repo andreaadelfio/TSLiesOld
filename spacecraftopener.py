@@ -139,6 +139,23 @@ class SpacecraftOpener:
         masked_data = self.data[mask]
         return {name: masked_data.field(name).tolist() for name in masked_data.names}
 
+    def get_sc_input_dataframe(self, initial_data, event_times):
+        """
+        Returns the spacecraft dataframe filtered on events times.
+        
+        Args:
+            initial_data (DataFrame): The initial spacecraft data.
+            event_times (DataFrame): The dataframe containing event times.
+        
+        Returns:
+            DataFrame: The filtered spacecraft dataframe.
+        """
+        df = pd.DataFrame()
+        for met, start, end in event_times.values():
+            df = pd.concat([df, self.get_masked_dataframe(data = initial_data, start = met + start, stop = met + end)], ignore_index = True)
+        return df
+
+
 if __name__ == '__main__':
     sc = SpacecraftOpener()
     sc.open()
