@@ -44,7 +44,7 @@ class SpacecraftOpener:
         SC_FILE_PATHS_FROM_GBM = regenerate_gbm()
         for SC_FILE_PATH_FROM_GBM in SC_FILE_PATHS_FROM_GBM:
             sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_GBM))
-        print(vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').keys())
+        vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_GBM_FILE_PATH, format='fits', overwrite=True)
 
 
     def open(self, sc_filename = SC_LAT_FILE_PATH, from_gbm = False):

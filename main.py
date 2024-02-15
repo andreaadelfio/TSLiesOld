@@ -22,7 +22,6 @@ bkg_signal_df = sco.get_from_gbm_poshist(bkg_signal_df)
 # initial_data = sco.get_data()
 # sc_input_df = sco.get_sc_input_dataframe(initial_data, event_times)
 
-
 ############## LAT ##############
 sco = SpacecraftOpener()
 sco.open()
