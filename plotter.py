@@ -1,6 +1,7 @@
 """Plotter module for plotting data points and curves."""
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 class Plotter:
     def __init__(self, x = None, y = None, df: pd.DataFrame = None, xy: dict = None, label = ''):
@@ -81,7 +82,11 @@ class Plotter:
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         """
         i = 0
-        _, axs = plt.subplots(len(self.df.columns) - 1, 1, sharex=True)
+        n_plots = len(self.df.columns) - 1
+        n_cols = int(np.ceil(np.sqrt(n_plots)))
+        n_rows = int(np.ceil(n_plots / n_cols))
+        _, axs = plt.subplots(n_rows, n_cols, sharex=True)
+        axs = axs.flatten()
         x = self.df[x_column]
         axs[0].set_title(self.label)
         for column in self.df.columns:
