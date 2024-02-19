@@ -53,7 +53,7 @@ class SpacecraftOpener:
             sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_LAT))
         vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
 
-    def open(self, sc_filename = SC_LAT_FILE_PATH, from_gbm = False):
+    def open(self, sc_filename = SC_LAT_WEEKLY_FILE_PATH, from_gbm = False):
         """
         Opens the spacecraft data file and retrieves the necessary information.
 
@@ -197,68 +197,10 @@ class SpacecraftOpener:
         for start, end in event_times.values():
             df = pd.concat([df, self.get_masked_dataframe(data = initial_data, start = start, stop = end)], ignore_index = True)
         return df
-
-    def get_from_gbm_poshist(self, dic_data):
-        p_tmp = PosHist.open(SC_GBM_FILE_PATH)
-        met_ts = dic_data['time']
-        print(met_ts)
-        # time_filter = (met_ts >= p_tmp._times.min()) & (met_ts <= p_tmp._times.max())
-        # for key in dic_data.keys():
-        #     dic_data[key] = dic_data[key][time_filter]
-        # met_ts = dic_data['time']
-        # # # Add feature columns
-        # TODO average the position over 4 seconds
-        # Position and rotation
-        var_tmp = p_tmp.get_eic(met_ts)
-        dic_data['pos_x'] = var_tmp[0]
-        dic_data['pos_y'] = var_tmp[1]
-        dic_data['pos_z'] = var_tmp[2]
-        var_tmp = p_tmp.get_quaternions(met_ts)
-        dic_data['a'] = var_tmp[0]
-        dic_data['b'] = var_tmp[1]
-        dic_data['c'] = var_tmp[2]
-        dic_data['d'] = var_tmp[3]
-        dic_data['lat'] = p_tmp.get_latitude(met_ts)
-        dic_data['lon'] = p_tmp.get_longitude(met_ts)
-        dic_data['alt'] = p_tmp.get_altitude(met_ts)
-        # Velocity
-        var_tmp = p_tmp.get_velocity(met_ts)
-        dic_data['vx'] = var_tmp[0]
-        dic_data['vy'] = var_tmp[1]
-        dic_data['vz'] = var_tmp[2]
-        var_tmp = p_tmp.get_angular_velocity(met_ts)
-        dic_data['w1'] = var_tmp[0]
-        dic_data['w2'] = var_tmp[1]
-        dic_data['w3'] = var_tmp[2]
-        # Sun and Earth visibility
-        dic_data['sun_vis'] = p_tmp.get_sun_visibility(met_ts)
-        var_tmp = coords.get_sun_loc(met_ts)
-        dic_data['sun_ra'] = var_tmp[0]
-        dic_data['sun_dec'] = var_tmp[1]
-        dic_data['earth_r'] = p_tmp.get_earth_radius(met_ts)
-        var_tmp = p_tmp.get_geocenter_radec(met_ts)
-        dic_data['earth_ra'] = var_tmp[0]
-        dic_data['earth_dec'] = var_tmp[1]
-        # Detectors pointing and visibility
-        # for det_name in ['n0', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'na', 'nb', 'b0', 'b1']:
-        #     # Equatorial pointing for each detector
-        #     var_tmp = p_tmp.detector_pointing(det_name, met_ts)
-        #     dic_data[det_name + '_' + 'ra'] = var_tmp[0]
-        #     dic_data[det_name + '_' + 'dec'] = var_tmp[1]
-        #     # Obscured by earth
-        #     dic_data[det_name + '_' + 'vis'] = p_tmp.location_visible(var_tmp[0], var_tmp[1], met_ts)
-        # Magnetic field
-        dic_data['saa'] = p_tmp.get_saa_passage(met_ts)
-        dic_data['l'] = p_tmp.get_mcilwain_l(met_ts)
-        # # # End add columns
-        # Remove file if all the data are saved in dic_data
-        # os.remove(PATH_TO_SAVE + FOLD_CSPEC_POS + '/' + file_tmp)
-        return dic_data
     
     def get_from_lat_weekly_poshist(self, dic_data):
-        p_tmp = PosHist.open(SC_LAT_WEEKLY_FILE_PATH)
+        p_tmp = PosHist.open_from_lat(SC_LAT_WEEKLY_FILE_PATH)
         met_ts = dic_data['time']
-        print(met_ts)
         # time_filter = (met_ts >= p_tmp._times.min()) & (met_ts <= p_tmp._times.max())
         # for key in dic_data.keys():
         #     dic_data[key] = dic_data[key][time_filter]
@@ -283,12 +225,12 @@ class SpacecraftOpener:
         dic_data['vx'] = var_tmp[0]
         dic_data['vy'] = var_tmp[1]
         dic_data['vz'] = var_tmp[2]
-        var_tmp = p_tmp.get_angular_velocity(met_ts)
-        dic_data['w1'] = var_tmp[0]
-        dic_data['w2'] = var_tmp[1]
-        dic_data['w3'] = var_tmp[2]
+        # var_tmp = p_tmp.get_angular_velocity(met_ts)
+        # dic_data['w1'] = var_tmp[0]
+        # dic_data['w2'] = var_tmp[1]
+        # dic_data['w3'] = var_tmp[2]
         # Sun and Earth visibility
-        dic_data['sun_vis'] = p_tmp.get_sun_visibility(met_ts)
+        # dic_data['sun_vis'] = p_tmp.get_sun_visibility(met_ts)
         var_tmp = coords.get_sun_loc(met_ts)
         dic_data['sun_ra'] = var_tmp[0]
         dic_data['sun_dec'] = var_tmp[1]
@@ -305,7 +247,7 @@ class SpacecraftOpener:
         #     # Obscured by earth
         #     dic_data[det_name + '_' + 'vis'] = p_tmp.location_visible(var_tmp[0], var_tmp[1], met_ts)
         # Magnetic field
-        dic_data['saa'] = p_tmp.get_saa_passage(met_ts)
+        # dic_data['saa'] = p_tmp.get_saa_passage(met_ts)
         dic_data['l'] = p_tmp.get_mcilwain_l(met_ts)
         # # # End add columns
         # Remove file if all the data are saved in dic_data

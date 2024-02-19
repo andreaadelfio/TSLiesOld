@@ -131,8 +131,8 @@ def createTChain(rootfiles, treeName, path):
 
 def do_work(fileSizes, binning):
      fill_dictSizes(fileSizes)
-     INPUT_RUNS_FOLDER = 'data/LATACD/input runs/'
-     OUTPUT_RUNS_FOLDER = 'data/LATACD/output runs/'
+     INPUT_RUNS_FOLDER = 'data/LAT_ACD/input runs/'
+     OUTPUT_RUNS_FOLDER = 'data/LAT_ACD/output runs/'
      for run in os.listdir(INPUT_RUNS_FOLDER):
           output_filename = f'{OUTPUT_RUNS_FOLDER}{run.split("_")[1]}.root'
           INPUT_ROOTS_FOLDER = INPUT_RUNS_FOLDER + run

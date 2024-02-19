@@ -25,6 +25,8 @@ bkg_signal_df = cr.get_signal_df_from_catalog(runs_dict)
 sco = SpacecraftOpener()
 sco.open()
 initial_data = sco.get_data()
+sc_input_df = sco.convert_to_df(initial_data)
+# bkg_signal_df = sco.get_from_lat_weekly_poshist(bkg_signal_df)
 sc_input_df = sco.get_sc_input_dataframe(initial_data, runs_times)
 Y_KEY = 'LAT_GEO'
 Plotter(x = sc_input_df['START'], y = sc_input_df[Y_KEY], label = f'spacecraft LAT {Y_KEY}').plot(marker = ',', show = False)
