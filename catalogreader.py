@@ -10,7 +10,7 @@ from config import DATA_BAT_FOLDER_PATH, DATA_LATACD_FOLDER_PATH
 class CatalogReader():
     """Class to read the catalog of runs and their properties"""
     
-    def __init__(self, data_dir = DATA_BAT_FOLDER_PATH, start = 0, end = -1):
+    def __init__(self, data_dir = None, from_lat = False, start = 0, end = -1):
         """
         Initialize the CatalogReader object.
 
@@ -19,6 +19,8 @@ class CatalogReader():
         - start (int): The index of the first run directory to consider.
         - end (int): The index of the last run directory to consider.
         """
+        if from_lat:
+            data_dir = DATA_LATACD_FOLDER_PATH
         self.data_dir = data_dir
         self.runs_roots = [f'{self.data_dir}/{filename}' for filename in os.listdir(data_dir)]
         self.runs_roots.sort()
@@ -64,7 +66,7 @@ class CatalogReader():
             froot = ROOT.TFile.Open(fname, 'read')
             hist = froot.Get(self.h_names[0])
             histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
-            self.runs_times[fname] = (float(hist.GetXaxis().GetTitle().split('-')[-1]), histx[0], histx[-1]) # get the run time from the histogram title ????
+            self.runs_times[fname] = (histx[0], histx[-1])
             self.runs_dict[fname] = {}
             for h_name in self.h_names:
                 hist = froot.Get(h_name)
