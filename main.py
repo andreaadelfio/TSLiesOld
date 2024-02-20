@@ -3,7 +3,7 @@ from catalogreader import CatalogReader
 from plotter import Plotter
 
 ########## BAT Catalog ##########
-cr = CatalogReader(from_lat = True, start = 0, end = 3)
+cr = CatalogReader(from_lat = True, start = 0, end = -1)
 runs_roots = cr.get_runs_roots()
 runs_dict = cr.get_runs_dict(runs_roots, smooth = True)
 runs_times = cr.get_runs_times()
@@ -33,6 +33,6 @@ input_output_df = sco.get_from_lat_weekly_poshist(tile_signal_df, sc_params_df)
 # Y_KEY = 'LAT_GEO'
 # Plotter(x = sc_params_df['START'], y = sc_params_df[Y_KEY], label = f'spacecraft LAT {Y_KEY}').plot(marker = ',', show = False)
 # Plotter(df = sc_params_df, label = 'SC parameters').df_plot_tiles(x_column = 'START', marker = ',', show = False)
-# Plotter(df = tile_signal_df, label = 'Tiles signals').df_plot_tiles(x_column = 'time', marker = ',', show = False)
-Plotter(df = input_output_df, label = 'Inputs and outputs').df_plot_tiles(x_column = 'time', marker = ',', show = False, with_smooth = True)
+Plotter(df = tile_signal_df, label = 'Tiles signals').df_plot_tiles(x_column = 'time', marker = ',', show = False, with_smooth = True)
+# Plotter(df = input_output_df, label = 'Inputs and outputs').df_plot_tiles(x_column = 'time', marker = ',', show = False, with_smooth = True)
 Plotter.show()
