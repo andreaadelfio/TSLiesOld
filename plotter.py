@@ -28,6 +28,7 @@ class Plotter:
         - marker (str): The marker style for the plot (default: '-').
         """
         plt.figure()
+        plt.tight_layout(pad = 0.4)
         plt.plot(self.x, self.y, marker = marker, lw = lw, label = self.label)
         plt.legend()
         plt.title(self.label)
@@ -44,6 +45,7 @@ class Plotter:
         """
         i = 0
         _, axs = plt.subplots(len(self.xy), 1, sharex=True)
+        plt.tight_layout(pad = 0.4)
         axs[0].set_title(self.label)
         for label, xy in self.xy.items():
             axs[i].plot(xy[0], xy[1], marker = marker, lw = lw, label=label)
@@ -64,6 +66,7 @@ class Plotter:
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         """
         plt.figure()
+        plt.tight_layout(pad = 0.4)
         plt.title(self.label)
         for label, xy in self.xy.items():
             plt.plot(xy[0], xy[1], marker = marker, lw = lw, label = label)
@@ -81,23 +84,24 @@ class Plotter:
         - lw (float): Line width of the curves (default: 0.1).
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         """
-        i = 0
-        n_plots = len(self.df.columns) - 1
+        df_columns = [column for column in self.df.columns if '_smooth' not in column]
+        n_plots = len(df_columns) - 1
         n_cols = int(np.ceil(np.sqrt(n_plots)))
         n_rows = int(np.ceil(n_plots / n_cols))
-        _, axs = plt.subplots(n_rows, n_cols, sharex=True)
+        _, axs = plt.subplots(n_rows, n_cols, sharex=True, squeeze=True, figsize=(17, 10), num=self.label)
+        plt.tight_layout(pad = 0.4)
         axs = axs.flatten()
         x = self.df[x_column]
-        axs[0].set_title(self.label)
-        for column in self.df.columns:
+        for i, column in enumerate(df_columns):
             if column != x_column:
-                axs[i].plot(x, self.df[column], marker = marker, lw = lw, label=column)
-                if with_smooth:
-                    axs[i].plot(x, self.df[column + '_smooth'], marker = marker, label=f'{column} smooth')
-                axs[i].legend()
-                axs[i].grid()
-                axs[i].set_xlim(x[0], x[len(x) - 1])
-                i += 1
+                axs[i-1].plot(x, self.df[column], marker = marker, lw = lw, label=column)
+                if with_smooth and column + '_smooth' in self.df.columns:
+                    axs[i-1].plot(x, self.df[column + '_smooth'], marker = marker, label=f'{column} smooth')
+                axs[i-1].legend()
+                axs[i-1].grid()
+                axs[i-1].set_xlim(x[0], x[len(x) - 1])
+        for j in range(i, len(axs)):
+            axs[j].axis('off')
         if show: plt.show()
 
     def df_multiplot(self, x_column, marker = '-', lw = 0.1, with_smooth = False, show = True):
@@ -109,6 +113,7 @@ class Plotter:
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         """
         plt.figure()
+        plt.tight_layout(pad = 0.4)
         plt.title(self.label)
         x = self.df[x_column]
         for column in self.df.columns:

@@ -13,15 +13,13 @@ Methods:
     get_masked_data(start, stop): Returns the masked data within the specified time range.
 '''
 
-import os
 from astropy.io import fits
 from astropy.table import Table, vstack
 import pandas as pd
 import numpy as np
-from gbm.finder import ContinuousFtp
 from gbm.data import PosHist
 from gbm import coords
-from config import SC_LAT_FILE_PATH, SC_GBM_FILE_PATH, SC_FOLDER_NAME_FROM_GBM, SC_LAT_WEEKLY_FILE_PATH, SC_FOLDER_NAME_FROM_LAT_WEEKLY, regenerate_lat_weekly, regenerate_gbm
+from config import SC_GBM_FILE_PATH, SC_LAT_WEEKLY_FILE_PATH, regenerate_lat_weekly
 
 class SpacecraftOpener:
     '''
@@ -37,21 +35,27 @@ class SpacecraftOpener:
         self.data = None
         self.df: pd.DataFrame = None
 
-    def get_from_gbm(self, met_list):
-        for met in met_list:
-            ContinuousFtp(met=met[0]).get_poshist(SC_FOLDER_NAME_FROM_GBM)
-        sc_fits_list = []
-        SC_FILE_PATHS_FROM_GBM = regenerate_gbm()
-        for SC_FILE_PATH_FROM_GBM in SC_FILE_PATHS_FROM_GBM:
-            sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_GBM))
-        vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_GBM_FILE_PATH, format='fits', overwrite=True)
+    # def get_from_gbm(self, met_list):
+    #     for met in met_list:
+    #         ContinuousFtp(met=met[0]).get_poshist(SC_FOLDER_NAME_FROM_GBM)
+    #     sc_fits_list = []
+    #     SC_FILE_PATHS_FROM_GBM = regenerate_gbm()
+    #     for SC_FILE_PATH_FROM_GBM in SC_FILE_PATHS_FROM_GBM:
+    #         sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_GBM))
+    #     vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_GBM_FILE_PATH, format='fits', overwrite=True)
 
     def get_from_lat_weekly(self):
-        sc_fits_list = []
-        SC_FILE_PATHS_FROM_LAT = regenerate_lat_weekly()
-        for SC_FILE_PATH_FROM_LAT in SC_FILE_PATHS_FROM_LAT:
-            sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_LAT))
-        vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
+            """
+            Retrieves data from LAT weekly files and writes them to a single FITS file.
+
+            Returns:
+                None
+            """
+            sc_fits_list = []
+            SC_FILE_PATHS_FROM_LAT = regenerate_lat_weekly()
+            for SC_FILE_PATH_FROM_LAT in SC_FILE_PATHS_FROM_LAT:
+                sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_LAT))
+            vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
 
     def open(self, sc_filename = SC_LAT_WEEKLY_FILE_PATH, from_gbm = False):
         """
@@ -67,11 +71,15 @@ class SpacecraftOpener:
             sc_filename = SC_GBM_FILE_PATH
         with fits.open(sc_filename) as hdulist:
             self.sc_header = hdulist[0].header
-            # self.sc_tstart = hdulist[0].header['TSTART']
-            # self.sc_tstop = hdulist[0].header['TSTOP']
             self.data = hdulist[1].data
 
     def get_sc_header(self):
+        """
+        Returns the spacecraft header.
+
+        Returns:
+            str: The spacecraft header.
+        """
         return self.sc_header
 
     def get_data_columns(self) -> list:
@@ -108,7 +116,20 @@ class SpacecraftOpener:
         Returns:
             numpy.ndarray: The spacecraft data.
         """
-        return self.data
+        cols_to_split = [name for name in self.data.dtype.names if self.data[name][0].size > 1]
+        arr_list = []
+        names = []
+        for name in self.data.dtype.names:
+            if name in cols_to_split:
+                for i in range(self.data[name][0].size):
+                    arr_list.append(self.data[name][:, i])
+                    names.append(f'{name}_{i}')
+            else:
+                arr_list.append(self.data[name])
+                names.append(name)
+
+        new_data = np.rec.fromarrays(arrayList = arr_list, names = names)
+        return new_data
 
     def convert_to_df(self, data_to_df) -> pd.DataFrame:
         """
@@ -117,7 +138,7 @@ class SpacecraftOpener:
         Returns:
             pandas.DataFrame: The dataframe containing the spacecraft data.
         """
-        return pd.DataFrame({name: data_to_df.field(name).tolist() for name in data_to_df.names})
+        return pd.DataFrame({name: data_to_df.field(name).tolist() for name in data_to_df.dtype.names})
 
     def get_dataframe(self) -> pd.DataFrame:
         """
@@ -141,12 +162,9 @@ class SpacecraftOpener:
         """
         if data is None:
             data = self.data
-        if 'START' in data.names:
-            mask = (data['START'] >= start) & (data['START'] <= stop)
-        else:
-            mask = (data['SCLK_UTC'] >= start) & (data['SCLK_UTC'] <= stop)
+        mask = (data['START'] >= start) & (data['START'] <= stop)
         masked_data = data[mask]
-        masked_data = {name: masked_data.field(name).tolist() for name in masked_data.names}
+        # masked_data = {name: masked_data.field(name).tolist() for name in masked_data.keys()}
         return pd.DataFrame(masked_data)
     
     def get_excluded_dataframes(self, data, start, stop):
@@ -182,12 +200,12 @@ class SpacecraftOpener:
         masked_data = self.data[mask]
         return {name: masked_data.field(name).tolist() for name in masked_data.names}
 
-    def get_sc_input_dataframe(self, initial_data, event_times):
+    def get_masked_sc_params_dataframe(self, initial_dataframe, event_times):
         """
         Returns the spacecraft dataframe filtered on events times.
         
         Args:
-            initial_data (DataFrame): The initial spacecraft data.
+            initial_dataframe (DataFrame): The initial spacecraft data.
             event_times (DataFrame): The dataframe containing event times.
         
         Returns:
@@ -195,10 +213,10 @@ class SpacecraftOpener:
         """
         df = pd.DataFrame()
         for start, end in event_times.values():
-            df = pd.concat([df, self.get_masked_dataframe(data = initial_data, start = start, stop = end)], ignore_index = True)
+            df = pd.concat([df, self.get_masked_dataframe(data = initial_dataframe, start = start, stop = end)], ignore_index = True)
         return df
     
-    def get_from_lat_weekly_poshist(self, dic_data):
+    def get_from_lat_weekly_poshist_crupi(self, dic_data):
         p_tmp = PosHist.open_from_lat(SC_LAT_WEEKLY_FILE_PATH)
         met_ts = dic_data['time']
         # time_filter = (met_ts >= p_tmp._times.min()) & (met_ts <= p_tmp._times.max())
@@ -254,7 +272,31 @@ class SpacecraftOpener:
         # os.remove(PATH_TO_SAVE + FOLD_CSPEC_POS + '/' + file_tmp)
         return dic_data
     
+    def get_from_lat_weekly_poshist(self, signal_data: pd.DataFrame, sc_data: pd.DataFrame | fits.fitsrec.FITS_rec) -> pd.DataFrame:
+        if type(sc_data) == fits.fitsrec.FITS_rec:
+            keys = list(sc_data.names)
+        elif type(sc_data) == pd.DataFrame:
+            keys = list(sc_data.keys())
+        else:
+            return None
+        for key in keys:
+            transpose = []
+            if type(sc_data[key][0]) == list:
+                transpose = np.array(sc_data[key].to_list()).T
+                keys.remove(key)
+                for i in range(len(transpose)):
+                    signal_data = pd.concat([signal_data, pd.DataFrame(transpose[i], columns = [f'{key}_{i}'])], axis = 1)
+            elif type(sc_data[key][0]) == np.ndarray:
+                transpose = sc_data[key].T
+                keys.remove(key)
+                for i in range(len(transpose)):
+                    signal_data = pd.concat([signal_data, pd.DataFrame(transpose[i], columns = [f'{key}_{i}'])], axis = 1)
+        sc_data = {key: sc_data[key] for key in keys}
+        signal_data = pd.concat([signal_data, pd.DataFrame(sc_data)], axis = 1)
+        return signal_data
+
+    
 if __name__ == '__main__':
     sc = SpacecraftOpener()
-    sc.open(from_gbm = True)
+    # sc.open()
     # print(sc.get_masked_data(239557417, 239557500))

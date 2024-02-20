@@ -24,8 +24,8 @@ class CatalogReader():
         self.runs_roots.sort()
         self.runs_roots = self.runs_roots[start:end]
 
-        self.h_names_norm = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
-        self.h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
+        self.h_names = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
+        # self.h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
         self.runs_times = {}
         self.runs_dict = {}
 
@@ -70,7 +70,7 @@ class CatalogReader():
                 if binning:
                     hist.Rebin(binning)
                 histc = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX() + 1)])
-                self.runs_dict[fname][h_name] = (histc)
+                self.runs_dict[fname][h_name] = histc
                 if smooth:
                     freq_cut1 = 0.001
                     time_step = histx[2] - histx[1]
@@ -79,7 +79,7 @@ class CatalogReader():
                     low_freq_fft1  = sig_fft.copy()
                     low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
                     filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
-                    self.runs_dict[fname][h_name] = (histc, filtered_sig1)
+                    self.runs_dict[fname][f'{h_name}_smooth'] = filtered_sig1
             froot.Close()
         return self.runs_dict
     

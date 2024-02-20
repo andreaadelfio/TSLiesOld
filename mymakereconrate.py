@@ -122,18 +122,28 @@ def mediaSides(hist_dict, identityFunc ):
 
 def createTChain(rootfiles, treeName, path):
      chain = ROOT.TChain(treeName)
+     separator = path.split('_')[-1]
+     temp_dict = {}
      for line in rootfiles:
           if line.endswith('.root'):
-               rootFile = f'{path}/{line}'
-               print("Tchain- adding file: ", rootFile)
-               chain.Add(rootFile)
+               temp_dict[int(line.split(separator)[1].split('_')[0])] = line
+     keys = list(temp_dict.keys())
+     keys.sort()
+     for key in keys:
+          rootFile = f'{path}/{temp_dict[key]}'
+          print("Tchain - adding file: ", rootFile)
+          chain.Add(rootFile)
      return chain
 
 def do_work(fileSizes, binning):
      fill_dictSizes(fileSizes)
-     INPUT_RUNS_FOLDER = 'data/LAT_ACD/input runs/'
+     INPUT_RUNS_FOLDER = '/media/andrea/DISK4T/ACD LAT Adelfio/'
      OUTPUT_RUNS_FOLDER = 'data/LAT_ACD/output runs/'
-     for run in os.listdir(INPUT_RUNS_FOLDER):
+     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
+     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
+     for output_run in output_folder_list:
+          input_folder_list.remove(f'testOutputs_{output_run.split(".root")[0]}')
+     for run in input_folder_list:
           output_filename = f'{OUTPUT_RUNS_FOLDER}{run.split("_")[1]}.root'
           INPUT_ROOTS_FOLDER = INPUT_RUNS_FOLDER + run
           list_file = os.listdir(INPUT_ROOTS_FOLDER)
