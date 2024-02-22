@@ -109,7 +109,7 @@ class SpacecraftOpener:
         """
         return self.sc_tstop
     
-    def get_data(self) -> np.ndarray:
+    def get_data(self, excluded_columns = []) -> np.ndarray:
         """
         Returns the spacecraft data.
 
@@ -119,7 +119,8 @@ class SpacecraftOpener:
         cols_to_split = [name for name in self.data.dtype.names if self.data[name][0].size > 1]
         arr_list = []
         names = []
-        for name in self.data.dtype.names:
+        cols_to_add = [name for name in self.data.dtype.names if name not in excluded_columns]
+        for name in cols_to_add:
             if name in cols_to_split:
                 for i in range(self.data[name][0].size):
                     arr_list.append(self.data[name][:, i])
