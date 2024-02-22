@@ -20,6 +20,8 @@ import numpy as np
 from gbm.data import PosHist
 from gbm import coords
 from config import SC_GBM_FILE_PATH, SC_LAT_WEEKLY_FILE_PATH, regenerate_lat_weekly
+from utils import from_met_to_datetime_str, from_met_to_datetime
+from scipy.interpolate import interp1d
 
 class SpacecraftOpener:
     '''
@@ -117,8 +119,8 @@ class SpacecraftOpener:
             numpy.ndarray: The spacecraft data.
         """
         cols_to_split = [name for name in self.data.dtype.names if self.data[name][0].size > 1]
-        arr_list = []
-        names = []
+        arr_list = [from_met_to_datetime(self.data['START'])]
+        names = ['datetime']
         cols_to_add = [name for name in self.data.dtype.names if name not in excluded_columns]
         for name in cols_to_add:
             if name in cols_to_split:
@@ -128,7 +130,6 @@ class SpacecraftOpener:
             else:
                 arr_list.append(self.data[name])
                 names.append(name)
-
         new_data = np.rec.fromarrays(arrayList = arr_list, names = names)
         return new_data
 
@@ -163,7 +164,7 @@ class SpacecraftOpener:
         """
         if data is None:
             data = self.data
-        mask = (data['START'] >= start) & (data['START'] <= stop)
+        mask = (data['datetime'] >= start) & (data['datetime'] <= stop)
         masked_data = data[mask]
         # masked_data = {name: masked_data.field(name).tolist() for name in masked_data.keys()}
         return pd.DataFrame(masked_data)
@@ -179,7 +180,7 @@ class SpacecraftOpener:
         Returns:
             list: The excluded dataframes within the specified time range.
         """
-        mask = (data['START'] < start) | (data['START'] > stop)
+        mask = (data['datetime'] < start) | (data['datetime'] > stop)
         excluded_data = data[mask]
         return excluded_data
 
@@ -194,110 +195,29 @@ class SpacecraftOpener:
         Returns:
             numpy.ndarray: The masked data within the specified time range.
         """
-        if 'START' in self.data.names:
-            mask = (self.data['START'] >= start) & (self.data['START'] <= stop)
-        else:
-            mask = (self.data['SCLK_UTC'] >= start) & (self.data['SCLK_UTC'] <= stop)
+        mask = (self.data['datetime'] >= start) & (self.data['START'] <= stop)
         masked_data = self.data[mask]
         return {name: masked_data.field(name).tolist() for name in masked_data.names}
 
-    def get_masked_sc_params_dataframe(self, initial_dataframe, event_times):
+    def filter_dataframe_with_run_times(self, initial_dataframe, run_times):
         """
-        Returns the spacecraft dataframe filtered on events times.
+        Returns the spacecraft dataframe filtered on runs times.
         
         Args:
             initial_dataframe (DataFrame): The initial spacecraft data.
-            event_times (DataFrame): The dataframe containing event times.
+            run_times (DataFrame): The dataframe containing run times.
         
         Returns:
             DataFrame: The filtered spacecraft dataframe.
         """
         df = pd.DataFrame()
-        for start, end in event_times.values():
+        for start, end in run_times.values():
             df = pd.concat([df, self.get_masked_dataframe(data = initial_dataframe, start = start, stop = end)], ignore_index = True)
         return df
     
-    def get_from_lat_weekly_poshist_crupi(self, dic_data):
-        p_tmp = PosHist.open_from_lat(SC_LAT_WEEKLY_FILE_PATH)
-        met_ts = dic_data['time']
-        # time_filter = (met_ts >= p_tmp._times.min()) & (met_ts <= p_tmp._times.max())
-        # for key in dic_data.keys():
-        #     dic_data[key] = dic_data[key][time_filter]
-        # met_ts = dic_data['time']
-        # # # Add feature columns
-        # TODO average the position over 4 seconds
-        # Position and rotation
-        var_tmp = p_tmp.get_eic(met_ts)
-        dic_data['pos_x'] = var_tmp[0]
-        dic_data['pos_y'] = var_tmp[1]
-        dic_data['pos_z'] = var_tmp[2]
-        var_tmp = p_tmp.get_quaternions(met_ts)
-        dic_data['a'] = var_tmp[0]
-        dic_data['b'] = var_tmp[1]
-        dic_data['c'] = var_tmp[2]
-        dic_data['d'] = var_tmp[3]
-        dic_data['lat'] = p_tmp.get_latitude(met_ts)
-        dic_data['lon'] = p_tmp.get_longitude(met_ts)
-        dic_data['alt'] = p_tmp.get_altitude(met_ts)
-        # Velocity
-        var_tmp = p_tmp.get_velocity(met_ts)
-        dic_data['vx'] = var_tmp[0]
-        dic_data['vy'] = var_tmp[1]
-        dic_data['vz'] = var_tmp[2]
-        # var_tmp = p_tmp.get_angular_velocity(met_ts)
-        # dic_data['w1'] = var_tmp[0]
-        # dic_data['w2'] = var_tmp[1]
-        # dic_data['w3'] = var_tmp[2]
-        # Sun and Earth visibility
-        # dic_data['sun_vis'] = p_tmp.get_sun_visibility(met_ts)
-        var_tmp = coords.get_sun_loc(met_ts)
-        dic_data['sun_ra'] = var_tmp[0]
-        dic_data['sun_dec'] = var_tmp[1]
-        dic_data['earth_r'] = p_tmp.get_earth_radius(met_ts)
-        var_tmp = p_tmp.get_geocenter_radec(met_ts)
-        dic_data['earth_ra'] = var_tmp[0]
-        dic_data['earth_dec'] = var_tmp[1]
-        # Detectors pointing and visibility
-        # for det_name in ['n0', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'na', 'nb', 'b0', 'b1']:
-        #     # Equatorial pointing for each detector
-        #     var_tmp = p_tmp.detector_pointing(det_name, met_ts)
-        #     dic_data[det_name + '_' + 'ra'] = var_tmp[0]
-        #     dic_data[det_name + '_' + 'dec'] = var_tmp[1]
-        #     # Obscured by earth
-        #     dic_data[det_name + '_' + 'vis'] = p_tmp.location_visible(var_tmp[0], var_tmp[1], met_ts)
-        # Magnetic field
-        # dic_data['saa'] = p_tmp.get_saa_passage(met_ts)
-        dic_data['l'] = p_tmp.get_mcilwain_l(met_ts)
-        # # # End add columns
-        # Remove file if all the data are saved in dic_data
-        # os.remove(PATH_TO_SAVE + FOLD_CSPEC_POS + '/' + file_tmp)
-        return dic_data
-    
-    def get_from_lat_weekly_poshist(self, signal_data: pd.DataFrame, sc_data: pd.DataFrame | fits.fitsrec.FITS_rec) -> pd.DataFrame:
-        if type(sc_data) == fits.fitsrec.FITS_rec:
-            keys = list(sc_data.names)
-        elif type(sc_data) == pd.DataFrame:
-            keys = list(sc_data.keys())
-        else:
-            return None
-        for key in keys:
-            transpose = []
-            if type(sc_data[key][0]) == list:
-                transpose = np.array(sc_data[key].to_list()).T
-                keys.remove(key)
-                for i in range(len(transpose)):
-                    signal_data = pd.concat([signal_data, pd.DataFrame(transpose[i], columns = [f'{key}_{i}'])], axis = 1)
-            elif type(sc_data[key][0]) == np.ndarray:
-                transpose = sc_data[key].T
-                keys.remove(key)
-                for i in range(len(transpose)):
-                    signal_data = pd.concat([signal_data, pd.DataFrame(transpose[i], columns = [f'{key}_{i}'])], axis = 1)
-        sc_data = {key: sc_data[key] for key in keys}
-        signal_data = pd.concat([signal_data, pd.DataFrame(sc_data)], axis = 1)
-        return signal_data
+    def merge_dfs(self, first_dataframe: pd.DataFrame, second_dataframe: pd.DataFrame) -> pd.DataFrame:
+        return pd.merge(first_dataframe, second_dataframe, on = 'datetime', how = 'outer')
 
     
 if __name__ == '__main__':
     sc = SpacecraftOpener()
-    # sc.open()
-    # print(sc.get_masked_data(239557417, 239557500))

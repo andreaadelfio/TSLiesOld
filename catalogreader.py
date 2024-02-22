@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy import fftpack
 from config import DATA_LATACD_FOLDER_PATH
+from utils import from_met_to_datetime
 
 class CatalogReader():
     """Class to read the catalog of runs and their properties"""
@@ -24,8 +25,9 @@ class CatalogReader():
         self.runs_roots.sort()
         self.runs_roots = self.runs_roots[start:end]
 
-        self.h_names = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
-        # self.h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
+        # self.h_names = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
+        # self.h_names = [f'rate_tile{i};1' for i in range(89)]
+        self.h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
         self.runs_times = {}
         self.runs_dict = {}
 
@@ -47,7 +49,7 @@ class CatalogReader():
         """
         return self.runs_times
 
-    def get_runs_dict(self, runs_roots, binning = None, smooth = False):
+    def get_runs_dict(self, runs_roots, binning = None):
         """
         Get the dictionary of runs and their properties.
 
@@ -63,25 +65,34 @@ class CatalogReader():
             froot = ROOT.TFile.Open(fname, 'read')
             hist = froot.Get(self.h_names[0])
             histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
-            self.runs_times[fname] = (histx[0], histx[-1])
-            self.runs_dict[fname] = {'time': histx}
+            self.runs_dict[fname] = {'MET': histx}
+            self.runs_dict[fname]['datetime'] = from_met_to_datetime(histx)
+            self.runs_times[fname] = (self.runs_dict[fname]['datetime'][0], self.runs_dict[fname]['datetime'][-1])
             for h_name in self.h_names:
                 hist = froot.Get(h_name)
                 if binning:
                     hist.Rebin(binning)
                 histc = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX() + 1)])
-                self.runs_dict[fname][h_name] = histc
-                if smooth:
-                    freq_cut1 = 0.001
-                    time_step = histx[2] - histx[1]
-                    sig_fft = fftpack.fft(histc)
-                    sample_freq = fftpack.fftfreq(len(histc), d=time_step)
-                    low_freq_fft1  = sig_fft.copy()
-                    low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
-                    filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
-                    self.runs_dict[fname][f'{h_name}_smooth'] = filtered_sig1
+                self.runs_dict[fname][h_name.split('hist_')[-1]] = histc
             froot.Close()
         return self.runs_dict
+
+    def add_smoothing(self, tile_signal_df):
+        """
+        """
+        histx = tile_signal_df['MET']
+        freq_cut1 = 0.001
+        time_step = histx[2] - histx[1]
+        for h_name in tile_signal_df.keys():
+            if h_name not in ('MET', 'datetime'):
+                histc = tile_signal_df[h_name].to_list()
+                sig_fft = fftpack.fft(histc)
+                sample_freq = fftpack.fftfreq(len(histc), d=time_step)
+                low_freq_fft1  = sig_fft.copy()
+                low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
+                filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
+                tile_signal_df[f'{h_name}_smooth'] = filtered_sig1
+        return tile_signal_df
     
     def get_signal_df_from_catalog(self, runs_dict):
         """
@@ -94,9 +105,10 @@ class CatalogReader():
         - signal_dataframe (pd.DataFrame): The signal dataframe.
         """
         if len(runs_dict) > 1:
-            return pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
+            catalog_df = pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
         else:
-            return pd.DataFrame(list(runs_dict.values())[0])
+            catalog_df = pd.DataFrame(list(runs_dict.values())[0])
+        return catalog_df
 
 if __name__ == '__main__':
     cr = CatalogReader(DATA_LATACD_FOLDER_PATH, 0, 2)

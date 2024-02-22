@@ -76,7 +76,7 @@ class Plotter:
         plt.xlim(xy[0][0], xy[0][-1])
         if show: plt.show()
 
-    def df_plot_tiles(self, x_column, marker = '-', lw = 0.1, with_smooth = False, show = True):
+    def df_plot_tiles(self, x_col, excluded_cols = [], marker = '-', lw = 0.1, with_smooth = False, show = True):
         """
         Plot multiple curves as tiles.
 
@@ -84,16 +84,16 @@ class Plotter:
         - lw (float): Line width of the curves (default: 0.1).
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         """
-        df_columns = [column for column in self.df.columns if '_smooth' not in column]
+        df_columns = [column for column in self.df.columns if '_smooth' not in column and column not in excluded_cols]
         n_plots = len(df_columns) - 1
         n_cols = int(np.ceil(np.sqrt(n_plots)))
         n_rows = int(np.ceil(n_plots / n_cols))
         _, axs = plt.subplots(n_rows, n_cols, sharex=True, squeeze=True, figsize=(17, 10), num=self.label)
         plt.tight_layout(pad = 0.4)
         axs = axs.flatten()
-        x = self.df[x_column]
+        x = self.df[x_col]
         for i, column in enumerate(df_columns):
-            if column != x_column:
+            if column != x_col:
                 axs[i-1].plot(x, self.df[column], marker = marker, lw = lw, label=column)
                 if with_smooth and column + '_smooth' in self.df.columns:
                     axs[i-1].plot(x, self.df[column + '_smooth'], marker = marker, label=f'{column} smooth')
@@ -104,7 +104,7 @@ class Plotter:
             axs[j].axis('off')
         if show: plt.show()
 
-    def df_multiplot(self, x_column, marker = '-', lw = 0.1, with_smooth = False, show = True):
+    def df_multiplot(self, x_col, marker = '-', lw = 0.1, with_smooth = False, show = True):
         """
         Plots multiple curves on the same figure.
 
@@ -115,9 +115,9 @@ class Plotter:
         plt.figure()
         plt.tight_layout(pad = 0.4)
         plt.title(self.label)
-        x = self.df[x_column]
+        x = self.df[x_col]
         for column in self.df.columns:
-            if column != x_column:
+            if column != x_col:
                 plt.plot(x, self.df[column], marker = marker, lw = lw, label = column)
                 if with_smooth:
                     plt.plot(x, self.df[column + '_smooth'], marker = marker, label = f'{column} smooth')
