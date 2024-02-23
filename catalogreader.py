@@ -49,7 +49,7 @@ class CatalogReader():
         """
         return self.runs_times
 
-    def get_runs_dict(self, runs_roots, binning = None):
+    def get_runs_dict(self, runs_roots = None, binning = None):
         """
         Get the dictionary of runs and their properties.
 
@@ -61,6 +61,8 @@ class CatalogReader():
         Returns:
         - runs_dict (dict): The dictionary of runs and their properties.
         """
+        if runs_roots is None:
+            runs_roots = self.runs_roots
         for fname in runs_roots:
             froot = ROOT.TFile.Open(fname, 'read')
             hist = froot.Get(self.h_names[0])
@@ -95,7 +97,7 @@ class CatalogReader():
                 tile_signal_df[f'{h_name}_smooth'] = filtered_sig1
         return tile_signal_df
     
-    def get_signal_df_from_catalog(self, runs_dict):
+    def get_signal_df_from_catalog(self, runs_dict = None):
         """
         Get the signal dataframe from the catalog.
 
@@ -105,6 +107,8 @@ class CatalogReader():
         Returns:
         - signal_dataframe (pd.DataFrame): The signal dataframe.
         """
+        if runs_dict is None:
+            runs_dict = self.get_runs_dict()
         if len(runs_dict) > 1:
             catalog_df = pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
         else:

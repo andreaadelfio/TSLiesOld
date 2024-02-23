@@ -133,14 +133,15 @@ class SpacecraftOpener:
         """
         return pd.DataFrame({name: data_to_df.field(name).tolist() for name in data_to_df.dtype.names})
 
-    def get_dataframe(self) -> pd.DataFrame:
+    def get_dataframe(self, excluded_columns = []) -> pd.DataFrame:
         """
         Returns the dataframe containing the spacecraft data.
         
         Returns:
             pandas.DataFrame: The dataframe containing the spacecraft data.
         """
-        return self.df
+        self.data = self.get_data(excluded_columns = excluded_columns)
+        return self.convert_to_df(self.data)
 
     def get_masked_dataframe(self, start, stop, data = None):
         """

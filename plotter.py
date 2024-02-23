@@ -100,7 +100,7 @@ class Plotter:
                 axs[i].legend()
                 axs[i].grid()
                 axs[i].set_xlim(x[0], x[len(x) - 1])
-            for j in range(i, len(axs)):
+            for j in range(i + 1, len(axs)):
                 axs[j].axis('off')
         else:
             column = df_columns[0]
