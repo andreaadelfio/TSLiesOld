@@ -9,7 +9,7 @@ from utils import from_met_to_datetime
 class CatalogReader():
     """Class to read the catalog of runs and their properties"""
     
-    def __init__(self, data_dir = None, from_lat = False, start = 0, end = -1):
+    def __init__(self, data_dir = None, from_lat = True, start = 0, end = -1):
         """
         Initialize the CatalogReader object.
 
@@ -81,8 +81,9 @@ class CatalogReader():
         """
         """
         histx = tile_signal_df['MET']
-        freq_cut1 = 0.001
         time_step = histx[2] - histx[1]
+        nyquist_freq = 0.5 / time_step
+        freq_cut1 = 0.01 * nyquist_freq
         for h_name in tile_signal_df.keys():
             if h_name not in ('MET', 'datetime'):
                 histc = tile_signal_df[h_name].to_list()

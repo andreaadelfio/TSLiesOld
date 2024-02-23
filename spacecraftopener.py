@@ -37,27 +37,18 @@ class SpacecraftOpener:
         self.data = None
         self.df: pd.DataFrame = None
 
-    # def get_from_gbm(self, met_list):
-    #     for met in met_list:
-    #         ContinuousFtp(met=met[0]).get_poshist(SC_FOLDER_NAME_FROM_GBM)
-    #     sc_fits_list = []
-    #     SC_FILE_PATHS_FROM_GBM = regenerate_gbm()
-    #     for SC_FILE_PATH_FROM_GBM in SC_FILE_PATHS_FROM_GBM:
-    #         sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_GBM))
-    #     vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_GBM_FILE_PATH, format='fits', overwrite=True)
-
     def get_from_lat_weekly(self):
-            """
-            Retrieves data from LAT weekly files and writes them to a single FITS file.
+        """
+        Retrieves data from LAT weekly files and writes them to a single FITS file.
 
-            Returns:
-                None
-            """
-            sc_fits_list = []
-            SC_FILE_PATHS_FROM_LAT = regenerate_lat_weekly()
-            for SC_FILE_PATH_FROM_LAT in SC_FILE_PATHS_FROM_LAT:
-                sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_LAT))
-            vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
+        Returns:
+            None
+        """
+        sc_fits_list = []
+        SC_FILE_PATHS_FROM_LAT = regenerate_lat_weekly()
+        for SC_FILE_PATH_FROM_LAT in SC_FILE_PATHS_FROM_LAT:
+            sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_LAT))
+        vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
 
     def open(self, sc_filename = SC_LAT_WEEKLY_FILE_PATH, from_gbm = False):
         """

@@ -1,11 +1,10 @@
 from spacecraftopener import SpacecraftOpener
 from catalogreader import CatalogReader
 from plotter import Plotter
-from sunmonitor import find_goes_data
-from utils import from_met_to_datetime_str, from_met_to_datetime
+from sunmonitor import find_goes_data, fetch_goes_data
 
 ########## BAT Catalog ##########
-cr = CatalogReader(from_lat = True, start = 0, end = -1)
+cr = CatalogReader(start = 10, end = 15)
 runs_roots = cr.get_runs_roots()
 runs_dict = cr.get_runs_dict(runs_roots)
 runs_times = cr.get_runs_times()
@@ -14,7 +13,8 @@ tile_signal_df = cr.add_smoothing(tile_signal_df)
 
 ############## GOES ##############
 tstart, tend = list(runs_times.values())[0][0], list(runs_times.values())[-1][1]
-solar_signal_df = find_goes_data(tstart=tstart, tend=tend)
+file_goes = fetch_goes_data(tstart=tstart, tend=tend)
+solar_signal_df = find_goes_data(file_goes)
 
 ############## LAT ##############
 sco = SpacecraftOpener()
@@ -30,6 +30,6 @@ inputs_outputs_df = sco.merge_dfs(tile_signal_df, inputs_df)
 # Y_KEY = 'LAT_GEO'
 # Plotter(x = sc_params_df['START'], y = sc_params_df[Y_KEY], label = f'spacecraft LAT {Y_KEY}').plot(marker = ',', show = False)
 Plotter(df = tile_signal_df, label = 'Tiles signals').df_plot_tiles(x_col = 'datetime', excluded_cols = ['MET'], marker = ',', show = False, with_smooth = True)
-Plotter(df = inputs_df, label = 'Inputs (SC + solar activity)').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START'], marker = ',', show = False)
-Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
+# Plotter(df = inputs_df, label = 'Inputs (SC + solar activity)').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START'], marker = ',', show = False)
+# Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
 Plotter.show()

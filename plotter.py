@@ -84,24 +84,30 @@ class Plotter:
         - lw (float): Line width of the curves (default: 0.1).
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         """
-        df_columns = [column for column in self.df.columns if '_smooth' not in column and column not in excluded_cols]
-        n_plots = len(df_columns) - 1
+        df_columns = [column for column in self.df.columns if '_smooth' not in column and column not in excluded_cols and column != x_col]
+        n_plots = len(df_columns)
         n_cols = int(np.ceil(np.sqrt(n_plots)))
         n_rows = int(np.ceil(n_plots / n_cols))
         _, axs = plt.subplots(n_rows, n_cols, sharex=True, squeeze=True, figsize=(17, 10), num=self.label)
         plt.tight_layout(pad = 0.4)
-        axs = axs.flatten()
         x = self.df[x_col]
-        for i, column in enumerate(df_columns):
-            if column != x_col:
-                axs[i-1].plot(x, self.df[column], marker = marker, lw = lw, label=column)
+        if n_plots > 1:
+            axs = axs.flatten()
+            for i, column in enumerate(df_columns):
+                axs[i].plot(x, self.df[column], marker = marker, lw = lw, label=column)
                 if with_smooth and column + '_smooth' in self.df.columns:
-                    axs[i-1].plot(x, self.df[column + '_smooth'], marker = marker, label=f'{column} smooth')
-                axs[i-1].legend()
-                axs[i-1].grid()
-                axs[i-1].set_xlim(x[0], x[len(x) - 1])
-        for j in range(i, len(axs)):
-            axs[j].axis('off')
+                    axs[i].plot(x, self.df[column + '_smooth'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} smooth')
+                axs[i].legend()
+                axs[i].grid()
+                axs[i].set_xlim(x[0], x[len(x) - 1])
+            for j in range(i, len(axs)):
+                axs[j].axis('off')
+        else:
+            column = df_columns[0]
+            axs.plot(x, self.df[column], marker = marker, lw = lw, label=column)
+            axs.legend()
+            axs.grid()
+            axs.set_xlim(x[0], x[len(x) - 1])
         if show: plt.show()
 
     def df_multiplot(self, x_col, marker = '-', lw = 0.1, with_smooth = False, show = True):

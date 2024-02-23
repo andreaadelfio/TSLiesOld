@@ -17,6 +17,8 @@ LOGGING_FOLDER_NAME = 'logs'
 LOGGING_FILE_REL_PATH = os.path.join(DIR, LOGGING_FOLDER_NAME, LOGGING_FILE_NAME)
 LOGGING_FILE_PATH = os.path.join(os.getcwd(), LOGGING_FILE_REL_PATH)
 
+SOLAR_FOLDER_NAME = 'data/solar'
+
 SC_FOLDER_NAME = 'data/spacecraft'
 SC_LAT_FILENAME = 'lat_spacecraft_merged.fits'
 SC_LAT_FILE_REL_PATH = os.path.join(DIR, SC_FOLDER_NAME, SC_LAT_FILENAME)
