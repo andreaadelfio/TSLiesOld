@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy import fftpack
 from config import DATA_LATACD_FOLDER_PATH
-from utils import from_met_to_datetime
+from utils import Time
 
 class CatalogReader():
     """Class to read the catalog of runs and their properties"""
@@ -68,7 +68,7 @@ class CatalogReader():
             hist = froot.Get(self.h_names[0])
             histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
             self.runs_dict[fname] = {'MET': histx}
-            self.runs_dict[fname]['datetime'] = from_met_to_datetime(histx)
+            self.runs_dict[fname]['datetime'] = Time.from_met_to_datetime(histx)
             self.runs_times[fname] = (self.runs_dict[fname]['datetime'][0], self.runs_dict[fname]['datetime'][-1])
             for h_name in self.h_names:
                 hist = froot.Get(h_name)

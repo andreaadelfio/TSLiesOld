@@ -20,7 +20,7 @@ import numpy as np
 from gbm.data import PosHist
 from gbm import coords
 from config import SC_GBM_FILE_PATH, SC_LAT_WEEKLY_FILE_PATH, regenerate_lat_weekly
-from utils import from_met_to_datetime_str, from_met_to_datetime
+from utils import Time, Data
 from scipy.interpolate import interp1d
 
 class SpacecraftOpener:
@@ -110,7 +110,7 @@ class SpacecraftOpener:
             numpy.ndarray: The spacecraft data.
         """
         cols_to_split = [name for name in self.data.dtype.names if self.data[name][0].size > 1]
-        arr_list = [from_met_to_datetime(self.data['START'])]
+        arr_list = [Time.from_met_to_datetime(self.data['START'])]
         names = ['datetime']
         cols_to_add = [name for name in self.data.dtype.names if name not in excluded_columns]
         for name in cols_to_add:
@@ -124,15 +124,6 @@ class SpacecraftOpener:
         new_data = np.rec.fromarrays(arrayList = arr_list, names = names)
         return new_data
 
-    def convert_to_df(self, data_to_df) -> pd.DataFrame:
-        """
-        Converts the data containing the spacecraft data in a pd.DataFrame.
-        
-        Returns:
-            pandas.DataFrame: The dataframe containing the spacecraft data.
-        """
-        return pd.DataFrame({name: data_to_df.field(name).tolist() for name in data_to_df.dtype.names})
-
     def get_dataframe(self, excluded_columns = []) -> pd.DataFrame:
         """
         Returns the dataframe containing the spacecraft data.
@@ -141,74 +132,7 @@ class SpacecraftOpener:
             pandas.DataFrame: The dataframe containing the spacecraft data.
         """
         self.data = self.get_data(excluded_columns = excluded_columns)
-        return self.convert_to_df(self.data)
-
-    def get_masked_dataframe(self, start, stop, data = None):
-        """
-        Returns the masked data within the specified time range.
-        
-        Args:
-            start (float): The start time of the desired data range.
-            stop (float): The stop time of the desired data range.
-        
-        Returns:
-            numpy.ndarray: The masked data within the specified time range.
-        """
-        if data is None:
-            data = self.data
-        mask = (data['datetime'] >= start) & (data['datetime'] <= stop)
-        masked_data = data[mask]
-        # masked_data = {name: masked_data.field(name).tolist() for name in masked_data.keys()}
-        return pd.DataFrame(masked_data)
-    
-    def get_excluded_dataframes(self, data, start, stop):
-        """
-        Returns the excluded dataframes within the specified time range.
-        
-        Args:
-            start (float): The start time of the desired data range.
-            stop (float): The stop time of the desired data range.
-        
-        Returns:
-            list: The excluded dataframes within the specified time range.
-        """
-        mask = (data['datetime'] < start) | (data['datetime'] > stop)
-        excluded_data = data[mask]
-        return excluded_data
-
-    def get_masked_data(self, start, stop):
-        """
-        Returns the masked data within the specified time range.
-        
-        Args:
-            start (float): The start time of the desired data range.
-            stop (float): The stop time of the desired data range.
-        
-        Returns:
-            numpy.ndarray: The masked data within the specified time range.
-        """
-        mask = (self.data['datetime'] >= start) & (self.data['START'] <= stop)
-        masked_data = self.data[mask]
-        return {name: masked_data.field(name).tolist() for name in masked_data.names}
-
-    def filter_dataframe_with_run_times(self, initial_dataframe, run_times):
-        """
-        Returns the spacecraft dataframe filtered on runs times.
-        
-        Args:
-            initial_dataframe (DataFrame): The initial spacecraft data.
-            run_times (DataFrame): The dataframe containing run times.
-        
-        Returns:
-            DataFrame: The filtered spacecraft dataframe.
-        """
-        df = pd.DataFrame()
-        for start, end in run_times.values():
-            df = pd.concat([df, self.get_masked_dataframe(data = initial_dataframe, start = start, stop = end)], ignore_index = True)
-        return df
-    
-    def merge_dfs(self, first_dataframe: pd.DataFrame, second_dataframe: pd.DataFrame) -> pd.DataFrame:
-        return pd.merge(first_dataframe, second_dataframe, on = 'datetime', how = 'outer')
+        return Data.convert_to_df(self.data)
 
     
 if __name__ == '__main__':

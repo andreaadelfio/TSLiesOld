@@ -88,8 +88,9 @@ class Plotter:
         n_plots = len(df_columns)
         n_cols = int(np.ceil(np.sqrt(n_plots)))
         n_rows = int(np.ceil(n_plots / n_cols))
-        _, axs = plt.subplots(n_rows, n_cols, sharex=True, squeeze=True, figsize=(17, 10), num=self.label)
+        fig, axs = plt.subplots(n_rows, n_cols, sharex=True, squeeze=True, figsize=(17, 10), num=self.label)
         plt.tight_layout(pad = 0.4)
+        fig.subplots_adjust(bottom = 0.06)
         x = self.df[x_col]
         if n_plots > 1:
             axs = axs.flatten()
@@ -100,6 +101,7 @@ class Plotter:
                 axs[i].legend()
                 axs[i].grid()
                 axs[i].set_xlim(x[0], x[len(x) - 1])
+                axs[i].tick_params(axis="x", labelrotation=45)  # Set x-axis label rotation to 45 degrees
             for j in range(i + 1, len(axs)):
                 axs[j].axis('off')
         else:
@@ -108,6 +110,7 @@ class Plotter:
             axs.legend()
             axs.grid()
             axs.set_xlim(x[0], x[len(x) - 1])
+            axs.tick_params(axis="x", labelrotation=45)  # Set x-axis label rotation to 45 degrees
         if show: plt.show()
 
     def df_multiplot(self, x_col, marker = '-', lw = 0.1, with_smooth = False, show = True):

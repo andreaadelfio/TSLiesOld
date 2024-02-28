@@ -5,6 +5,7 @@ from sunpy.net import attrs as a
 from plotter import Plotter
 import os
 from config import SOLAR_FOLDER_NAME
+from utils import Time
 
 
 class SunMonitor:
@@ -49,6 +50,7 @@ class SunMonitor:
             df_goes.reset_index(inplace=True)
             df_goes = df_goes[(df_goes["xrsa_quality"] == 0) & (df_goes["xrsb_quality"] == 0)]
             df_goes = df_goes[['datetime', 'xrsb']]
+            df_goes['datetime'] = Time.remove_milliseconds_from_datetime(df_goes['datetime'])
             dfs.append(df_goes)
         df_mean = pd.concat(dfs).groupby('datetime')['xrsb'].mean().reset_index()
         df_mean.columns = ['datetime', 'solar']
@@ -56,8 +58,7 @@ class SunMonitor:
 
 
 if __name__ == "__main__":
-    sm = SunMonitor(tstart = '2024-02-16 00:00:00', tend = '2024-02-24 00:00:00')
+    sm = SunMonitor(tstart = '2024-02-16 00:00:00', tend = '2024-02-28 00:00:00')
     file_goes = sm.fetch_goes_data()
     df = sm.find_goes_data(file_goes)
-    print(df.head())
-    Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START'], marker = ',')
+    Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime', marker = ',')
