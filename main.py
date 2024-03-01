@@ -1,8 +1,7 @@
 """Main file to run the project
 Author: Andrea Adelfio
 TODO:
-- ruotare xticks
-- salvare i dati in un file
+- aggiungere funzione per scaricare sc data con wget
 """
 from spacecraftopener import SpacecraftOpener
 from catalogreader import CatalogReader
@@ -11,11 +10,10 @@ from sunmonitor import SunMonitor
 from utils import Time, Data
 import gc
 
-
 def fetch_and_write_inputs_outputs():
     ########## BAT Catalog ##########
     print('BAT Catalog...', end='')
-    cr = CatalogReader(start = 0, end = -1)
+    cr = CatalogReader(start = 0, end = 2)
     tile_signal_df = cr.get_signal_df_from_catalog()
     tile_signal_df = cr.add_smoothing(tile_signal_df)
     runs_times = cr.get_runs_times()
@@ -36,8 +34,8 @@ def fetch_and_write_inputs_outputs():
     ############## LAT ##############
     print('LAT data...', end='')
     sco = SpacecraftOpener()
-    sco.open()
-    sc_params_df = sco.get_dataframe(excluded_columns = ['LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'IN_SAA', 'STOP', 'LIVETIME'])
+    sco.open(excluded_columns = ['LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'IN_SAA', 'STOP', 'LIVETIME'])
+    sc_params_df = sco.get_dataframe()
     sc_params_df = Data.filter_dataframe_with_run_times(sc_params_df, runs_times)
     solar_signal_df = Data.filter_dataframe_with_run_times(solar_signal_df, runs_times)
     inputs_df = Data.merge_dfs(sc_params_df, solar_signal_df)
@@ -49,19 +47,20 @@ def fetch_and_write_inputs_outputs():
     gc.collect
     return tile_signal_df, inputs_df, inputs_outputs_df
 
-inputs_outputs_df = Data.read_df_from_file()
-print(inputs_outputs_df.head())
-Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
-if inputs_outputs_df is None:
-    tile_signal_df, inputs_df, inputs_outputs_df = fetch_and_write_inputs_outputs()
-    Plotter(df = tile_signal_df, label = 'Tiles signals').df_plot_tiles(x_col = 'datetime', excluded_cols = ['MET'], marker = ',', show = False, with_smooth = True)
-    Plotter(df = inputs_df, label = 'Inputs (SC + solar activity)').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START'], marker = ',', show = False)
+
+########### Main ############
+if __name__ == '__main__':
+    inputs_outputs_df = Data.read_df_from_file()
+    if inputs_outputs_df is None:
+        tile_signal_df, inputs_df, inputs_outputs_df = fetch_and_write_inputs_outputs()
+        # Plotter(df = tile_signal_df, label = 'Tiles signals').df_plot_tiles(x_col = 'datetime', excluded_cols = ['MET'], marker = ',', show = False, with_smooth = True)
+        # Plotter(df = inputs_df, label = 'Inputs (SC + solar activity)').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START'], marker = ',', show = False)
+
     Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
+    ########### Plotting ############
+    print('Plotting...', end='')
+    # Y_KEY = 'LAT_GEO'
+    # Plotter(x = sc_params_df['START'], y = sc_params_df[Y_KEY], label = f'spacecraft LAT {Y_KEY}').plot(marker = ',', show = False)
+    Plotter.show()
 
-########### Plotting ############
-print('Plotting...', end='')
-# Y_KEY = 'LAT_GEO'
-# Plotter(x = sc_params_df['START'], y = sc_params_df[Y_KEY], label = f'spacecraft LAT {Y_KEY}').plot(marker = ',', show = False)
-Plotter.show()
-
-print(' done')
+    print(' done')

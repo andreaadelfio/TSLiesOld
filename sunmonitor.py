@@ -15,7 +15,6 @@ class SunMonitor:
 
     def fetch_goes_data(self):
         """
-        
         """
         result_goes = Fido.search(a.Time(self.tstart, self.tend), a.Instrument("XRS"), a.Resolution("flx1s"))
         files_to_fetch = {}

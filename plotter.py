@@ -101,7 +101,7 @@ class Plotter:
                 axs[i].legend()
                 axs[i].grid()
                 axs[i].set_xlim(x[0], x[len(x) - 1])
-                axs[i].tick_params(axis="x", labelrotation=45)  # Set x-axis label rotation to 45 degrees
+                axs[i].tick_params(axis="x", labelrotation=30)
             for j in range(i + 1, len(axs)):
                 axs[j].axis('off')
         else:
