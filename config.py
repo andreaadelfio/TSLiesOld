@@ -4,39 +4,33 @@ Configuration file for ACNBkg.scripts
 import os
 
 USER = os.environ.get('USERNAME')
+
 DIR = os.path.dirname(os.path.realpath(__file__))
 #DIR = '/media/andrea/DISK4T/ACD LAT Adelfio/'
 
-DATA_LATACD_REL_FOLDER_PATH = 'data/LAT_ACD/output runs'
-DATA_LATACD_FOLDER_PATH = os.path.join(DIR, DATA_LATACD_REL_FOLDER_PATH)
-
+# Folders: parent (data), children (solar, spacecraft, LAT_ACD/output runs)
 DATA_FOLDER_NAME = os.path.join(DIR, 'data')
-SOLAR_FOLDER_NAME = os.path.join(DIR, 'data/solar')
+SOLAR_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'solar')
+SC_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'spacecraft')
+DATA_LATACD_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/output runs')
 
-SC_FOLDER_NAME = 'data/spacecraft'
 SC_LAT_FILENAME = 'lat_spacecraft_merged.fits'
-SC_LAT_FILE_REL_PATH = os.path.join(DIR, SC_FOLDER_NAME, SC_LAT_FILENAME)
-SC_LAT_FILE_PATH = os.path.join(DIR, SC_LAT_FILE_REL_PATH)
+SC_LAT_FILE_PATH = os.path.join(SC_FOLDER_NAME, SC_LAT_FILENAME)
 
 SC_LAT_WEEKLY_FILENAME = 'lat_weekly_spacecraft_merged.fits'
-SC_LAT_WEEKLY_FILE_REL_PATH = os.path.join(DIR, SC_FOLDER_NAME, SC_LAT_WEEKLY_FILENAME)
-SC_LAT_WEEKLY_FILE_PATH = os.path.join(DIR, SC_LAT_WEEKLY_FILE_REL_PATH)
+SC_LAT_WEEKLY_FILE_PATH = os.path.join(SC_FOLDER_NAME, SC_LAT_WEEKLY_FILENAME)
 
 SOLAR_FILENAME = 'solar_activity'
-SOLAR_FILE_REL_PATH = os.path.join(DIR, SOLAR_FOLDER_NAME, SOLAR_FILENAME)
-SOLAR_FILE_PATH = os.path.join(SOLAR_FILE_REL_PATH)
+SOLAR_FILE_PATH = os.path.join(SOLAR_FOLDER_NAME, SOLAR_FILENAME)
 
 TILE_SIGNAL_FILENAME = 'tile_signal'
-TILE_SIGNAL_FILE_REL_PATH = os.path.join(DIR, DATA_LATACD_REL_FOLDER_PATH, TILE_SIGNAL_FILENAME)
-TILE_SIGNAL_FILE_PATH = os.path.join(TILE_SIGNAL_FILE_REL_PATH)
+TILE_SIGNAL_FILE_PATH = os.path.join(DATA_LATACD_FOLDER_PATH, TILE_SIGNAL_FILENAME)
 
 SC_FILENAME = 'sc'
-SC_FILE_REL_PATH = os.path.join(DIR, SC_FOLDER_NAME, SC_FILENAME)
-SC_FILE_PATH = os.path.join(SC_FILE_REL_PATH)
+SC_FILE_PATH = os.path.join(SC_FOLDER_NAME, SC_FILENAME)
 
 INPUTS_OUTPUTS_FILENAME = 'inputs_outputs'
-INPUTS_OUTPUTS_FILE_REL_PATH = os.path.join(DIR, DATA_FOLDER_NAME, INPUTS_OUTPUTS_FILENAME)
-INPUTS_OUTPUTS_FILE_PATH = os.path.join(INPUTS_OUTPUTS_FILE_REL_PATH)
+INPUTS_OUTPUTS_FILE_PATH = os.path.join(DATA_FOLDER_NAME, INPUTS_OUTPUTS_FILENAME)
 
 SC_FOLDER_NAME_FROM_LAT_WEEKLY = 'data/spacecraft/LAT/weekly'
 SC_FOLDER_NAME_FROM_LAT_WEEKLY = os.path.join(DIR, SC_FOLDER_NAME_FROM_LAT_WEEKLY)
@@ -57,7 +51,7 @@ def regenerate_lat_weekly():
         SC_FILE_PATHS_FROM_LAT_WEEKLY.append(os.path.join(DIR, SC_FILE_REL_PATH_FROM_LAT_WEEKLY))
     return SC_FILE_PATHS_FROM_LAT_WEEKLY
 
-LOGGING_FILE_NAME = 'acdbkg.log'
 LOGGING_FOLDER_NAME = 'logs'
+LOGGING_FILE_NAME = 'acdbkg.log'
 LOGGING_FILE_REL_PATH = os.path.join(LOGGING_FOLDER_NAME, LOGGING_FILE_NAME)
 LOGGING_FILE_PATH = os.path.join(os.getcwd(), LOGGING_FILE_REL_PATH)

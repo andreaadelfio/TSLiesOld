@@ -29,6 +29,7 @@ if __name__ == '__main__':
             # File.write_on_file('data/runs_times.txt', runs_times)
         else:
             runs_times = {'event' : [tile_signal_df['datetime'][0], tile_signal_df['datetime'][int(len(tile_signal_df['datetime']) - 1)]]}
+        
         print(' done')
         ############## GOES ##############
         print('GOES data...', end='')
@@ -53,7 +54,9 @@ if __name__ == '__main__':
             sc_params_df = Data.filter_dataframe_with_run_times(sc_params_df, runs_times)
             File.write_df_on_file(sc_params_df, SC_FILE_PATH)
 
+        print(' done')
         ############# MERGE #############
+        print('MERGE...', end='')
         inputs_df = Data.merge_dfs(sc_params_df, solar_signal_df)
         inputs_outputs_df = Data.merge_dfs(tile_signal_df, inputs_df)
         File.write_df_on_file(inputs_outputs_df)
