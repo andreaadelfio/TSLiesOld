@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 
 class Plotter:
+    """
+    This class provides methods for plotting data points and curves.
+    """
     def __init__(self, x = None, y = None, df: pd.DataFrame = None, xy: dict = None, label = ''):
         """
         Initialize the Plotter object.
@@ -33,7 +36,8 @@ class Plotter:
         plt.legend()
         plt.title(self.label)
         plt.xlim(self.x[0], self.x[len(self.x) - 1])
-        if show: plt.show()
+        if show:
+            plt.show()
 
     def plot_tiles(self, marker = '-', lw = 0.2, with_smooth = False, show = True):
         """
@@ -55,7 +59,8 @@ class Plotter:
             axs[i].grid()
             axs[i].set_xlim(xy[0][0], xy[0][-1])
             i += 1
-        if show: plt.show()
+        if show:
+            plt.show()
 
     def multiplot(self, marker = '-', lw = 0.1, with_smooth = False, show = True):
         """
@@ -76,7 +81,7 @@ class Plotter:
         plt.xlim(xy[0][0], xy[0][-1])
         if show: plt.show()
 
-    def df_plot_tiles(self, x_col, excluded_cols = [], marker = '-', lw = 0.1, with_smooth = False, show = True):
+    def df_plot_tiles(self, x_col, excluded_cols = None, marker = '-', lw = 0.1, with_smooth = False, show = True):
         """
         Plot multiple curves as tiles.
 
@@ -90,7 +95,7 @@ class Plotter:
         n_rows = int(np.ceil(n_plots / n_cols))
         fig, axs = plt.subplots(n_rows, n_cols, sharex=True, squeeze=True, figsize=(17, 10), num=self.label)
         plt.tight_layout(pad = 0.4)
-        fig.subplots_adjust(bottom = 0.06)
+        fig.subplots_adjust(bottom = 0.06, hspace = 0)
         x = self.df[x_col]
         if n_plots > 1:
             axs = axs.flatten()
@@ -98,7 +103,7 @@ class Plotter:
                 axs[i].plot(x, self.df[column], marker = marker, lw = lw, label=column)
                 if with_smooth and column + '_smooth' in self.df.columns:
                     axs[i].plot(x, self.df[column + '_smooth'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} smooth')
-                axs[i].legend()
+                axs[i].legend(loc='upper right')
                 axs[i].grid()
                 axs[i].set_xlim(x[0], x[len(x) - 1])
                 axs[i].tick_params(axis="x", labelrotation=30)
@@ -107,11 +112,12 @@ class Plotter:
         else:
             column = df_columns[0]
             axs.plot(x, self.df[column], marker = marker, lw = lw, label=column)
-            axs.legend()
+            axs.legend(loc='upper right')
             axs.grid()
             axs.set_xlim(x[0], x[len(x) - 1])
             axs.tick_params(axis="x", labelrotation=45)  # Set x-axis label rotation to 45 degrees
-        if show: plt.show()
+        if show:
+            plt.show()
 
     def df_multiplot(self, x_col, marker = '-', lw = 0.1, with_smooth = False, show = True):
         """

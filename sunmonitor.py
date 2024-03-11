@@ -5,14 +5,18 @@ from sunpy.net import attrs as a
 from plotter import Plotter
 import os
 from config import SOLAR_FOLDER_NAME
-from utils import Time
+from utils import Time, Logger, logger_decorator
 
 
 class SunMonitor:
+    logger = Logger('SunMonitor').get_logger()
+
+    @logger_decorator(logger)
     def __init__(self, tstart, tend):
         self.tstart = tstart
         self.tend = tend
 
+    @logger_decorator(logger)
     def fetch_goes_data(self):
         """
         """
@@ -28,10 +32,11 @@ class SunMonitor:
                 files_to_fetch[i] = path
         if len(files_to_fetch) > 0:
             for i in files_to_fetch.keys():
-                files_list += Fido.fetch(result_goes[0][i], path='./data/solar/', progress=False)
+                files_list += Fido.fetch(result_goes[0][i], path=SOLAR_FOLDER_NAME, progress=False)
         return files_list
-
-    def find_goes_data(self, file_goes):
+    
+    # @logger_decorator(logger)
+    def find_goes_data(self, file_goes_list):
         """
         Find and download GOES XRS data for a specific time period.
 
@@ -43,7 +48,9 @@ class SunMonitor:
         pandas.DataFrame: A DataFrame containing the mean solar XRSB data for each datetime.
         """
         dfs = []
-        for goes in ts.TimeSeries(file_goes):
+        for file_goes in file_goes_list:
+            print(file_goes)
+            goes = ts.TimeSeries(file_goes)
             df_goes = pd.DataFrame(goes.to_dataframe())
             df_goes.index.name = 'datetime'
             df_goes.reset_index(inplace=True)

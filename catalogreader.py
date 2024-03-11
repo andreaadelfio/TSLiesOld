@@ -4,11 +4,13 @@ import numpy as np
 import pandas as pd
 from scipy import fftpack
 from config import DATA_LATACD_FOLDER_PATH
-from utils import Time
+from utils import Time, Logger, logger_decorator
 
 class CatalogReader():
     """Class to read the catalog of runs and their properties"""
-    
+    logger = Logger('CatalogReader').get_logger()
+
+    @logger_decorator(logger)
     def __init__(self, data_dir = None, from_lat = True, start = 0, end = -1):
         """
         Initialize the CatalogReader object.
@@ -24,13 +26,13 @@ class CatalogReader():
         self.runs_roots = [f'{self.data_dir}/{filename}' for filename in os.listdir(data_dir)]
         self.runs_roots.sort()
         self.runs_roots = self.runs_roots[start:end]
-
         # self.h_names = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
         # self.h_names = [f'rate_tile{i};1' for i in range(89)]
         self.h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
         self.runs_times = {}
         self.runs_dict = {}
 
+    @logger_decorator(logger)
     def get_runs_roots(self):
         """
         Get the list of run directories.
@@ -40,6 +42,7 @@ class CatalogReader():
         """
         return self.runs_roots
     
+    @logger_decorator(logger)
     def get_runs_times(self):
         """
         Get the dictionary of run times.
@@ -49,6 +52,7 @@ class CatalogReader():
         """
         return self.runs_times
 
+    @logger_decorator(logger)
     def get_runs_dict(self, runs_roots = None, binning = None):
         """
         Get the dictionary of runs and their properties.
@@ -64,6 +68,7 @@ class CatalogReader():
         if runs_roots is None:
             runs_roots = self.runs_roots
         for fname in runs_roots:
+            # self.logger.debug(f'Processing {fname}')
             froot = ROOT.TFile.Open(fname, 'read')
             hist = froot.Get(self.h_names[0])
             histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
@@ -79,6 +84,7 @@ class CatalogReader():
             froot.Close()
         return self.runs_dict
 
+    @logger_decorator(logger)
     def add_smoothing(self, tile_signal_df):
         """
         """
@@ -96,7 +102,8 @@ class CatalogReader():
                 filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
                 tile_signal_df[f'{h_name}_smooth'] = filtered_sig1
         return tile_signal_df
-    
+
+    @logger_decorator(logger)
     def get_signal_df_from_catalog(self, runs_dict = None):
         """
         Get the signal dataframe from the catalog.

@@ -13,20 +13,21 @@ Methods:
     get_masked_data(start, stop): Returns the masked data within the specified time range.
 '''
 
+import wget
 from astropy.io import fits
 from astropy.table import Table, vstack
 import pandas as pd
 import numpy as np
-from gbm.data import PosHist
-from gbm import coords
-from config import SC_GBM_FILE_PATH, SC_LAT_WEEKLY_FILE_PATH, regenerate_lat_weekly
-from utils import Time, Data
-from scipy.interpolate import interp1d
+from config import SC_FOLDER_NAME_FROM_LAT_WEEKLY, SC_LAT_WEEKLY_FILE_PATH, regenerate_lat_weekly
+from utils import Time, Data, Logger, logger_decorator
 
 class SpacecraftOpener:
     '''
     A class for opening and retrieving information from a spacecraft data file
     '''
+    logger = Logger('SpacecraftOpener').get_logger()
+
+    @logger_decorator(logger)
     def __init__(self):
         """
         Initializes a new instance of the SpacecraftOpener class.
@@ -34,26 +35,7 @@ class SpacecraftOpener:
         self.raw_data: None
         self.data = None
 
-    def fetch_sc_weekly_data(self, runs_times):
-        """
-        Calculates which week to download from the runs_times and downloads the weekly files from 'https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/weekly/1s_spacecraft/'.
-        using wget.
-        """
-        week_list = self.get_week_from_run_times(runs_times)
-        print(week_list)
-
-    def get_week_from_run_times(self, runs_times):
-        """
-        Returns the week from the runs_times.
-
-        Args:
-            runs_times (dict): The runs_times dictionary.
-
-        Returns:
-            list: The list of weeks.
-        """
-        return Time.get_week_from_datetime([times[0] for times in runs_times.values()])
-
+    @logger_decorator(logger)
     def get_from_lat_weekly(self):
         """
         Retrieves data from LAT weekly files and writes them to a single FITS file.
@@ -63,10 +45,28 @@ class SpacecraftOpener:
         """
         sc_fits_list = []
         SC_FILE_PATHS_FROM_LAT = regenerate_lat_weekly()
+        print(SC_FILE_PATHS_FROM_LAT)
         for SC_FILE_PATH_FROM_LAT in SC_FILE_PATHS_FROM_LAT:
             sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_LAT))
         vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
 
+    @logger_decorator(logger)
+    def download_lat_weekly(self, start, end):
+        """
+        Downloads LAT weekly spacecraft data.
+
+        Returns:
+            None
+        """
+        # command = f'wget -m -P {SC_FOLDER_NAME_FROM_LAT_WEEKLY} -nH --cut-dirs=4 -np -e robots=off '
+        url = 'https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/weekly/spacecraft/'
+        files_list = [url + f'lat_1sec_spacecraft_weekly_w{i}_p310_v001.fits' for i in range(start, end)]
+        for file_url in files_list:
+            wget.download(file_url, out='.')#SC_FOLDER_NAME_FROM_LAT_WEEKLY)
+        # command = command + ' '.join(files_list)
+        # subprocess.run(command, shell=True, check=False)
+
+    @logger_decorator(logger)
     def open(self, sc_filename = SC_LAT_WEEKLY_FILE_PATH, excluded_columns = [], from_gbm = False):
         """
         Opens the spacecraft data file and retrieves the necessary information.
@@ -83,6 +83,7 @@ class SpacecraftOpener:
             self.raw_data = hdulist[1].data
             self.data = self.init_data(excluded_columns = excluded_columns)
     
+    @logger_decorator(logger)
     def init_data(self, excluded_columns = []) -> np.ndarray:
         """
         Returns the spacecraft data.
@@ -105,6 +106,7 @@ class SpacecraftOpener:
         new_data = np.rec.fromarrays(arrayList = arr_list, names = names)
         return new_data
     
+    @logger_decorator(logger)
     def get_data(self) -> np.ndarray:
         """
         Returns the spacecraft data.
@@ -114,6 +116,7 @@ class SpacecraftOpener:
         """
         return self.data
 
+    @logger_decorator(logger)
     def get_dataframe(self) -> pd.DataFrame:
         """
         Returns the dataframe containing the spacecraft data.
@@ -126,4 +129,5 @@ class SpacecraftOpener:
     
 if __name__ == '__main__':
     sc = SpacecraftOpener()
-    sc.fetch_sc_weekly_data(runs_times = {'run1': ['2024-02-16 00:00:00', '2024-02-28 00:00:00']})
+    # sc.download_lat_weekly(800, 802)
+    sc.get_from_lat_weekly()

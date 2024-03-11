@@ -2,6 +2,7 @@
 /data
 /gbm
 /DeepGRB
+/logs
 
 # Extensions
 *.pyc

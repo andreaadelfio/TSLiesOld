@@ -1,19 +1,87 @@
 """Utils module for the ACNBkg project."""
+import sys
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 import pandas as pd
-from config import INPUTS_OUTPUTS_FILE_PATH
+from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
+
+
+class Logger():
+    """
+    A class that provides utility functions for logging.
+
+    """
+    def __init__(self, logger_name: str,
+                 log_file_name: str = LOGGING_FILE_PATH,
+                 log_level: int = logging.DEBUG):
+        '''
+        Initializes a Logger object.
+
+        Args:
+            logger_name (str): The name of the logger.
+            log_file_name (str): The name of the log file. Default is LOGGING_FILE_PATH from config.py.
+            log_level (int): The log level. Default is logging.DEBUG.
+
+        Returns:
+            None
+        '''
+        if not os.path.exists(log_file_name):
+            os.makedirs(os.path.dirname(log_file_name), exist_ok=True)
+        self.log_file_name = log_file_name
+        self.log_level = log_level
+        self.logger_name = logger_name
+        self.logger = logging.getLogger(self.logger_name)
+        self.logger.setLevel(self.log_level)
+        self.format = '%(asctime)s %(name)s [%(levelname)s]: %(pathname)s - %(funcName)s (%(lineno)d) : %(message)s'
+        self.formatter = logging.Formatter(self.format)
+        for handler in self.logger.handlers[:]:
+            self.logger.removeHandler(handler)
+        self.file_handler = logging.FileHandler(self.log_file_name)
+        self.file_handler.setLevel(self.log_level)
+        self.file_handler.setFormatter(self.formatter)
+        self.logger.addHandler(self.file_handler)
+
+    def get_logger(self):
+        '''
+        Returns the logger object.
+
+        Returns:
+            logging.Logger: The logger object.
+        '''
+        return self.logger
+
+
+def logger_decorator(logger):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            class CustomLogRecord(logging.LogRecord):
+                def __init__(self, *args, **kwargs):
+                    super().__init__(*args, **kwargs)
+                    self.pathname = sys.modules.get(func.__module__).__file__
+                    self.funcName = func.__name__
+            logging.setLogRecordFactory(CustomLogRecord)
+            logger.info(f'{func.__name__} - START')
+            result = func(*args, **kwargs)
+            logger.info(f'{func.__name__} - END')
+            return result
+        return wrapper
+    return decorator
 
 class Time:
+    logger = Logger('Time').get_logger()
+
     fermi_ref_time = datetime(2001, 1, 1, 0, 0, 0)
+
 
     def from_met_to_datetime(met_list) -> list:
         """
         Convert the MET to a datetime object.
-        
+
         Parameters:
         - met_list (list): The MET list to convert.
-        
+
         Returns:
         - datetime_list (list of datetime): The datetime object corresponding to the MET.
         """
@@ -22,10 +90,10 @@ class Time:
     def from_met_to_datetime_str(met_list) -> list:
         """
         Convert the MET to a datetime object and return as string.
-        
+
         Parameters:
         - met_list (list): The MET list to convert.
-        
+
         Returns:
         - datetime_list (list of str): The datetime object corresponding to the MET, represented as strings.
         """
@@ -34,10 +102,10 @@ class Time:
     def remove_milliseconds_from_datetime(datetime_list) -> list:
         """
         Remove the milliseconds from the datetime object.
-        
+
         Parameters:
         - datetime_list (list): The datetime list to convert.
-        
+
         Returns:
         - datetime_list (list of datetime): The datetime object without milliseconds.
         """
@@ -46,10 +114,10 @@ class Time:
     def get_week_from_datetime(datetime_list) -> list:
         """
         Get the week number from the datetime object.
-        
+
         Parameters:
         - datetime_list (list): The datetime list to convert.
-        
+
         Returns:
         - week_list (list of int): The week number corresponding to the datetime.
         """
@@ -58,10 +126,12 @@ class Time:
         return [(Time.fermi_ref_time + datetime(dt)).isocalendar()[1] for dt in datetime_list]
 
 class Data():
+    logger = Logger('Data').get_logger()
     """
     A class that provides utility functions for data manipulation.
     """
-
+    
+    @logger_decorator(logger)
     def get_masked_dataframe(start, stop, data, column='datetime'):
         """
         Returns the masked data within the specified time range.
@@ -113,6 +183,7 @@ class Data():
         masked_data = data[mask]
         return {name: masked_data.field(name).tolist() for name in masked_data.names}
 
+    @logger_decorator(logger)
     def filter_dataframe_with_run_times(initial_dataframe, run_times):
         """
         Returns the spacecraft dataframe filtered on runs times.
@@ -141,6 +212,7 @@ class Data():
         """
         return pd.DataFrame({name: data_to_df.field(name).tolist() for name in data_to_df.dtype.names})
 
+    @logger_decorator(logger)
     def merge_dfs(first_dataframe: pd.DataFrame, second_dataframe: pd.DataFrame, on_column='datetime') -> pd.DataFrame:
         """
         Merges two dataframes based on a common column.
@@ -155,6 +227,10 @@ class Data():
         """
         return pd.merge(first_dataframe, second_dataframe, on=on_column, how='outer')
 
+class File:
+    logger = Logger('File').get_logger()
+
+    @logger_decorator(logger)
     def write_df_on_file(df, filename=INPUTS_OUTPUTS_FILE_PATH):
         """
         Write the dataframe to a file.
@@ -166,6 +242,7 @@ class Data():
         df.to_csv(filename + '.csv', index=False)
         df.to_pickle(filename + '.pk')
 
+    @logger_decorator(logger)
     def read_df_from_file(filename=INPUTS_OUTPUTS_FILE_PATH):
         """
         Read the dataframe from a file.
@@ -180,3 +257,10 @@ class Data():
             return pd.read_pickle(filename + '.pk')
         else:
             return None
+
+    @logger_decorator(logger)
+    def write_on_file(data, filename):
+        with open(filename, 'w') as file:
+            for key, value in data.items():
+                file.write(f'{key}: {value}\n')
+
