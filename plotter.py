@@ -105,7 +105,7 @@ class Plotter:
                     axs[i].plot(x, self.df[column + '_smooth'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} smooth')
                 axs[i].legend(loc='upper right')
                 axs[i].grid()
-                axs[i].set_xlim(x[0], x[len(x) - 1])
+                # axs[i].set_xlim(x[0], x[len(x) - 1])
                 axs[i].tick_params(axis="x", labelrotation=30)
             for j in range(i + 1, len(axs)):
                 axs[j].axis('off')
@@ -114,7 +114,7 @@ class Plotter:
             axs.plot(x, self.df[column], marker = marker, lw = lw, label=column)
             axs.legend(loc='upper right')
             axs.grid()
-            axs.set_xlim(x[0], x[len(x) - 1])
+            # axs.set_xlim(x[0], x[len(x) - 1])
             axs.tick_params(axis="x", labelrotation=45)  # Set x-axis label rotation to 45 degrees
         if show:
             plt.show()

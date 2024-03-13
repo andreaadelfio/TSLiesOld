@@ -224,8 +224,8 @@ def create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER):
     logger.info(f'Processing {output_filename} - done')
 
 def do_work(binning):
-    INPUT_RUNS_FOLDER = '/media/andrea/DISK4T/ACD LAT Adelfio/'
-    OUTPUT_RUNS_FOLDER = 'data/LAT_ACD/output runs/'
+    INPUT_RUNS_FOLDER = '/media/andrea/DISK4T1/ACD LAT Adelfio/data/LAT_ACD/merged input runs/'
+    OUTPUT_RUNS_FOLDER = '/media/andrea/DISK4T1/ACD LAT Adelfio/data/LAT_ACD/output runs/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
@@ -236,14 +236,14 @@ def do_work(binning):
         create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER)
 
 def do_work_parallel(binning):
-    INPUT_RUNS_FOLDER = '/media/andrea/DISK4T/ACD LAT Adelfio/'
-    OUTPUT_RUNS_FOLDER = '/media/andrea/DISK4T/Outputs ACD/'
+    INPUT_RUNS_FOLDER = '/media/andrea/DISK4T1/ACD LAT Adelfio/data/LAT_ACD/merged input runs/'
+    OUTPUT_RUNS_FOLDER = '/media/andrea/DISK4T1/ACD LAT Adelfio/data/LAT_ACD/output runs/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
         if output_run != 'parallel':
 	        input_folder_list.remove(f'testOutputs_{output_run.split(".root")[0]}')
-    OUTPUT_RUNS_FOLDER = '/media/andrea/DISK4T/Outputs ACD/parallel/'
+    OUTPUT_RUNS_FOLDER = OUTPUT_RUNS_FOLDER + 'parallel/'
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(create_root, run, binning, f'{OUTPUT_RUNS_FOLDER}{run.split("_")[1]}.root', INPUT_RUNS_FOLDER + run) for run in input_folder_list]

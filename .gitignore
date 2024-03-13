@@ -3,9 +3,11 @@
 /gbm
 /DeepGRB
 /logs
+/m_check
 
 # Extensions
 *.pyc
+*.log
 
 # Files
 sc_meta.txt
