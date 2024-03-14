@@ -10,7 +10,7 @@ from catalogreader import CatalogReader
 from plotter import Plotter
 from sunmonitor import SunMonitor
 from utils import Data, File
-from config import SOLAR_FILE_PATH, TILE_SIGNAL_FILE_PATH, SC_FILE_PATH, INPUTS_OUTPUTS_FILE_PATH
+from config import SOLAR_FILE_PATH, TILE_SIGNAL_FILE_PATH, SC_FILE_PATH, INPUTS_OUTPUTS_FILE_PATH, MODEL_NN_FOLDER_NAME
 from nn import NN
 
 ########### Main ############
@@ -49,7 +49,8 @@ if __name__ == '__main__':
         sc_params_df = File.read_df_from_file(SC_FILE_PATH)
         if sc_params_df is None:
             sco = SpacecraftOpener()
-            sco.open(excluded_columns = ['LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'IN_SAA', 'STOP', 'LIVETIME'])
+            # sco.open(excluded_columns = ['LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'IN_SAA', 'STOP', 'LIVETIME'])
+            sco.open(excluded_columns = ['STOP'])
             sc_params_df = sco.get_dataframe()
             sc_params_df = Data.filter_dataframe_with_run_times(sc_params_df, runs_times)
             File.write_df_on_file(sc_params_df, SC_FILE_PATH)
@@ -67,7 +68,7 @@ if __name__ == '__main__':
         Plotter.show()
 
     ########### Plotting ############
-    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-05 09:35:00', stop='2023-12-05 11:35:00')
+    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-12 09:35:00', stop='2023-12-12 11:35:00')
     # File.write_df_on_file(inputs_outputs_df, './inputs_outputs_df')
     # print('Plotting...', end='')
     Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
@@ -75,18 +76,20 @@ if __name__ == '__main__':
     # print(' done')
 
     ############## NN ###############
-    # nn = NN(inputs_outputs_df)
-    # nn.train(loss_type='mae', units=2048, epochs=10, lr=0.0008, bs=2048, do=0.02)
-    # nn.predict()
-    
-    # df_ori = pd.read_pickle("./" + 'frg_' + '.pk')
-    # y_pred = pd.read_pickle("./" + 'bkg_' + '.pk')
-
-    # # Plotter(df = df_ori, label = 'df_ori').df_plot_tiles(x_col = 'timestamp', excluded_cols = ['START', 'met'], marker = ',', show = False, with_smooth = True)
-    # # Plotter(df = y_pred, label = 'y_pred').df_plot_tiles(x_col = 'timestamp', excluded_cols = ['START', 'met'], marker = ',', show = False, with_smooth = True)
-    # nn.plot(det_rng='top')
-    # nn.plot(det_rng='Xpos')
-    # nn.plot(det_rng='Xneg')
-    # nn.plot(det_rng='Ypos')
-    # nn.plot(det_rng='Yneg')
-    # Plotter.show()
+    nn = NN(inputs_outputs_df)
+    nn.train(loss_type='mae', units=30, epochs=50, lr=0.0008, bs=1000, do=0.02)
+    nn.predict()
+    print(inputs_outputs_df.dtypes)
+    df_ori = pd.read_pickle(MODEL_NN_FOLDER_NAME + '/frg' + '.pk')
+    y_pred = pd.read_pickle(MODEL_NN_FOLDER_NAME + '/bkg' + '.pk')
+    y_pred['datetime'] = y_pred['timestamp']
+    cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+    y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in cols})
+    inputs_outputs_df = Data.merge_dfs(inputs_outputs_df[[col for col in inputs_outputs_df.columns if '_smooth' not in col]], y_pred[['top_smooth','Xpos_smooth','Xneg_smooth','Ypos_smooth','Yneg_smooth', 'datetime']])
+    Plotter(df = inputs_outputs_df, label = 'inputs_outputs_df').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
+    # nn.plot(df_ori, y_pred, det_rng='top')
+    nn.plot(df_ori, y_pred, det_rng='Xpos')
+    # nn.plot(df_ori, y_pred, det_rng='Xneg')
+    # nn.plot(df_ori, y_pred, det_rng='Ypos')
+    # nn.plot(df_ori, y_pred, det_rng='Yneg')
+    Plotter.show()

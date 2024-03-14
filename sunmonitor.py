@@ -5,7 +5,7 @@ from sunpy.net import attrs as a
 from plotter import Plotter
 import os
 from config import SOLAR_FOLDER_NAME
-from utils import Time, Logger, logger_decorator
+from utils import File, Time, Logger, logger_decorator
 
 
 class SunMonitor:
@@ -59,12 +59,16 @@ class SunMonitor:
             df_goes['datetime'] = Time.remove_milliseconds_from_datetime(df_goes['datetime'])
             dfs.append(df_goes)
         df_mean = pd.concat(dfs).groupby('datetime')['xrsb'].mean().reset_index()
-        df_mean.columns = ['datetime', 'solar']
+        df_mean.columns = ['datetime', 'SOLAR']
+        df_mean['SOLAR'] = df_mean['SOLAR'].astype('float64')
         return df_mean
 
 
 if __name__ == "__main__":
-    sm = SunMonitor(tstart = '2024-02-16 00:00:00', tend = '2024-02-28 00:00:00')
+    sm = SunMonitor(tstart = '2024-02-16 00:00:00', tend = '2024-02-17 00:00:00')
     file_goes = sm.fetch_goes_data()
     df = sm.find_goes_data(file_goes)
-    Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime', marker = ',')
+    Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime', excluded_cols=[], marker = ',')
+    File.write_df_on_file(df, SOLAR_FOLDER_NAME + '/solar_activity')
+    df = File.read_df_from_file(SOLAR_FOLDER_NAME + '/solar_activity')
+    print(df.dtypes)

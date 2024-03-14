@@ -6,7 +6,7 @@ import os
 USER = os.environ.get('USERNAME')
 
 DIR = os.path.dirname(os.path.realpath(__file__))
-# DIR = '/media/andrea/DISK4T/ACD LAT Adelfio/'
+# DIR = '/media/andrea/DISK4T1/ACD LAT Adelfio/'
 
 # Folders: parent (data), children (solar, spacecraft, LAT_ACD/output runs)
 DATA_FOLDER_NAME = os.path.join(DIR, 'data')

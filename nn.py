@@ -30,6 +30,7 @@ from config import MODEL_NN_SAVED_FILE_PATH, MODEL_NN_FOLDER_NAME
 from tensorflow.keras import backend as K
 import tensorflow.keras.losses as losses
 import tensorflow as tf
+from tensorflow import keras
 from tensorflow.python.ops import math_ops
 from tensorflow.python.framework import ops
 
@@ -66,15 +67,14 @@ def loss_max(y_true, y_predict):
 
 class NN:
     def __init__(self, df_data):
-        self.col_datetime = ['datetime']
         self.col_range = ['top','Xpos','Xneg','Ypos','Yneg']
-        self.col_sat_pos = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2','solar']
+        self.col_sat_pos = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','IN_SAA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','LAT_MODE','LAT_CONFIG','DATA_QUAL','LIVETIME','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2','SOLAR']
+        # self.col_sat_pos = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','IN_SAA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','LAT_MODE','LAT_CONFIG','DATA_QUAL','LIVETIME','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2']
 
         self.col_selected = self.col_sat_pos
         self.df_data = df_data
     
-    def train(self, loss_type='mean', units=4000, epochs=512, lr=0.001, bs=2000,
-              do=0.05):
+    def train(self, loss_type='mean', units=200, epochs=512, lr=0.001, bs=2000, do=0.05):
         # Load the data
         y = self.df_data[self.col_range].astype('float32')
         X = self.df_data[self.col_selected].astype('float32')
@@ -86,26 +86,26 @@ class NN:
         self.scaler = scaler
         X_train = scaler.transform(X_train)
         X_test = scaler.transform(X_test)
-
         # Num of inputs as columns of table
         inputs = tf.keras.Input(shape=(X_train.shape[1],))
 
         hidden = Dense(units, activation='relu')(inputs)
-        hidden = tf.keras.layers.BatchNormalization()(hidden)
-        hidden = Dropout(do)(hidden)
+        # hidden = tf.keras.layers.BatchNormalization()(hidden)
+        # hidden = Dropout(do)(hidden)
 
-        hidden = Dense(units, activation='relu')(hidden)
-        hidden = tf.keras.layers.BatchNormalization()(hidden)
-        hidden = Dropout(do)(hidden)
+        # hidden = Dense(units, activation='relu')(hidden)
+        # hidden = tf.keras.layers.BatchNormalization()(hidden)
+        # hidden = Dropout(do)(hidden)
 
-        hidden = Dense(int(units / 2), activation='relu')(hidden)
-        hidden = tf.keras.layers.BatchNormalization()(hidden)
-        hidden = Dropout(do)(hidden)
+        # hidden = Dense(int(units / 2), activation='relu')(hidden)
+        # hidden = tf.keras.layers.BatchNormalization()(hidden)
+        # hidden = Dropout(do)(hidden)
         outputs = Dense(len(self.col_range), activation='relu')(hidden)
 
         nn_r = tf.keras.Model(inputs=[inputs], outputs=outputs)
         # Optimizer
-        opt = tf.keras.optimizers.Nadam(learning_rate=lr, beta_1=0.9, beta_2=0.99, epsilon=1e-07)
+        opt = tf.keras.optimizers.Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
+        # opt = tf.keras.optimizers.Nadam(learning_rate=lr, beta_1=0.9, beta_2=0.99, epsilon=1e-07)
         # opt = tf.keras.optimizers.RMSprop( learning_rate=0.002, rho=0.6, momentum=0.0, epsilon=1e-07)
 
         if loss_type == 'max':
@@ -142,7 +142,7 @@ class NN:
                                 verbose=0, save_best_only=True)
         
         history = nn_r.fit(X_train, y_train, epochs=epochs, batch_size=bs,
-                            validation_split=0.3, callbacks=[es, mc, call_lr])
+                            validation_split=0.3, callbacks=[es, mc])#, call_lr])
         nn_r = load_model(MODEL_NN_SAVED_FILE_PATH)
         
         # Insert loss result in model name
@@ -180,12 +180,12 @@ class NN:
         plt.plot(history.history['val_loss'][4:], label='test')
         plt.legend()
 
-        nn_r.save(MODEL_NN_FOLDER_NAME + n/ame_model + '.keras')
+        nn_r.save(MODEL_NN_FOLDER_NAME + name_model + '.keras')
         self.nn_r = nn_r
         # Save figure of performance
-        plt.savefig(MODEL_NN_FOLDER_NAME + n/ame_model + '.png')
+        plt.savefig(MODEL_NN_FOLDER_NAME + name_model + '.png')
         # open text file and write mae performance
-        text_file = open(MODEL_NN_FOLDER_NAME + n/ame_model + '.txt', "w")
+        text_file = open(MODEL_NN_FOLDER_NAME + name_model + '.txt', "w")
         text_file.write(text_mae)
         text_file.close()
 
@@ -212,11 +212,10 @@ class NN:
         File.write_df_on_file(df_ori, MODEL_NN_FOLDER_NAME + '/frg')
         File.write_df_on_file(y_pred, MODEL_NN_FOLDER_NAME + '/bkg')
 
-    def plot(self, det_rng='top'):
+    def plot(self, df_ori, y_pred, det_rng='top'):
         # Plot a particular zone and det_rng
-        df_ori = pd.read_csv(MODEL_NN_FOLDER_NAME + '/frg' + '.csv')
-        y_pred = pd.read_csv(MODEL_NN_FOLDER_NAME + '/bkg' + '.csv')
-
+        # df_ori = pd.read_csv(MODEL_NN_FOLDER_NAME + '/frg' + '.csv')
+        # y_pred = pd.read_csv(MODEL_NN_FOLDER_NAME + '/bkg' + '.csv')
         # Plot frg, bkg and residual for det_rng
         with sns.plotting_context("talk"):
             fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12))  # , tight_layout=True)
@@ -234,8 +233,8 @@ class NN:
 
             axs[1].plot(pd.to_datetime(df_ori['timestamp']),
                         df_ori[det_rng] - y_pred[det_rng], 'k-.')
-            axs[1].plot(pd.to_datetime(df_ori['timestamp']).fillna(method='ffill'),
-                        df_ori['met'].fillna(0) * 0, 'k-')
+            axs[1].plot(pd.to_datetime(df_ori['timestamp']).ffill(),
+                        df_ori['met'].ffill() * 0, 'k-')
             axs[1].set_xlabel('time (YYYY-MM-DD hh:mm:ss)')
             # xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
             # axs[1].xaxis.set_major_formatter(xfmt)
@@ -246,10 +245,10 @@ class NN:
         with sns.plotting_context("talk"):
             fig = plt.figure()
             fig.set_size_inches(24, 12)
+            plt.axis('equal')
             plt.plot(df_ori[self.col_range], y_pred[self.col_range], '.', alpha=0.2)
-            plt.plot([0, 600], [0, 600], '-')
-            plt.xlim([0, 600])
-            plt.ylim([0, 600])
+            min_y, max_y = min(y_pred[self.col_range].min()), max(y_pred[self.col_range].max())
+            plt.plot([min_y, max_y], [min_y, max_y], '-')
             plt.xlabel('True signal')
             plt.ylabel('Predicted signal')
         plt.legend(self.col_range)
