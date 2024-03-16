@@ -12,11 +12,8 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_FOLDER_NAME = os.path.join(DIR, 'data')
 SOLAR_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'solar')
 SC_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'spacecraft')
-DATA_LATACD_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/output runs')
+DATA_LATACD_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/merged output runs')
 MODEL_NN_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'model_nn')
-
-SC_LAT_FILENAME = 'lat_spacecraft_merged.fits'
-SC_LAT_FILE_PATH = os.path.join(SC_FOLDER_NAME, SC_LAT_FILENAME)
 
 SC_LAT_WEEKLY_FILENAME = 'lat_weekly_spacecraft_merged.fits'
 SC_LAT_WEEKLY_FILE_PATH = os.path.join(SC_FOLDER_NAME, SC_LAT_WEEKLY_FILENAME)
@@ -58,4 +55,3 @@ LOGGING_FILE_REL_PATH = os.path.join(LOGGING_FOLDER_NAME, LOGGING_FILE_NAME)
 LOGGING_FILE_PATH = os.path.join(os.getcwd(), LOGGING_FILE_REL_PATH)
 
 MODEL_NN_SAVED_FILE_NAME = 'saved_model.keras'
-MODEL_NN_SAVED_FILE_PATH = os.path.join(MODEL_NN_FOLDER_NAME, MODEL_NN_SAVED_FILE_NAME)

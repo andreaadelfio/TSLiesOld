@@ -21,7 +21,7 @@ if __name__ == '__main__':
         print('BAT Catalog...', end='')
         tile_signal_df = File.read_df_from_file(TILE_SIGNAL_FILE_PATH)
         if tile_signal_df is None:
-            cr = CatalogReader(start = 0, end = 100)
+            cr = CatalogReader(start = 0, end = 400)
             tile_signal_df = cr.get_signal_df_from_catalog()
             tile_signal_df = cr.add_smoothing(tile_signal_df)
             File.write_df_on_file(tile_signal_df, TILE_SIGNAL_FILE_PATH)
@@ -58,38 +58,41 @@ if __name__ == '__main__':
         print(' done')
         ############# MERGE #############
         print('MERGE...', end='')
-        inputs_df = Data.merge_dfs(sc_params_df, solar_signal_df)
-        inputs_outputs_df = Data.merge_dfs(tile_signal_df, inputs_df)
+        tile_signal_df = Data.merge_dfs(tile_signal_df, solar_signal_df)
+        inputs_outputs_df = Data.merge_dfs(tile_signal_df, sc_params_df)
         File.write_df_on_file(inputs_outputs_df)
 
         print(' done')
         Plotter(df = tile_signal_df, label = 'Tiles signals').df_plot_tiles(x_col = 'datetime', excluded_cols = ['MET'], marker = ',', show = False, with_smooth = True)
-        Plotter(df = inputs_df, label = 'Inputs (SC + solar activity)').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START'], marker = ',', show = False)
+        Plotter(df = sc_params_df, label = 'Inputs (SC + solar activity)').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START'], marker = ',', show = False)
         Plotter.show()
 
     ########### Plotting ############
-    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-12 09:35:00', stop='2023-12-12 11:35:00')
+    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-05 18:10:00', stop='2023-12-10 18:40:00')
     # File.write_df_on_file(inputs_outputs_df, './inputs_outputs_df')
     # print('Plotting...', end='')
-    Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
-    Plotter.show()
+    # Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
+    # Plotter.show()
     # print(' done')
 
     ############## NN ###############
     nn = NN(inputs_outputs_df)
-    nn.train(loss_type='mae', units=30, epochs=50, lr=0.0008, bs=1000, do=0.02)
-    nn.predict()
-    print(inputs_outputs_df.dtypes)
-    df_ori = pd.read_pickle(MODEL_NN_FOLDER_NAME + '/frg' + '.pk')
-    y_pred = pd.read_pickle(MODEL_NN_FOLDER_NAME + '/bkg' + '.pk')
-    y_pred['datetime'] = y_pred['timestamp']
-    cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
-    y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in cols})
-    inputs_outputs_df = Data.merge_dfs(inputs_outputs_df[[col for col in inputs_outputs_df.columns if '_smooth' not in col]], y_pred[['top_smooth','Xpos_smooth','Xneg_smooth','Ypos_smooth','Yneg_smooth', 'datetime']])
-    Plotter(df = inputs_outputs_df, label = 'inputs_outputs_df').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
-    # nn.plot(df_ori, y_pred, det_rng='top')
-    nn.plot(df_ori, y_pred, det_rng='Xpos')
-    # nn.plot(df_ori, y_pred, det_rng='Xneg')
-    # nn.plot(df_ori, y_pred, det_rng='Ypos')
-    # nn.plot(df_ori, y_pred, det_rng='Yneg')
-    Plotter.show()
+    for units in [40]:
+        for bs in [1000]:
+            for do in [0.02]:
+                for opt_name in ['Adam']:
+                    # nn.train(loss_type='mae', units=units, epochs=500, lr=0.0008, bs=bs, do=do, opt_name=opt_name)
+                    # nn.predict()
+                    df_ori = pd.read_pickle(MODEL_NN_FOLDER_NAME + '/frg' + '.pk')
+                    y_pred = pd.read_pickle(MODEL_NN_FOLDER_NAME + '/bkg' + '.pk')
+                    y_pred['datetime'] = y_pred['timestamp']
+                    cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+                    y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in cols})
+                    inputs_outputs_df = Data.merge_dfs(inputs_outputs_df[[col for col in inputs_outputs_df.columns if '_smooth' not in col]], y_pred[['top_smooth','Xpos_smooth','Xneg_smooth','Ypos_smooth','Yneg_smooth', 'datetime']])
+                    Plotter(df = inputs_outputs_df, label = 'inputs_outputs_df').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in inputs_outputs_df.columns if col not in ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg', 'SOLAR', 'top_smooth','Xpos_smooth','Xneg_smooth','Ypos_smooth','Yneg_smooth']], marker = ',', show = False, with_smooth = True)
+                    # nn.plot(df_ori, y_pred, det_rng='top')
+                    nn.plot(df_ori, y_pred, det_rng='Xpos')
+                    # nn.plot(df_ori, y_pred, det_rng='Xneg')
+                    # nn.plot(df_ori, y_pred, det_rng='Ypos')
+                    # nn.plot(df_ori, y_pred, det_rng='Yneg')
+                    Plotter.show()

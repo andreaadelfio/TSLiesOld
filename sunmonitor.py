@@ -60,7 +60,6 @@ class SunMonitor:
             dfs.append(df_goes)
         df_mean = pd.concat(dfs).groupby('datetime')['xrsb'].mean().reset_index()
         df_mean.columns = ['datetime', 'SOLAR']
-        df_mean['SOLAR'] = df_mean['SOLAR'].astype('float64')
         return df_mean
 
 

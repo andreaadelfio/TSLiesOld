@@ -225,7 +225,7 @@ class Data():
         Returns:
             DataFrame: The merged dataframe.
         """
-        return pd.merge(first_dataframe, second_dataframe, on=on_column, how='outer')
+        return pd.merge(first_dataframe, second_dataframe, on=on_column, how='inner')
 
 class File:
     logger = Logger('File').get_logger()

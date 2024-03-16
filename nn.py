@@ -1,36 +1,25 @@
 
 from utils import File
-import tensorflow as tf
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-# import utils
-# Standard packages
 import matplotlib.pyplot as plt
-import matplotlib.dates as md
 import seaborn as sns
 import pandas as pd
 import gc
-from astropy.time import Time
 from datetime import date
 # Preprocess
-import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error as MAE, median_absolute_error as MeAE
 from sklearn.preprocessing import StandardScaler
 # Tensorflow, Keras
 import tensorflow as tf
-import keras_tuner as kt
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.models import load_model
 # Explainability
-import shap
-from config import MODEL_NN_SAVED_FILE_PATH, MODEL_NN_FOLDER_NAME
+from config import MODEL_NN_SAVED_FILE_NAME, MODEL_NN_FOLDER_NAME
 from tensorflow.keras import backend as K
 import tensorflow.keras.losses as losses
 import tensorflow as tf
-from tensorflow import keras
 from tensorflow.python.ops import math_ops
 from tensorflow.python.framework import ops
 
@@ -68,16 +57,14 @@ def loss_max(y_true, y_predict):
 class NN:
     def __init__(self, df_data):
         self.col_range = ['top','Xpos','Xneg','Ypos','Yneg']
-        self.col_sat_pos = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','IN_SAA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','LAT_MODE','LAT_CONFIG','DATA_QUAL','LIVETIME','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2','SOLAR']
-        # self.col_sat_pos = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','IN_SAA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','LAT_MODE','LAT_CONFIG','DATA_QUAL','LIVETIME','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2']
-
-        self.col_selected = self.col_sat_pos
+        self.col_selected = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','IN_SAA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','LAT_MODE','LAT_CONFIG','DATA_QUAL','LIVETIME','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2','SOLAR']
         self.df_data = df_data
     
-    def train(self, loss_type='mean', units=200, epochs=512, lr=0.001, bs=2000, do=0.05):
+    def train(self, opt_name='Adam', loss_type='mean', units=200, epochs=512, lr=0.001, bs=2000, do=0.05):
         # Load the data
         y = self.df_data[self.col_range].astype('float32')
         X = self.df_data[self.col_selected].astype('float32')
+
         # Splitting
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=0, shuffle=True)
         # Scale
@@ -88,25 +75,29 @@ class NN:
         X_test = scaler.transform(X_test)
         # Num of inputs as columns of table
         inputs = tf.keras.Input(shape=(X_train.shape[1],))
-
         hidden = Dense(units, activation='relu')(inputs)
-        # hidden = tf.keras.layers.BatchNormalization()(hidden)
-        # hidden = Dropout(do)(hidden)
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+        hidden = Dropout(do)(hidden)
 
-        # hidden = Dense(units, activation='relu')(hidden)
-        # hidden = tf.keras.layers.BatchNormalization()(hidden)
-        # hidden = Dropout(do)(hidden)
+        hidden = Dense(units, activation='relu')(hidden)
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+        hidden = Dropout(do)(hidden)
 
-        # hidden = Dense(int(units / 2), activation='relu')(hidden)
-        # hidden = tf.keras.layers.BatchNormalization()(hidden)
-        # hidden = Dropout(do)(hidden)
+        hidden = Dense(int(units / 2), activation='relu')(hidden)
+        hidden = tf.keras.layers.BatchNormalization()(hidden)
+        hidden = Dropout(do)(hidden)
         outputs = Dense(len(self.col_range), activation='relu')(hidden)
 
         nn_r = tf.keras.Model(inputs=[inputs], outputs=outputs)
         # Optimizer
-        opt = tf.keras.optimizers.Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
-        # opt = tf.keras.optimizers.Nadam(learning_rate=lr, beta_1=0.9, beta_2=0.99, epsilon=1e-07)
-        # opt = tf.keras.optimizers.RMSprop( learning_rate=0.002, rho=0.6, momentum=0.0, epsilon=1e-07)
+        if opt_name == 'Adam':
+            opt = tf.keras.optimizers.Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
+        elif opt_name == 'Nadam':
+            opt = tf.keras.optimizers.Nadam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
+        elif opt_name == 'RMSprop':
+            opt = tf.keras.optimizers.RMSprop(rho=0.6, momentum=0.0, epsilon=1e-07)
+        elif opt_name == 'SGD':
+            opt = tf.keras.optimizers.SGD()
 
         if loss_type == 'max':
             # Define Loss as max_i(det_ran_error)
@@ -138,18 +129,18 @@ class NN:
 
         # Fitting the model
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=32)
-        mc = ModelCheckpoint(MODEL_NN_SAVED_FILE_PATH, monitor='val_loss', mode='min',
+        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{units}_{opt_name}_{MODEL_NN_SAVED_FILE_NAME}', monitor='val_loss', mode='min',
                                 verbose=0, save_best_only=True)
         
         history = nn_r.fit(X_train, y_train, epochs=epochs, batch_size=bs,
                             validation_split=0.3, callbacks=[es, mc])#, call_lr])
-        nn_r = load_model(MODEL_NN_SAVED_FILE_PATH)
+        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{units}_{opt_name}_{MODEL_NN_SAVED_FILE_NAME}')
         
         # Insert loss result in model name
         loss_test = round(nn_r.evaluate(X_test, y_test), 2)
         # TODO set a proper name of the model
         today = date.today()
-        name_model = 'model_' + str(loss_test) + '_' + str(today)
+        name_model = f'model_{opt_name}_{loss_test}_units_{units}_{today}'
 
         # Predict the model
         pred_train = nn_r.predict(X_train)
@@ -176,8 +167,8 @@ class NN:
             idx = idx + 1
 
         # plot training history
-        plt.plot(history.history['loss'][4:], label='train')
-        plt.plot(history.history['val_loss'][4:], label='test')
+        plt.plot(history.history['loss'][4:], label=f'train {units} {opt_name}')
+        plt.plot(history.history['val_loss'][4:], label=f'test {units} {opt_name}')
         plt.legend()
 
         nn_r.save(MODEL_NN_FOLDER_NAME + name_model + '.keras')
@@ -228,7 +219,6 @@ class NN:
             axs[0].plot(pd.to_datetime(df_ori['timestamp']), y_pred[det_rng], 'r-')
 
             axs[0].set_title('foreground and background')
-            #axs[0].set_xlabel('time')
             axs[0].set_ylabel('Count Rate')
 
             axs[1].plot(pd.to_datetime(df_ori['timestamp']),
