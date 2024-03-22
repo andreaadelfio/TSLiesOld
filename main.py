@@ -6,13 +6,13 @@ TODO:
 """
 import matplotlib.pyplot as plt
 import pandas as pd
-from spacecraftopener import SpacecraftOpener
-from catalogreader import CatalogReader
-from plotter import Plotter
-from sunmonitor import SunMonitor
-from utils import Data, File
-from config import SOLAR_FILE_PATH, TILE_SIGNAL_FILE_PATH, SC_FILE_PATH, INPUTS_OUTPUTS_FILE_PATH, MODEL_NN_FOLDER_NAME
-from nn import NN
+from scripts.spacecraftopener import SpacecraftOpener
+from scripts.catalogreader import CatalogReader
+from scripts.plotter import Plotter
+from scripts.sunmonitor import SunMonitor
+from scripts.utils import Data, File
+from scripts.config import SOLAR_FILE_PATH, TILE_SIGNAL_FILE_PATH, SC_FILE_PATH, INPUTS_OUTPUTS_FILE_PATH, MODEL_NN_FOLDER_NAME
+from scripts.nn import NN
 # from nn import MedianKNeighborsRegressor
 #from sklearn.multioutput import MultiOutputRegressor
 #from sklearn.neighbors import KNeighborsRegressor
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         for bs in [1000]:
             for do in [0.02]:
                 for opt_name in ['Adam']:
-                    for lr in [0.0001]:
+                    for lr in [0.0001, 0.00001]:
                         nn.create_model(units=units, loss_type='mae', do=do, opt_name=opt_name, lr=lr)
                         nn.train(epochs=500, bs=bs)
                         nn.predict(start=12000, end=17000)
@@ -103,7 +103,7 @@ if __name__ == '__main__':
                         # nn.plot(df_ori, y_pred, det_rng='Xneg')
                         # nn.plot(df_ori, y_pred, det_rng='Ypos')
                         # nn.plot(df_ori, y_pred, det_rng='Yneg')
-                        Plotter.show()
+                        Plotter.save()
     
     
     # col_range = ['top','Xpos','Xneg','Ypos','Yneg']

@@ -142,3 +142,6 @@ class Plotter:
 
     def show():
         plt.show()
+
+    def save():
+        plt.savefig()

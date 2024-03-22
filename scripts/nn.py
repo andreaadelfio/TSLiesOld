@@ -1,5 +1,5 @@
 
-from utils import File
+from scripts.utils import File
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -17,7 +17,7 @@ from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler
 from tensorflow.keras.models import load_model
 # Explainability
-from config import MODEL_NN_SAVED_FILE_NAME, MODEL_NN_FOLDER_NAME
+from scripts.config import MODEL_NN_SAVED_FILE_NAME, MODEL_NN_FOLDER_NAME
 from tensorflow.keras import backend as K
 import tensorflow.keras.losses as losses
 from tensorflow.python.ops import math_ops

@@ -3,8 +3,8 @@ import ROOT
 import numpy as np
 import pandas as pd
 from scipy import fftpack
-from config import DATA_LATACD_FOLDER_PATH
-from utils import Time, Logger, logger_decorator
+from scripts.config import DATA_LATACD_FOLDER_PATH
+from scripts.utils import Time, Logger, logger_decorator
 
 class CatalogReader():
     """Class to read the catalog of runs and their properties"""

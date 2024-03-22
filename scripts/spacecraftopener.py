@@ -18,8 +18,9 @@ from astropy.io import fits
 from astropy.table import Table, vstack
 import pandas as pd
 import numpy as np
-from config import SC_FOLDER_NAME_FROM_LAT_WEEKLY, SC_LAT_WEEKLY_FILE_PATH, regenerate_lat_weekly
-from utils import Time, Data, Logger, logger_decorator
+from scripts.config import SC_LAT_WEEKLY_FILE_PATH, regenerate_lat_weekly
+from scripts.utils import Time, Data, Logger, logger_decorator
+
 
 class SpacecraftOpener:
     '''
@@ -48,7 +49,8 @@ class SpacecraftOpener:
         print(SC_FILE_PATHS_FROM_LAT)
         for SC_FILE_PATH_FROM_LAT in SC_FILE_PATHS_FROM_LAT:
             sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_LAT))
-        vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
+        vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(
+            SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
 
     @logger_decorator(logger)
     def download_lat_weekly(self, start, end):
@@ -60,14 +62,15 @@ class SpacecraftOpener:
         """
         # command = f'wget -m -P {SC_FOLDER_NAME_FROM_LAT_WEEKLY} -nH --cut-dirs=4 -np -e robots=off '
         url = 'https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/weekly/spacecraft/'
-        files_list = [url + f'lat_1sec_spacecraft_weekly_w{i}_p310_v001.fits' for i in range(start, end)]
+        files_list = [
+            url + f'lat_1sec_spacecraft_weekly_w{i}_p310_v001.fits' for i in range(start, end)]
         for file_url in files_list:
-            wget.download(file_url, out='.')#SC_FOLDER_NAME_FROM_LAT_WEEKLY)
+            wget.download(file_url, out='.')  # SC_FOLDER_NAME_FROM_LAT_WEEKLY)
         # command = command + ' '.join(files_list)
         # subprocess.run(command, shell=True, check=False)
 
     @logger_decorator(logger)
-    def open(self, sc_filename = SC_LAT_WEEKLY_FILE_PATH, excluded_columns = []):
+    def open(self, sc_filename=SC_LAT_WEEKLY_FILE_PATH, excluded_columns=None):
         """
         Opens the spacecraft data file and retrieves the necessary information.
 
@@ -79,20 +82,24 @@ class SpacecraftOpener:
         """
         with fits.open(sc_filename) as hdulist:
             self.raw_data = hdulist[1].data
-            self.data = self.init_data(excluded_columns = excluded_columns)
-    
+            self.data = self.init_data(excluded_columns=excluded_columns)
+
     @logger_decorator(logger)
-    def init_data(self, excluded_columns = []) -> np.ndarray:
+    def init_data(self, excluded_columns=None) -> np.ndarray:
         """
         Returns the spacecraft data.
 
         Returns:
             numpy.ndarray: The spacecraft data.
         """
-        cols_to_split = [name for name in self.raw_data.dtype.names if self.raw_data[name][0].size > 1]
+        cols_to_split = [
+            name for name in self.raw_data.dtype.names if self.raw_data[name][0].size > 1]
         arr_list = [Time.from_met_to_datetime(self.raw_data['START'])]
         names = ['datetime']
-        cols_to_add = [name for name in self.raw_data.dtype.names if name not in excluded_columns]
+        if excluded_columns is None:
+            excluded_columns = []
+        cols_to_add = [
+            name for name in self.raw_data.dtype.names if name not in excluded_columns]
         for name in cols_to_add:
             if name in cols_to_split:
                 for i in range(self.raw_data[name][0].size):
@@ -101,9 +108,9 @@ class SpacecraftOpener:
             else:
                 arr_list.append(self.raw_data[name])
                 names.append(name)
-        new_data = np.rec.fromarrays(arrayList = arr_list, names = names)
+        new_data = np.rec.fromarrays(arrayList=arr_list, names=names)
         return new_data
-    
+
     @logger_decorator(logger)
     def get_data(self) -> np.ndarray:
         """
@@ -118,13 +125,13 @@ class SpacecraftOpener:
     def get_dataframe(self) -> pd.DataFrame:
         """
         Returns the dataframe containing the spacecraft data.
-        
+
         Returns:
             pandas.DataFrame: The dataframe containing the spacecraft data.
         """
         return Data.convert_to_df(self.data)
 
-    
+
 if __name__ == '__main__':
     sc = SpacecraftOpener()
     # sc.download_lat_weekly(800, 802)

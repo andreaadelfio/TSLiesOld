@@ -1,11 +1,11 @@
+import os
 import pandas as pd
 from sunpy import timeseries as ts
 from sunpy.net import Fido
 from sunpy.net import attrs as a
-from plotter import Plotter
-import os
-from config import SOLAR_FOLDER_NAME
-from utils import File, Time, Logger, logger_decorator
+from scripts.plotter import Plotter
+from scripts.config import SOLAR_FOLDER_NAME
+from scripts.utils import File, Time, Logger, logger_decorator
 
 
 class SunMonitor:

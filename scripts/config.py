@@ -2,10 +2,11 @@
 Configuration file for ACNBkg.scripts
 '''
 import os
+import pathlib
 
 USER = os.environ.get('USERNAME')
 
-DIR = os.path.dirname(os.path.realpath(__file__))
+DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__))).parent
 # DIR = '/media/andrea/DISK4T1/ACD LAT Adelfio/'
 
 # Folders: parent (data), children (solar, spacecraft, LAT_ACD/output runs)

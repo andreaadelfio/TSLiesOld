@@ -5,7 +5,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 import pandas as pd
-from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
+from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
 
 
 class Logger():
@@ -75,7 +75,7 @@ class Time:
     fermi_ref_time = datetime(2001, 1, 1, 0, 0, 0)
 
 
-    def from_met_to_datetime(met_list) -> list:
+    def from_met_to_datetime(met_list: list) -> list:
         """
         Convert the MET to a datetime object.
 
@@ -87,7 +87,7 @@ class Time:
         """
         return [Time.fermi_ref_time + timedelta(seconds=int(met)) for met in met_list]
 
-    def from_met_to_datetime_str(met_list) -> list:
+    def from_met_to_datetime_str(met_list: list) -> list:
         """
         Convert the MET to a datetime object and return as string.
 
@@ -99,7 +99,7 @@ class Time:
         """
         return [str(Time.fermi_ref_time + timedelta(seconds=int(met))) for met in met_list]
 
-    def remove_milliseconds_from_datetime(datetime_list) -> list:
+    def remove_milliseconds_from_datetime(datetime_list: list) -> list:
         """
         Remove the milliseconds from the datetime object.
 
@@ -111,7 +111,7 @@ class Time:
         """
         return [dt.replace(microsecond=0) for dt in datetime_list]
 
-    def get_week_from_datetime(datetime_list) -> list:
+    def get_week_from_datetime(datetime_list: list) -> list:
         """
         Get the week number from the datetime object.
 
