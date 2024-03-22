@@ -17,7 +17,7 @@ from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler
 from tensorflow.keras.models import load_model
 # Explainability
-from scripts.config import MODEL_NN_SAVED_FILE_NAME, MODEL_NN_FOLDER_NAME
+from scripts.config import MODEL_NN_FOLDER_NAME
 from tensorflow.keras import backend as K
 import tensorflow.keras.losses as losses
 from tensorflow.python.ops import math_ops
@@ -59,22 +59,40 @@ class NN:
         self.col_range = col_range
         self.col_selected = col_selected
         self.df_data = df_data
+
         self.y = None
         self.X = None
         self.X_train = self.X_test = self.y_train = self.y_test = None
         self.scaler = None
         self.nn_r = None
-        self.opt_name = None
+
+        self.params = None
         self.units = None
+        self.bs = None
+        self.do = None
+        self.opt_name = None
         self.lr = None
+        self.loss_type = None
+        self.epochs = None
     
-    def create_model(self, units=200, loss_type='mean', do=0.05, opt_name='Adam', lr=0.001):
+    def set_hyperparams(self, params):
+        self.params = params
+        self.params_string = '_'.join([f'{k}_{v}' for k, v in self.params.items()])
+        self.units = params['units']
+        self.bs = params['bs']
+        self.do = params['do']
+        self.opt_name = params['opt_name']
+        self.lr = params['lr']
+        self.loss_type = params['loss_type']
+        self.epochs = params['epochs']
+        
+    def create_model(self):
         # Load the data
         self.y = self.df_data[self.col_range].astype('float32')
         self.X = self.df_data[self.col_selected].astype('float32')
-        self.units = units
-        self.lr = lr
-        self.do = do
+        self.units = self.units
+        self.lr = self.lr
+        self.do = self.do
         # Splitting
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=0, shuffle=True)
         # Scale
@@ -85,7 +103,7 @@ class NN:
         self.X_test = scaler.transform(self.X_test)
         # Num of inputs as columns of table
         inputs = Input(shape=(self.X_train.shape[1],))
-        hidden = Dense(units, activation='relu')(inputs)
+        hidden = Dense(self.units, activation='relu')(inputs)
         # hidden = BatchNormalization()(hidden)
         # hidden = Dropout(do)(hidden)
 
@@ -100,7 +118,6 @@ class NN:
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
 
-        self.opt_name = opt_name
         # Optimizer
         if self.opt_name == 'Adam':
             opt = Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
@@ -111,17 +128,17 @@ class NN:
         elif self.opt_name == 'SGD':
             opt = SGD()
 
-        if loss_type == 'max':
+        if self.loss_type == 'max':
             # Define Loss as max_i(det_ran_error)
             loss = loss_max
-        elif loss_type == 'median':
+        elif self.loss_type == 'median':
             # Define Loss as average of Median Absolute Error for each detector_range
             loss = loss_median
-        elif loss_type == 'mean' or loss_type == 'mae':
+        elif self.loss_type == 'mean' or self.loss_type == 'mae':
             # Define Loss as average of Mean Absolute Error for each detector_range
             loss = 'mae'
             # loss = keras.losses.MeanAbsoluteError()
-        elif loss_type == 'huber':
+        elif self.loss_type == 'huber':
             loss = keras.losses.Huber(delta=1)
         else:
             # Define Loss as average of Mean Squared Error for each detector_range
@@ -138,19 +155,19 @@ class NN:
             return self.lr/2
 
 
-    def train(self, epochs=512, bs=2000):
+    def train(self):
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=32)
-        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.units}_{self.opt_name}_{MODEL_NN_SAVED_FILE_NAME}', monitor='val_loss', mode='min',
+        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/keras_{self.params_string}.keras', monitor='val_loss', mode='min',
                                 verbose=0, save_best_only=True)
         
         if not self.lr:
-            history = self.nn_r.fit(self.X_train, self.y_train, epochs=epochs, batch_size=bs,
+            history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
                                 validation_split=0.3, callbacks=[es, mc])
         else:
             call_lr = LearningRateScheduler(self.scheduler)
-            history = self.nn_r.fit(self.X_train, self.y_train, epochs=epochs, batch_size=bs,
+            history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
                                 validation_split=0.3, callbacks=[es, mc, call_lr])
-        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.units}_{self.opt_name}_{MODEL_NN_SAVED_FILE_NAME}')
+        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/keras_{self.params_string}.keras')
         
         # Compute MAE per each detector and range
         pred_train = nn_r.predict(self.X_train)
@@ -178,14 +195,11 @@ class NN:
         plt.plot(history.history['loss'][4:], label=f'train {self.units} {self.opt_name}')
         plt.plot(history.history['val_loss'][4:], label=f'test {self.units} {self.opt_name}')
         plt.legend()
-
-        name_model = f'model_{self.opt_name}_do_{self.do}_{round(nn_r.evaluate(self.X_test, self.y_test), 2)}_units_{self.units}_{date.today()}'
-        nn_r.save(MODEL_NN_FOLDER_NAME + name_model + '.keras')
+        
+        nn_r.save(f'{MODEL_NN_FOLDER_NAME}/keras_{self.params_string}.keras')
         self.nn_r = nn_r
-        # Save figure of performance
-        plt.savefig(MODEL_NN_FOLDER_NAME + name_model + '.png')
         # open text file and write mae performance
-        text_file = open(MODEL_NN_FOLDER_NAME + name_model + '.txt', "w")
+        text_file = open(f'{MODEL_NN_FOLDER_NAME}/txt_{self.params_string}.txt', "w")
         text_file.write(text_mae)
         text_file.close()
 
@@ -204,9 +218,8 @@ class NN:
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
-
-        File.write_df_on_file(df_ori, MODEL_NN_FOLDER_NAME + '/frg')
-        File.write_df_on_file(y_pred, MODEL_NN_FOLDER_NAME + '/bkg')
+        File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/frg_{self.params_string}')
+        File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/bkg_{self.params_string}')
 
     def plot(self, df_ori, y_pred, det_rng='top'):
         with sns.plotting_context("talk"):

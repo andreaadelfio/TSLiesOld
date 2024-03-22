@@ -143,5 +143,14 @@ class Plotter:
     def show():
         plt.show()
 
-    def save():
-        plt.savefig()
+    def save(folder_name = '.', params = None):
+        if params:
+            params = '_'.join([f'{k}_{v}' for k, v in params.items()])
+            for i in plt.get_fignums():
+                plt.figure(i)
+                plt.savefig(f'{folder_name}/plot{i}_{params}.png')
+        else:
+            for i in plt.get_fignums():
+                plt.figure(i)
+                plt.savefig(f'{folder_name}/plot{i}.png')
+        plt.close('all')

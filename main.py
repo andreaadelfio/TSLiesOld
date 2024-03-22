@@ -72,7 +72,7 @@ if __name__ == '__main__':
         # Plotter.show()
 
     ########### Plotting ############
-    inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-05 18:10:00', stop='2023-12-25 18:40:00')
+    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-05 18:10:00', stop='2023-12-10 18:40:00')
     # File.write_df_on_file(inputs_outputs_df, './inputs_outputs_df')
     # print('Plotting...', end='')
     # Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
@@ -83,27 +83,32 @@ if __name__ == '__main__':
     col_range = ['top','Xpos','Xneg','Ypos','Yneg']
     col_selected = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2','SOLAR']
     nn = NN(inputs_outputs_df, col_range, col_selected)
-    for units in [40]:
-        for bs in [1000]:
-            for do in [0.02]:
-                for opt_name in ['Adam']:
-                    for lr in [0.0001, 0.00001]:
-                        nn.create_model(units=units, loss_type='mae', do=do, opt_name=opt_name, lr=lr)
-                        nn.train(epochs=500, bs=bs)
-                        nn.predict(start=12000, end=17000)
-                        df_ori = pd.read_pickle(MODEL_NN_FOLDER_NAME + '/frg' + '.pk')
-                        y_pred = pd.read_pickle(MODEL_NN_FOLDER_NAME + '/bkg' + '.pk')
-                        y_pred['datetime'] = y_pred['timestamp']
-                        cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
-                        y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in cols})
-                        inputs_outputs_df = Data.merge_dfs(inputs_outputs_df[[col for col in inputs_outputs_df.columns if '_smooth' not in col]], y_pred[['top_smooth','Xpos_smooth','Xneg_smooth','Ypos_smooth','Yneg_smooth', 'datetime']])
-                        Plotter(df = inputs_outputs_df, label = 'inputs_outputs_df').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in inputs_outputs_df.columns if col not in ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg', 'SOLAR', 'top_smooth','Xpos_smooth','Xneg_smooth','Ypos_smooth','Yneg_smooth']], marker = ',', show = False, with_smooth = True)
-                        # nn.plot(df_ori, y_pred, det_rng='top')
-                        nn.plot(df_ori, y_pred, det_rng='Xpos')
-                        # nn.plot(df_ori, y_pred, det_rng='Xneg')
-                        # nn.plot(df_ori, y_pred, det_rng='Ypos')
-                        # nn.plot(df_ori, y_pred, det_rng='Yneg')
-                        Plotter.save()
+    for units in [30, 40, 50]:
+        for epochs in [50]:
+            for bs in [1000]:
+                for do in [0.02]:
+                    for opt_name in ['Adam']:
+                        for lr in [0.0001, 0.00001]:
+                            for loss_type in ['mae', 'mse']:
+                                params = {'units': units, 'bs': bs, 'do': do, 'opt_name': opt_name, 'lr': lr, 'loss_type': loss_type, 'epochs': epochs}
+                                params_string = '_'.join([f'{k}_{v}' for k, v in params.items()])
+                                nn.set_params(params)
+                                nn.create_model()
+                                nn.train()
+                                nn.predict(start=12000, end=17000)
+                                df_ori = pd.read_pickle(MODEL_NN_FOLDER_NAME + f'/frg_{params_string}.pk')
+                                y_pred = pd.read_pickle(MODEL_NN_FOLDER_NAME + f'/bkg_{params_string}.pk')
+                                y_pred['datetime'] = y_pred['timestamp']
+                                cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+                                y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in cols})
+                                inputs_outputs_df = Data.merge_dfs(inputs_outputs_df[[col for col in inputs_outputs_df.columns if '_smooth' not in col]], y_pred[['top_smooth','Xpos_smooth','Xneg_smooth','Ypos_smooth','Yneg_smooth', 'datetime']])
+                                Plotter(df = inputs_outputs_df, label = 'inputs_outputs_df').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in inputs_outputs_df.columns if col not in ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg', 'SOLAR', 'top_smooth','Xpos_smooth','Xneg_smooth','Ypos_smooth','Yneg_smooth']], marker = ',', show = False, with_smooth = True)
+                                # nn.plot(df_ori, y_pred, det_rng='top')
+                                nn.plot(df_ori, y_pred, det_rng='Xpos')
+                                # nn.plot(df_ori, y_pred, det_rng='Xneg')
+                                # nn.plot(df_ori, y_pred, det_rng='Ypos')
+                                # nn.plot(df_ori, y_pred, det_rng='Yneg')
+                                Plotter.save(MODEL_NN_FOLDER_NAME, params)
     
     
     # col_range = ['top','Xpos','Xneg','Ypos','Yneg']
