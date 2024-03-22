@@ -67,7 +67,7 @@ class SpacecraftOpener:
         # subprocess.run(command, shell=True, check=False)
 
     @logger_decorator(logger)
-    def open(self, sc_filename = SC_LAT_WEEKLY_FILE_PATH, excluded_columns = [], from_gbm = False):
+    def open(self, sc_filename = SC_LAT_WEEKLY_FILE_PATH, excluded_columns = []):
         """
         Opens the spacecraft data file and retrieves the necessary information.
 
@@ -77,8 +77,6 @@ class SpacecraftOpener:
         Returns:
             None
         """
-        if from_gbm:
-            sc_filename = SC_GBM_FILE_PATH
         with fits.open(sc_filename) as hdulist:
             self.raw_data = hdulist[1].data
             self.data = self.init_data(excluded_columns = excluded_columns)

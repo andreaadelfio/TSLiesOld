@@ -5,24 +5,24 @@ import seaborn as sns
 import pandas as pd
 import gc
 from datetime import date
+import numpy as np
 # Preprocess
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error as MAE, median_absolute_error as MeAE
 from sklearn.preprocessing import StandardScaler
 # Tensorflow, Keras
-import tensorflow as tf
-from tensorflow.keras.layers import Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.optimizers import Adam, Nadam, RMSprop, SGD
+from tensorflow.keras import Input, Model
+from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler
 from tensorflow.keras.models import load_model
 # Explainability
 from config import MODEL_NN_SAVED_FILE_NAME, MODEL_NN_FOLDER_NAME
 from tensorflow.keras import backend as K
 import tensorflow.keras.losses as losses
-import tensorflow as tf
 from tensorflow.python.ops import math_ops
 from tensorflow.python.framework import ops
-
+from sklearn.neighbors import KNeighborsRegressor
 
 def loss_median(y_t, f):
     """
@@ -50,54 +50,66 @@ def loss_max(y_true, y_predict):
     """
     # Define Loss as max_i(det_ran_error)
     loss_mae_none = losses.MeanAbsoluteError(reduction=losses.Reduction.NONE)
-    a = tf.math.reduce_max(loss_mae_none(y_true, y_predict))  # axis=0
+    a = math.reduce_max(loss_mae_none(y_true, y_predict))  # axis=0
     return a
 
 
 class NN:
-    def __init__(self, df_data):
-        self.col_range = ['top','Xpos','Xneg','Ypos','Yneg']
-        self.col_selected = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','IN_SAA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','LAT_MODE','LAT_CONFIG','DATA_QUAL','LIVETIME','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2','SOLAR']
+    def __init__(self, df_data, col_range, col_selected):
+        self.col_range = col_range
+        self.col_selected = col_selected
         self.df_data = df_data
+        self.y = None
+        self.X = None
+        self.X_train = self.X_test = self.y_train = self.y_test = None
+        self.scaler = None
+        self.nn_r = None
+        self.opt_name = None
+        self.units = None
+        self.lr = None
     
-    def train(self, opt_name='Adam', loss_type='mean', units=200, epochs=512, lr=0.001, bs=2000, do=0.05):
+    def create_model(self, units=200, loss_type='mean', do=0.05, opt_name='Adam', lr=0.001):
         # Load the data
-        y = self.df_data[self.col_range].astype('float32')
-        X = self.df_data[self.col_selected].astype('float32')
-
+        self.y = self.df_data[self.col_range].astype('float32')
+        self.X = self.df_data[self.col_selected].astype('float32')
+        self.units = units
+        self.lr = lr
+        self.do = do
         # Splitting
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=0, shuffle=True)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=0, shuffle=True)
         # Scale
         scaler = StandardScaler()
-        scaler.fit(X_train)
+        scaler.fit(self.X_train)
         self.scaler = scaler
-        X_train = scaler.transform(X_train)
-        X_test = scaler.transform(X_test)
+        self.X_train = scaler.transform(self.X_train)
+        self.X_test = scaler.transform(self.X_test)
         # Num of inputs as columns of table
-        inputs = tf.keras.Input(shape=(X_train.shape[1],))
+        inputs = Input(shape=(self.X_train.shape[1],))
         hidden = Dense(units, activation='relu')(inputs)
-        hidden = tf.keras.layers.BatchNormalization()(hidden)
-        hidden = Dropout(do)(hidden)
+        # hidden = BatchNormalization()(hidden)
+        # hidden = Dropout(do)(hidden)
 
-        hidden = Dense(units, activation='relu')(hidden)
-        hidden = tf.keras.layers.BatchNormalization()(hidden)
-        hidden = Dropout(do)(hidden)
+        # hidden = Dense(units, activation='relu')(hidden)
+        # hidden = BatchNormalization()(hidden)
+        # hidden = Dropout(do)(hidden)
 
-        hidden = Dense(int(units / 2), activation='relu')(hidden)
-        hidden = tf.keras.layers.BatchNormalization()(hidden)
-        hidden = Dropout(do)(hidden)
+        # hidden = Dense(int(units / 2), activation='relu')(hidden)
+        # hidden = BatchNormalization()(hidden)
+        # hidden = Dropout(do)(hidden)
         outputs = Dense(len(self.col_range), activation='relu')(hidden)
 
-        nn_r = tf.keras.Model(inputs=[inputs], outputs=outputs)
+        self.nn_r = Model(inputs=[inputs], outputs=outputs)
+
+        self.opt_name = opt_name
         # Optimizer
-        if opt_name == 'Adam':
-            opt = tf.keras.optimizers.Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
-        elif opt_name == 'Nadam':
-            opt = tf.keras.optimizers.Nadam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
-        elif opt_name == 'RMSprop':
-            opt = tf.keras.optimizers.RMSprop(rho=0.6, momentum=0.0, epsilon=1e-07)
-        elif opt_name == 'SGD':
-            opt = tf.keras.optimizers.SGD()
+        if self.opt_name == 'Adam':
+            opt = Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
+        elif self.opt_name == 'Nadam':
+            opt = Nadam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
+        elif self.opt_name == 'RMSprop':
+            opt = RMSprop(rho=0.6, momentum=0.0, epsilon=1e-07)
+        elif self.opt_name == 'SGD':
+            opt = SGD()
 
         if loss_type == 'max':
             # Define Loss as max_i(det_ran_error)
@@ -108,69 +120,66 @@ class NN:
         elif loss_type == 'mean' or loss_type == 'mae':
             # Define Loss as average of Mean Absolute Error for each detector_range
             loss = 'mae'
-            # loss = tf.keras.losses.MeanAbsoluteError()
+            # loss = keras.losses.MeanAbsoluteError()
         elif loss_type == 'huber':
-            loss = tf.keras.losses.Huber(delta=1)
+            loss = keras.losses.Huber(delta=1)
         else:
             # Define Loss as average of Mean Squared Error for each detector_range
             loss = 'mse'
 
-        nn_r.compile(loss=loss, optimizer=opt)
+        self.nn_r.compile(loss=loss, optimizer=opt)
 
-        def scheduler(epoch, lr_actual):
-            if epoch < 4:
-                return lr*12.5
-            if 4 <= epoch < 12:
-                return lr*2
-            if 12 <= epoch:
-                return lr/2
+    def scheduler(self, epoch, lr_actual):
+        if epoch < 4:
+            return self.lr*12.5
+        if 4 <= epoch < 12:
+            return self.lr*2
+        if 12 <= epoch:
+            return self.lr/2
 
-        call_lr = tf.keras.callbacks.LearningRateScheduler(scheduler)
 
-        # Fitting the model
+    def train(self, epochs=512, bs=2000):
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=32)
-        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{units}_{opt_name}_{MODEL_NN_SAVED_FILE_NAME}', monitor='val_loss', mode='min',
+        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.units}_{self.opt_name}_{MODEL_NN_SAVED_FILE_NAME}', monitor='val_loss', mode='min',
                                 verbose=0, save_best_only=True)
         
-        history = nn_r.fit(X_train, y_train, epochs=epochs, batch_size=bs,
-                            validation_split=0.3, callbacks=[es, mc])#, call_lr])
-        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{units}_{opt_name}_{MODEL_NN_SAVED_FILE_NAME}')
+        if not self.lr:
+            history = self.nn_r.fit(self.X_train, self.y_train, epochs=epochs, batch_size=bs,
+                                validation_split=0.3, callbacks=[es, mc])
+        else:
+            call_lr = LearningRateScheduler(self.scheduler)
+            history = self.nn_r.fit(self.X_train, self.y_train, epochs=epochs, batch_size=bs,
+                                validation_split=0.3, callbacks=[es, mc, call_lr])
+        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.units}_{self.opt_name}_{MODEL_NN_SAVED_FILE_NAME}')
         
-        # Insert loss result in model name
-        loss_test = round(nn_r.evaluate(X_test, y_test), 2)
-        # TODO set a proper name of the model
-        today = date.today()
-        name_model = f'model_{opt_name}_{loss_test}_units_{units}_{today}'
-
-        # Predict the model
-        pred_train = nn_r.predict(X_train)
-        pred_test = nn_r.predict(X_test)
-
         # Compute MAE per each detector and range
+        pred_train = nn_r.predict(self.X_train)
+        pred_test = nn_r.predict(self.X_test)
         idx = 0
         text_mae = ""
-        for i in self.col_range:
-            mae_tr = MAE(y_train.iloc[:, idx], pred_train[:, idx])
-            mae_te = MAE(y_test.iloc[:, idx], pred_test[:, idx])
-            diff_i = (y_test.iloc[:, idx] - pred_test[:, idx]).mean()
-            meae_tr = MeAE(y_train.iloc[:, idx], pred_train[:, idx])
-            meae_te = MeAE(y_test.iloc[:, idx], pred_test[:, idx])
-            diff_i_m = (y_test.iloc[:, idx] - pred_test[:, idx]).median()
-            text_tr = "MAE train of " + i + " : %0.3f" % (mae_tr)
-            text_te = "MAE test of " + i + " : %0.3f" % (mae_te)
-            test_diff_i = "diff test - pred " + i + " : %0.3f" % (diff_i)
-            text_tr_m = "MeAE train of " + i + " : %0.3f" % (meae_tr)
-            text_te_m = "MeAE test of " + i + " : %0.3f" % (meae_te)
-            test_diff_i_m = "med diff test - pred " + i + " : %0.3f" % (diff_i_m)
+        for col in self.col_range:
+            mae_tr = MAE(self.y_train.iloc[:, idx], pred_train[:, idx])
+            mae_te = MAE(self.y_test.iloc[:, idx], pred_test[:, idx])
+            diff_i = (self.y_test.iloc[:, idx] - pred_test[:, idx]).mean()
+            meae_tr = MeAE(self.y_train.iloc[:, idx], pred_train[:, idx])
+            meae_te = MeAE(self.y_test.iloc[:, idx], pred_test[:, idx])
+            diff_i_m = (self.y_test.iloc[:, idx] - pred_test[:, idx]).median()
+            text_tr = "MAE train of " + col + " : %0.3f" % (mae_tr)
+            text_te = "MAE test of " + col + " : %0.3f" % (mae_te)
+            test_diff_i = "diff test - pred " + col + " : %0.3f" % (diff_i)
+            text_tr_m = "MeAE train of " + col + " : %0.3f" % (meae_tr)
+            text_te_m = "MeAE test of " + col + " : %0.3f" % (meae_te)
+            test_diff_i_m = "med diff test - pred " + col + " : %0.3f" % (diff_i_m)
             text_mae += text_tr + '    ' + text_te + '    ' + test_diff_i + '    ' + \
                         text_tr_m + '    ' + text_te_m + '    ' + test_diff_i_m + '\n'
             idx = idx + 1
 
         # plot training history
-        plt.plot(history.history['loss'][4:], label=f'train {units} {opt_name}')
-        plt.plot(history.history['val_loss'][4:], label=f'test {units} {opt_name}')
+        plt.plot(history.history['loss'][4:], label=f'train {self.units} {self.opt_name}')
+        plt.plot(history.history['val_loss'][4:], label=f'test {self.units} {self.opt_name}')
         plt.legend()
 
+        name_model = f'model_{self.opt_name}_do_{self.do}_{round(nn_r.evaluate(self.X_test, self.y_test), 2)}_units_{self.units}_{date.today()}'
         nn_r.save(MODEL_NN_FOLDER_NAME + name_model + '.keras')
         self.nn_r = nn_r
         # Save figure of performance
@@ -180,41 +189,31 @@ class NN:
         text_file.write(text_mae)
         text_file.close()
 
-    def predict(self):
-        pred_x_tot = self.nn_r.predict(self.scaler.transform(self.df_data[self.col_selected]))
-        ts = self.df_data['datetime']
+    def predict(self, start = 0, end = -1):
+        df_data = self.df_data[start:end]
+        pred_x_tot = self.nn_r.predict(self.scaler.transform(df_data[self.col_selected]))
+        ts = df_data['datetime']
         gc.collect()
 
-        # # # Generate a dataset for trigger algorithm
-        # Original bkg + ssa + met
-        df_ori = self.df_data[self.col_range].reset_index(drop=True)
-        # Prediction of the bkg
+        df_ori = df_data[self.col_range].reset_index(drop=True)
         y_pred = pd.DataFrame(pred_x_tot, columns=self.col_range)
-        df_ori['timestamp'] = ts
-        y_pred['timestamp'] = ts
-        df_ori['met'] = self.df_data['MET'].values
-        y_pred['met'] = self.df_data['MET'].values
-
+        df_ori['timestamp'] = ts.values
+        y_pred['timestamp'] = ts.values
+        df_ori['met'] = df_data['MET'].values
+        y_pred['met'] = df_data['MET'].values
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
 
-        # Save the data
         File.write_df_on_file(df_ori, MODEL_NN_FOLDER_NAME + '/frg')
         File.write_df_on_file(y_pred, MODEL_NN_FOLDER_NAME + '/bkg')
 
     def plot(self, df_ori, y_pred, det_rng='top'):
-        # Plot a particular zone and det_rng
-        # df_ori = pd.read_csv(MODEL_NN_FOLDER_NAME + '/frg' + '.csv')
-        # y_pred = pd.read_csv(MODEL_NN_FOLDER_NAME + '/bkg' + '.csv')
-        # Plot frg, bkg and residual for det_rng
         with sns.plotting_context("talk"):
             fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12))  # , tight_layout=True)
-            # Remove horizontal space between axes
             fig.subplots_adjust(hspace=0)
             fig.suptitle(det_rng + " " + str(pd.to_datetime(df_ori['timestamp']).iloc[0]))
 
-            # Plot each graph, and manually set the y tick values
             axs[0].plot(pd.to_datetime(df_ori['timestamp']), df_ori[det_rng], 'k-.')
             axs[0].plot(pd.to_datetime(df_ori['timestamp']), y_pred[det_rng], 'r-')
 
@@ -226,8 +225,6 @@ class NN:
             axs[1].plot(pd.to_datetime(df_ori['timestamp']).ffill(),
                         df_ori['met'].ffill() * 0, 'k-')
             axs[1].set_xlabel('time (YYYY-MM-DD hh:mm:ss)')
-            # xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
-            # axs[1].xaxis.set_major_formatter(xfmt)
             plt.xticks(rotation=0)
             axs[1].set_ylabel('Residuals')
 
@@ -242,3 +239,67 @@ class NN:
             plt.xlabel('True signal')
             plt.ylabel('Predicted signal')
         plt.legend(self.col_range)
+
+# from sklearn.neighbors import KNeighborsRegressor, check_array, _get_weights
+
+# class MedianKNNRegressor(KNeighborsRegressor):
+#     def predict(self, X):
+#         X = check_array(X, accept_sparse='csr')
+
+#         neigh_dist, neigh_ind = self.kneighbors(X)
+
+#         weights = _get_weights(neigh_dist, self.weights)
+
+#         _y = self._y
+#         if _y.ndim == 1:
+#             _y = _y.reshape((-1, 1))
+
+#         ######## Begin modification
+#         if weights is None:
+#             y_pred = np.median(_y[neigh_ind], axis=1)
+#         else:
+#             # y_pred = weighted_median(_y[neigh_ind], weights, axis=1)
+#             raise NotImplementedError("weighted median")
+#         ######### End modification
+
+#         if self._y.ndim == 1:
+#             y_pred = y_pred.ravel()
+
+#         return y_pred    
+
+class MedianKNeighborsRegressor(KNeighborsRegressor):
+    def predict(self, X):
+        """Predict the target for the provided data.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix} of shape (n_queries, n_features), \
+                or (n_queries, n_indexed) if metric == 'precomputed'
+            Test samples.
+
+        Returns
+        -------
+        y : ndarray of shape (n_queries,) or (n_queries, n_outputs), dtype=int
+            Target values.
+        """
+        if self.weights == "uniform":
+            # In that case, we do not need the distances to perform
+            # the weighting so we do not compute them.
+            neigh_ind = self.kneighbors(X, return_distance=False)
+            neigh_dist = None
+        else:
+            neigh_dist, neigh_ind = self.kneighbors(X)
+
+        weights = None
+
+        _y = self._y
+        if _y.ndim == 1:
+            _y = _y.reshape((-1, 1))
+
+        if weights is None:
+            y_pred = np.median(_y[neigh_ind], axis=1)
+
+        if self._y.ndim == 1:
+            y_pred = y_pred.ravel()
+
+        return y_pred

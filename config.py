@@ -12,7 +12,7 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_FOLDER_NAME = os.path.join(DIR, 'data')
 SOLAR_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'solar')
 SC_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'spacecraft')
-DATA_LATACD_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/merged output runs')
+DATA_LATACD_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/output runs')
 MODEL_NN_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'model_nn')
 
 SC_LAT_WEEKLY_FILENAME = 'lat_weekly_spacecraft_merged.fits'

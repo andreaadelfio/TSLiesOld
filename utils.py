@@ -231,7 +231,7 @@ class File:
     logger = Logger('File').get_logger()
 
     @logger_decorator(logger)
-    def write_df_on_file(df, filename=INPUTS_OUTPUTS_FILE_PATH):
+    def write_df_on_file(df, filename=INPUTS_OUTPUTS_FILE_PATH, format='pk'):
         """
         Write the dataframe to a file.
 
@@ -239,8 +239,13 @@ class File:
             df (DataFrame): The dataframe to write.
             filename (str, optional): The name of the file to write the dataframe to. Defaults to INPUTS_OUTPUTS_FILE_PATH.
         """
-        df.to_csv(filename + '.csv', index=False)
-        df.to_pickle(filename + '.pk')
+        if format == 'csv':
+            df.to_csv(filename + '.csv', index=False)
+        elif format == 'pk':
+            df.to_pickle(filename + '.pk')
+        elif format == 'both':
+            df.to_csv(filename + '.csv', index=False)
+            df.to_pickle(filename + '.pk')
 
     @logger_decorator(logger)
     def read_df_from_file(filename=INPUTS_OUTPUTS_FILE_PATH):
