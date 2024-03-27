@@ -1,4 +1,5 @@
 
+import os
 from scripts.utils import File
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -19,6 +20,7 @@ from tensorflow.keras.models import load_model
 # Explainability
 from scripts.config import MODEL_NN_FOLDER_NAME
 from tensorflow.keras import backend as K
+from tensorflow.keras.utils import plot_model
 import tensorflow.keras.losses as losses
 from tensorflow.python.ops import math_ops
 from tensorflow.python.framework import ops
@@ -67,32 +69,47 @@ class NN:
         self.nn_r = None
 
         self.params = None
-        self.units = None
+        self.units_1 = None
+        self.units_2 = None
+        self.units_3 = None
         self.bs = None
         self.do = None
         self.opt_name = None
         self.lr = None
         self.loss_type = None
         self.epochs = None
+        self.norm_1 = None
+        self.drop_1 = None
+        self.norm_2 = None
+        self.drop_2 = None
+        self.norm_3 = None
+        self.drop_3 = None
     
     def set_hyperparams(self, params):
         self.params = params
         self.params_string = '_'.join([f'{k}_{v}' for k, v in self.params.items()])
-        self.units = params['units']
+        if not os.path.exists(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}'):
+            os.makedirs(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}')
+        self.units_1 = params['units_1']
+        self.units_2 = params['units_2']
+        self.units_3 = params['units_3']
         self.bs = params['bs']
         self.do = params['do']
         self.opt_name = params['opt_name']
         self.lr = params['lr']
         self.loss_type = params['loss_type']
         self.epochs = params['epochs']
+        self.norm_1 = params['norm_1']
+        self.drop_1 = params['drop_1']
+        self.norm_2 = params['norm_2']
+        self.drop_2 = params['drop_2']
+        self.norm_3 = params['norm_3']
+        self.drop_3 = params['drop_3']
         
     def create_model(self):
         # Load the data
         self.y = self.df_data[self.col_range].astype('float32')
         self.X = self.df_data[self.col_selected].astype('float32')
-        self.units = self.units
-        self.lr = self.lr
-        self.do = self.do
         # Splitting
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=0, shuffle=True)
         # Scale
@@ -103,21 +120,33 @@ class NN:
         self.X_test = scaler.transform(self.X_test)
         # Num of inputs as columns of table
         inputs = Input(shape=(self.X_train.shape[1],))
-        hidden = Dense(self.units, activation='relu')(inputs)
-        # hidden = BatchNormalization()(hidden)
-        # hidden = Dropout(do)(hidden)
+        if self.units_1:
+            hidden = Dense(self.units_1, activation='relu')(inputs)
+            if self.norm_1:
+                hidden = BatchNormalization()(hidden)
+            if self.drop_1:
+                hidden = Dropout(self.do)(hidden)
+        else:
+            hidden = inputs
+        
 
-        # hidden = Dense(units, activation='relu')(hidden)
-        # hidden = BatchNormalization()(hidden)
-        # hidden = Dropout(do)(hidden)
+        if self.units_2:
+            hidden = Dense(self.units_2, activation='relu')(hidden)
+            if self.norm_2:
+                hidden = BatchNormalization()(hidden)
+            if self.drop_2:
+                hidden = Dropout(self.do)(hidden)
 
-        # hidden = Dense(int(units / 2), activation='relu')(hidden)
-        # hidden = BatchNormalization()(hidden)
-        # hidden = Dropout(do)(hidden)
+        if self.units_3:
+            hidden = Dense(self.units_3, activation='relu')(hidden)
+            if self.norm_3:
+                hidden = BatchNormalization()(hidden)
+            if self.drop_3:
+                hidden = Dropout(self.do)(hidden)
         outputs = Dense(len(self.col_range), activation='relu')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
-
+        plot_model(self.nn_r, to_file=f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/schema_{self.params_string}.png', show_shapes=True, show_layer_names=True, rankdir='LR')
         # Optimizer
         if self.opt_name == 'Adam':
             opt = Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
@@ -156,8 +185,8 @@ class NN:
 
 
     def train(self):
-        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=32)
-        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/keras_{self.params_string}.keras', monitor='val_loss', mode='min',
+        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=50)
+        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/keras_{self.params_string}.keras', monitor='val_loss', mode='min',
                                 verbose=0, save_best_only=True)
         
         if not self.lr:
@@ -167,7 +196,7 @@ class NN:
             call_lr = LearningRateScheduler(self.scheduler)
             history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
                                 validation_split=0.3, callbacks=[es, mc, call_lr])
-        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/keras_{self.params_string}.keras')
+        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/keras_{self.params_string}.keras')
         
         # Compute MAE per each detector and range
         pred_train = nn_r.predict(self.X_train)
@@ -181,27 +210,28 @@ class NN:
             meae_tr = MeAE(self.y_train.iloc[:, idx], pred_train[:, idx])
             meae_te = MeAE(self.y_test.iloc[:, idx], pred_test[:, idx])
             diff_i_m = (self.y_test.iloc[:, idx] - pred_test[:, idx]).median()
-            text_tr = "MAE train of " + col + " : %0.3f" % (mae_tr)
-            text_te = "MAE test of " + col + " : %0.3f" % (mae_te)
-            test_diff_i = "diff test - pred " + col + " : %0.3f" % (diff_i)
-            text_tr_m = "MeAE train of " + col + " : %0.3f" % (meae_tr)
-            text_te_m = "MeAE test of " + col + " : %0.3f" % (meae_te)
-            test_diff_i_m = "med diff test - pred " + col + " : %0.3f" % (diff_i_m)
+            text_tr = "MAE train of " + col + " : %0.5f" % (mae_tr)
+            text_te = "MAE test of " + col + " : %0.5f" % (mae_te)
+            test_diff_i = "diff test - pred " + col + " : %0.5f" % (diff_i)
+            text_tr_m = "MeAE train of " + col + " : %0.5f" % (meae_tr)
+            text_te_m = "MeAE test of " + col + " : %0.5f" % (meae_te)
+            test_diff_i_m = "med diff test - pred " + col + " : %0.5f" % (diff_i_m)
             text_mae += text_tr + '    ' + text_te + '    ' + test_diff_i + '    ' + \
                         text_tr_m + '    ' + text_te_m + '    ' + test_diff_i_m + '\n'
             idx = idx + 1
 
         # plot training history
-        plt.plot(history.history['loss'][4:], label=f'train {self.units} {self.opt_name}')
-        plt.plot(history.history['val_loss'][4:], label=f'test {self.units} {self.opt_name}')
+        plt.plot(history.history['loss'][4:], label=f'train {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
+        plt.plot(history.history['val_loss'][4:], label=f'test {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
         plt.legend()
         
-        nn_r.save(f'{MODEL_NN_FOLDER_NAME}/keras_{self.params_string}.keras')
+        nn_r.save(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/keras_{self.params_string}.keras')
         self.nn_r = nn_r
         # open text file and write mae performance
-        text_file = open(f'{MODEL_NN_FOLDER_NAME}/txt_{self.params_string}.txt', "w")
+        text_file = open(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/txt_{self.params_string}.txt', "w")
         text_file.write(text_mae)
         text_file.close()
+        return text_mae
 
     def predict(self, start = 0, end = -1):
         df_data = self.df_data[start:end]
@@ -218,8 +248,8 @@ class NN:
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
-        File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/frg_{self.params_string}')
-        File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/bkg_{self.params_string}')
+        File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/frg_{self.params_string}')
+        File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/bkg_{self.params_string}')
 
     def plot(self, df_ori, y_pred, det_rng='top'):
         with sns.plotting_context("talk"):

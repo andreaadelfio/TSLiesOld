@@ -148,7 +148,7 @@ class Plotter:
             params = '_'.join([f'{k}_{v}' for k, v in params.items()])
             for i in plt.get_fignums():
                 plt.figure(i)
-                plt.savefig(f'{folder_name}/plot{i}_{params}.png')
+                plt.savefig(f'{folder_name}/{params}/plot{i}_{params}.png')
         else:
             for i in plt.get_fignums():
                 plt.figure(i)
