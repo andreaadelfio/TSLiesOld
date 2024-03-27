@@ -67,6 +67,8 @@ class NN:
         self.X_train = self.X_test = self.y_train = self.y_test = None
         self.scaler = None
         self.nn_r = None
+        self.text = None
+        self.model_id = None
 
         self.params = None
         self.units_1 = None
@@ -85,11 +87,30 @@ class NN:
         self.norm_3 = None
         self.drop_3 = None
     
+    
+    def trim_hyperparams_combinations(self, hyperparams_combinations):
+        hyperparams_combinations_tmp = []
+        with open(MODEL_NN_FOLDER_NAME + '/models_params.txt', 'a') as f:
+            f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'epochs', 'bs', 'do', 'norm_1', 'drop_1', 'norm_2', 'drop_2', 'norm_3', 'drop_3', 'opt_name', 'lr', 'loss_type']) + '\n')
+            for model_id, (units_1, units_2, units_3, epochs, bs, do, norm_1, drop_1, norm_2, drop_2, norm_3, drop_3, opt_name, lr, loss_type) in enumerate(hyperparams_combinations):
+                if units_1 == 0 and units_2 == 0 and units_3 == 0:
+                    continue
+                if units_1 == 0 and (norm_1 == 1 or drop_1 == 1):
+                    continue
+                if units_2 == 0 and (norm_2 == 1 or drop_2 == 1):
+                    continue
+                if units_3 == 0 and (norm_3 == 1 or drop_3 == 1):
+                    continue
+                hyperparams_combinations_tmp.append((units_1, units_2, units_3, epochs, bs, do, norm_1, drop_1, norm_2, drop_2, norm_3, drop_3, opt_name, lr, loss_type))
+                f.write('\t'.join([str(model_id), str(units_1), str(units_2), str(units_3), str(epochs), str(bs), str(do), str(norm_1), str(drop_1), str(norm_2), str(drop_2), str(norm_3), str(drop_3), str(opt_name), str(lr), str(loss_type), '\n']))
+        return hyperparams_combinations_tmp
+    
     def set_hyperparams(self, params):
         self.params = params
         self.params_string = '_'.join([f'{k}_{v}' for k, v in self.params.items()])
-        if not os.path.exists(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}'):
-            os.makedirs(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}')
+        self.model_id = params['model_id']
+        if not os.path.exists(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}'):
+            os.makedirs(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}')
         self.units_1 = params['units_1']
         self.units_2 = params['units_2']
         self.units_3 = params['units_3']
@@ -146,7 +167,7 @@ class NN:
         outputs = Dense(len(self.col_range), activation='relu')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
-        plot_model(self.nn_r, to_file=f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/schema_{self.params_string}.png', show_shapes=True, show_layer_names=True, rankdir='LR')
+        plot_model(self.nn_r, to_file=f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/schema.png', show_shapes=True, show_layer_names=True, rankdir='LR')
         # Optimizer
         if self.opt_name == 'Adam':
             opt = Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
@@ -186,7 +207,7 @@ class NN:
 
     def train(self):
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=50)
-        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/keras_{self.params_string}.keras', monitor='val_loss', mode='min',
+        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras', monitor='val_loss', mode='min',
                                 verbose=0, save_best_only=True)
         
         if not self.lr:
@@ -196,28 +217,27 @@ class NN:
             call_lr = LearningRateScheduler(self.scheduler)
             history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
                                 validation_split=0.3, callbacks=[es, mc, call_lr])
-        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/keras_{self.params_string}.keras')
+        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
         
         # Compute MAE per each detector and range
         pred_train = nn_r.predict(self.X_train)
         pred_test = nn_r.predict(self.X_test)
         idx = 0
-        text_mae = ""
+        text = ''
         for col in self.col_range:
             mae_tr = MAE(self.y_train.iloc[:, idx], pred_train[:, idx])
             mae_te = MAE(self.y_test.iloc[:, idx], pred_test[:, idx])
-            diff_i = (self.y_test.iloc[:, idx] - pred_test[:, idx]).mean()
+            diff_i = (self.y_test.iloc[:, idx] - pred_test[:, idx])
+            mean_diff_i = (diff_i).mean()
             meae_tr = MeAE(self.y_train.iloc[:, idx], pred_train[:, idx])
             meae_te = MeAE(self.y_test.iloc[:, idx], pred_test[:, idx])
-            diff_i_m = (self.y_test.iloc[:, idx] - pred_test[:, idx]).median()
-            text_tr = "MAE train of " + col + " : %0.5f" % (mae_tr)
-            text_te = "MAE test of " + col + " : %0.5f" % (mae_te)
-            test_diff_i = "diff test - pred " + col + " : %0.5f" % (diff_i)
-            text_tr_m = "MeAE train of " + col + " : %0.5f" % (meae_tr)
-            text_te_m = "MeAE test of " + col + " : %0.5f" % (meae_te)
-            test_diff_i_m = "med diff test - pred " + col + " : %0.5f" % (diff_i_m)
-            text_mae += text_tr + '    ' + text_te + '    ' + test_diff_i + '    ' + \
-                        text_tr_m + '    ' + text_te_m + '    ' + test_diff_i_m + '\n'
+            median_diff_i = (diff_i).median()
+            text += f"MAE_train_{col} : {mae_tr:0.5f}\t" + \
+                    f"MAE_test_{col} : {mae_te:0.5f}\t" + \
+                    f"mean_diff_test_pred_{col} : {mean_diff_i:0.5f}" + \
+                    f"MeAE_train_{col} {meae_tr:0.5f}" + \
+                    f"MeAE_test_{col} {meae_te:0.5f}" + \
+                    f"median_diff_test_pred_{col} {median_diff_i:0.5f}\n"
             idx = idx + 1
 
         # plot training history
@@ -225,13 +245,16 @@ class NN:
         plt.plot(history.history['val_loss'][4:], label=f'test {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
         plt.legend()
         
-        nn_r.save(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/keras_{self.params_string}.keras')
+        nn_r.save(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
         self.nn_r = nn_r
+        # open text file and write params
+        with open(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/params.txt', "w") as params_file:
+            for key, value in self.params.items():
+                params_file.write(f'{key} : {value}\n')
         # open text file and write mae performance
-        text_file = open(f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/txt_{self.params_string}.txt', "w")
-        text_file.write(text_mae)
-        text_file.close()
-        return text_mae
+        with open(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/performance.txt', "w") as text_file:
+            text_file.write(text)
+        self.text = text
 
     def predict(self, start = 0, end = -1):
         df_data = self.df_data[start:end]
@@ -248,8 +271,8 @@ class NN:
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
-        File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/frg_{self.params_string}')
-        File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.params_string}/bkg_{self.params_string}')
+        File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/frg')
+        File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/bkg')
 
     def plot(self, df_ori, y_pred, det_rng='top'):
         with sns.plotting_context("talk"):
@@ -283,6 +306,10 @@ class NN:
             plt.ylabel('Predicted signal')
         plt.legend(self.col_range)
 
+    def update_summary(self):
+        with open(f'{MODEL_NN_FOLDER_NAME}/summary.txt', "a") as text_file:
+            text = f'{self.params}:\n{self.text}\n#########################\n\n'
+            text_file.write(text)
 # from sklearn.neighbors import KNeighborsRegressor, check_array, _get_weights
 
 # class MedianKNNRegressor(KNeighborsRegressor):
