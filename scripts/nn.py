@@ -72,42 +72,49 @@ class NN:
 
         self.params = None
         self.units_1 = None
+        self.norm_1 = None
+        self.drop_1 = None
         self.units_2 = None
+        self.norm_2 = None
+        self.drop_2 = None
         self.units_3 = None
+        self.norm_3 = None
+        self.drop_3 = None
         self.bs = None
         self.do = None
         self.opt_name = None
         self.lr = None
         self.loss_type = None
         self.epochs = None
-        self.norm_1 = None
-        self.drop_1 = None
-        self.norm_2 = None
-        self.drop_2 = None
-        self.norm_3 = None
-        self.drop_3 = None
     
     
     def trim_hyperparams_combinations(self, hyperparams_combinations):
         hyperparams_combinations_tmp = []
-        with open(MODEL_NN_FOLDER_NAME + '/models_params.txt', 'a') as f:
-            f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'epochs', 'bs', 'do', 'norm_1', 'drop_1', 'norm_2', 'drop_2', 'norm_3', 'drop_3', 'opt_name', 'lr', 'loss_type']) + '\n')
-            for model_id, (units_1, units_2, units_3, epochs, bs, do, norm_1, drop_1, norm_2, drop_2, norm_3, drop_3, opt_name, lr, loss_type) in enumerate(hyperparams_combinations):
+        if os.path.exists(MODEL_NN_FOLDER_NAME + '/models_params.csv'):
+            os.remove(MODEL_NN_FOLDER_NAME + '/models_params.csv')
+        if os.path.exists(MODEL_NN_FOLDER_NAME + '/summary.txt'):
+            os.remove(MODEL_NN_FOLDER_NAME + '/summary.txt')
+        with open(MODEL_NN_FOLDER_NAME + '/models_params.csv', 'a') as f:
+            f.write('\t'.join(['model_id', 'units_1', 'norm_1', 'drop_1', 'units_2', 'norm_2', 'drop_2', 'units_3', 'norm_3', 'drop_3', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type']) + '\n')
+            for model_id, (units_1, norm_1, drop_1, units_2, norm_2, drop_2, units_3, norm_3, drop_3, epochs, bs, do, opt_name, lr, loss_type) in enumerate(hyperparams_combinations):
                 if units_1 == 0 and units_2 == 0 and units_3 == 0:
+                    model_id -= 1
                     continue
                 if units_1 == 0 and (norm_1 == 1 or drop_1 == 1):
+                    model_id -= 1
                     continue
                 if units_2 == 0 and (norm_2 == 1 or drop_2 == 1):
+                    model_id -= 1
                     continue
                 if units_3 == 0 and (norm_3 == 1 or drop_3 == 1):
+                    model_id -= 1
                     continue
-                hyperparams_combinations_tmp.append((units_1, units_2, units_3, epochs, bs, do, norm_1, drop_1, norm_2, drop_2, norm_3, drop_3, opt_name, lr, loss_type))
-                f.write('\t'.join([str(model_id), str(units_1), str(units_2), str(units_3), str(epochs), str(bs), str(do), str(norm_1), str(drop_1), str(norm_2), str(drop_2), str(norm_3), str(drop_3), str(opt_name), str(lr), str(loss_type), '\n']))
+                hyperparams_combinations_tmp.append((model_id, units_1, norm_1, drop_1, units_2, norm_2, drop_2, units_3, norm_3, drop_3, epochs, bs, do, opt_name, lr, loss_type))
+                f.write('\t'.join([str(value) for value in hyperparams_combinations_tmp[-1]] + ['\n']))
         return hyperparams_combinations_tmp
     
     def set_hyperparams(self, params):
         self.params = params
-        self.params_string = '_'.join([f'{k}_{v}' for k, v in self.params.items()])
         self.model_id = params['model_id']
         if not os.path.exists(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}'):
             os.makedirs(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}')
@@ -241,6 +248,7 @@ class NN:
             idx = idx + 1
 
         # plot training history
+        plt.figure("history", layout="tight")
         plt.plot(history.history['loss'][4:], label=f'train {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
         plt.plot(history.history['val_loss'][4:], label=f'test {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
         plt.legend()
@@ -259,44 +267,40 @@ class NN:
     def predict(self, start = 0, end = -1):
         df_data = self.df_data[start:end]
         pred_x_tot = self.nn_r.predict(self.scaler.transform(df_data[self.col_selected]))
-        ts = df_data['datetime']
         gc.collect()
 
         df_ori = df_data[self.col_range].reset_index(drop=True)
         y_pred = pd.DataFrame(pred_x_tot, columns=self.col_range)
-        df_ori['timestamp'] = ts.values
-        y_pred['timestamp'] = ts.values
-        df_ori['met'] = df_data['MET'].values
-        y_pred['met'] = df_data['MET'].values
+        df_ori['datetime'] = df_data['datetime'].values
+        y_pred['datetime'] = df_data['datetime'].values
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
         File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/frg')
         File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/bkg')
+        return df_ori, y_pred
 
     def plot(self, df_ori, y_pred, det_rng='top'):
         with sns.plotting_context("talk"):
-            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12))  # , tight_layout=True)
+            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12), num=det_rng, tight_layout=True)
             fig.subplots_adjust(hspace=0)
-            fig.suptitle(det_rng + " " + str(pd.to_datetime(df_ori['timestamp']).iloc[0]))
+            # fig.suptitle(det_rng)
 
-            axs[0].plot(pd.to_datetime(df_ori['timestamp']), df_ori[det_rng], 'k-.')
-            axs[0].plot(pd.to_datetime(df_ori['timestamp']), y_pred[det_rng], 'r-')
+            axs[0].plot(pd.to_datetime(df_ori['datetime']), df_ori[det_rng], 'k-.')
+            axs[0].plot(pd.to_datetime(df_ori['datetime']), y_pred[det_rng], 'r-')
 
             axs[0].set_title('foreground and background')
             axs[0].set_ylabel('Count Rate')
 
-            axs[1].plot(pd.to_datetime(df_ori['timestamp']),
-                        df_ori[det_rng] - y_pred[det_rng], 'k-.')
-            axs[1].plot(pd.to_datetime(df_ori['timestamp']).ffill(),
-                        df_ori['met'].ffill() * 0, 'k-')
+            axs[1].plot(pd.to_datetime(df_ori['datetime']), df_ori[det_rng] - y_pred[det_rng], 'k-.')
+            axs[1].plot(pd.to_datetime(df_ori['datetime']).ffill(), [0 for _ in df_ori['datetime'].ffill()], 'k-')
             axs[1].set_xlabel('time (YYYY-MM-DD hh:mm:ss)')
             plt.xticks(rotation=0)
             axs[1].set_ylabel('Residuals')
 
         # Plot y_pred vs y_true
         with sns.plotting_context("talk"):
-            fig = plt.figure()
+            fig = plt.figure("pred_vs_true", layout="tight")
             fig.set_size_inches(24, 12)
             plt.axis('equal')
             plt.plot(df_ori[self.col_range], y_pred[self.col_range], '.', alpha=0.2)
@@ -306,9 +310,10 @@ class NN:
             plt.ylabel('Predicted signal')
         plt.legend(self.col_range)
 
+    
     def update_summary(self):
         with open(f'{MODEL_NN_FOLDER_NAME}/summary.txt', "a") as text_file:
-            text = f'{self.params}:\n{self.text}\n#########################\n\n'
+            text = f'#########################\n{self.params}\n\n{self.text}\n\n'
             text_file.write(text)
 # from sklearn.neighbors import KNeighborsRegressor, check_array, _get_weights
 

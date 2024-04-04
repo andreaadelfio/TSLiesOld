@@ -89,8 +89,8 @@ if __name__ == '__main__':
     col_selected = ['SC_POSITION_0', 'SC_POSITION_1', 'SC_POSITION_2', 'LAT_GEO', 'LON_GEO', 'RAD_GEO', 'RA_ZENITH', 'DEC_ZENITH', 'B_MCILWAIN', 'L_MCILWAIN', 'GEOMAG_LAT', 'LAMBDA', 'RA_SCZ',
                     'DEC_SCZ', 'RA_SCX', 'DEC_SCX', 'RA_NPOLE', 'DEC_NPOLE', 'ROCK_ANGLE', 'QSJ_1', 'QSJ_2', 'QSJ_3', 'QSJ_4', 'RA_SUN', 'DEC_SUN', 'SC_VELOCITY_0', 'SC_VELOCITY_1', 'SC_VELOCITY_2', 'SOLAR']
     nn = NN(inputs_outputs_df, col_range, col_selected)
-    units_1_values = [0, 50, 70, 90, 120]
-    units_2_values = [0, 30, 50, 70, 90, 120]
+    units_1_values = [0, 50, 90, 120]
+    units_2_values = [0, 50, 90, 120]
     units_3_values = [0, 10, 30, 50, 70, 90, 120]
     epochs_values = [150]
     bs_values = [1000]
@@ -104,39 +104,27 @@ if __name__ == '__main__':
     opt_name_values = ['Adam']
     lr_values = [0.00009]
     loss_type_values = ['mae', 'mse']
-    hyperparams_combinations = list(itertools.product(units_1_values, units_2_values, units_3_values, epochs_values, bs_values, do_values, norm_1_values, drop_1_values, norm_2_values, drop_2_values, norm_3_values, drop_3_values, opt_name_values, lr_values, loss_type_values))
+    hyperparams_combinations = list(itertools.product(units_1_values, norm_1_values, drop_1_values, units_2_values, norm_2_values, drop_2_values, units_3_values, norm_3_values, drop_3_values, epochs_values, bs_values, do_values, opt_name_values, lr_values, loss_type_values))
     hyperparams_combinations = nn.trim_hyperparams_combinations(hyperparams_combinations)
 
-    for model_id, (units_1, units_2, units_3, epochs, bs, do, norm_1, drop_1, norm_2, drop_2, norm_3, drop_3, opt_name, lr, loss_type) in enumerate(hyperparams_combinations):
-        params = {'model_id': model_id, 'units_1': units_1, 'units_2': units_2, 'units_3': units_3, 'epochs': epochs, 'bs': bs, 'do': do, 'opt_name': opt_name, 'lr': lr,
-                  'loss_type': loss_type, 'norm_1': norm_1, 'drop_1': drop_1, 'norm_2': norm_2, 'drop_2': drop_2, 'norm_3': norm_3, 'drop_3': drop_3}
-        params_string = '_'.join([f'{k}_{v}' for k, v in params.items()])
+    for model_id, units_1, norm_1, drop_1, units_2, norm_2, drop_2, units_3, norm_3, drop_3, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
+        params = {'model_id': model_id, 'units_1': units_1, 'norm_1': norm_1, 'drop_1': drop_1, 'units_2': units_2, 'norm_2': norm_2, 'drop_2': drop_2, 'units_3': units_3, 'norm_3': norm_3, 'drop_3': drop_3, 'epochs': epochs, 'bs': bs, 'do': do, 'opt_name': opt_name, 'lr': lr, 'loss_type': loss_type}
         nn.set_hyperparams(params)
         nn.create_model()
         nn.train()
         nn.update_summary()
-        nn.predict(start=50000, end=70000)
-        df_ori = pd.read_pickle(MODEL_NN_FOLDER_NAME +
-                                f'/{params_string}/frg_{params_string}.pk')
-        y_pred = pd.read_pickle(MODEL_NN_FOLDER_NAME +
-                                f'/{params_string}/bkg_{params_string}.pk')
-        y_pred['datetime'] = y_pred['timestamp']
-        cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
-        y_pred = y_pred.assign(
-            **{f"{col}_smooth": y_pred[col] for col in cols})
-        inputs_outputs_df = Data.merge_dfs(inputs_outputs_df[[col for col in inputs_outputs_df.columns if '_smooth' not in col]], y_pred[[
+        df_ori, y_pred = nn.predict(start=50000, end=70000)
+        y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in col_range})
+        inputs_outputs_df = Data.merge_dfs(df_ori[col_range + ['datetime']], y_pred[[
                                            'top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth', 'datetime']])
-        Plotter(df=inputs_outputs_df, label='inputs_outputs_df').df_plot_tiles(x_col='datetime', excluded_cols=[col for col in inputs_outputs_df.columns if col not in [
-            'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg', 'SOLAR', 'top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']], marker=',', show=False, with_smooth=True)
-        # nn.plot(df_ori, y_pred, det_rng='top')
+        Plotter(df=inputs_outputs_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',', show=False, with_smooth=True)
+        nn.plot(df_ori, y_pred, det_rng='top')
         nn.plot(df_ori, y_pred, det_rng='Xpos')
-        # nn.plot(df_ori, y_pred, det_rng='Xneg')
-        # nn.plot(df_ori, y_pred, det_rng='Ypos')
-        # nn.plot(df_ori, y_pred, det_rng='Yneg')
+        nn.plot(df_ori, y_pred, det_rng='Xneg')
+        nn.plot(df_ori, y_pred, det_rng='Ypos')
+        nn.plot(df_ori, y_pred, det_rng='Yneg')
         Plotter.save(MODEL_NN_FOLDER_NAME, params)
 
-    # col_range = ['top','Xpos','Xneg','Ypos','Yneg']
-    # col_selected = ['SC_POSITION_0','SC_POSITION_1','SC_POSITION_2','LAT_GEO','LON_GEO','RAD_GEO','RA_ZENITH','DEC_ZENITH','B_MCILWAIN','L_MCILWAIN','GEOMAG_LAT','LAMBDA','IN_SAA','RA_SCZ','DEC_SCZ','RA_SCX','DEC_SCX','RA_NPOLE','DEC_NPOLE','ROCK_ANGLE','LAT_MODE','LAT_CONFIG','DATA_QUAL','LIVETIME','QSJ_1','QSJ_2','QSJ_3','QSJ_4','RA_SUN','DEC_SUN','SC_VELOCITY_0','SC_VELOCITY_1','SC_VELOCITY_2','SOLAR']
     # y = inputs_outputs_df[col_range].astype('float32')
     # X = inputs_outputs_df[col_selected].astype('float32')
     # n_points = -1

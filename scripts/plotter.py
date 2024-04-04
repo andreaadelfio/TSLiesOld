@@ -79,7 +79,8 @@ class Plotter:
                 plt.plot(xy[0], xy[2], marker = marker, label = f'{label} smooth')
             plt.legend()
         plt.xlim(xy[0][0], xy[0][-1])
-        if show: plt.show()
+        if show:
+            plt.show()
 
     def df_plot_tiles(self, x_col, excluded_cols = None, marker = '-', lw = 0.1, with_smooth = False, show = True):
         """
@@ -89,6 +90,8 @@ class Plotter:
         - lw (float): Line width of the curves (default: 0.1).
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         """
+        if not excluded_cols:
+            excluded_cols = []
         df_columns = [column for column in self.df.columns if '_smooth' not in column and column not in excluded_cols and column != x_col]
         n_plots = len(df_columns)
         n_cols = int(np.ceil(np.sqrt(n_plots)))
@@ -105,7 +108,7 @@ class Plotter:
                     axs[i].plot(x, self.df[column + '_smooth'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} smooth')
                 axs[i].legend(loc='upper right')
                 axs[i].grid()
-                # axs[i].set_xlim(x[0], x[len(x) - 1])
+                axs[i].set_xlim(x[0], x[len(x) - 1])
                 axs[i].tick_params(axis="x", labelrotation=30)
             for j in range(i + 1, len(axs)):
                 axs[j].axis('off')
@@ -114,8 +117,8 @@ class Plotter:
             axs.plot(x, self.df[column], marker = marker, lw = lw, label=column)
             axs.legend(loc='upper right')
             axs.grid()
-            # axs.set_xlim(x[0], x[len(x) - 1])
-            axs.tick_params(axis="x", labelrotation=45)  # Set x-axis label rotation to 45 degrees
+            axs.set_xlim(x[0], x[len(x) - 1])
+            axs.tick_params(axis="x", labelrotation=45)
         if show:
             plt.show()
 
@@ -127,7 +130,7 @@ class Plotter:
         - lw (float): Line width of the curves (default: 0.1).
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         """
-        plt.figure()
+        plt.figure(self.label)
         plt.tight_layout(pad = 0.4)
         plt.title(self.label)
         x = self.df[x_col]
@@ -138,19 +141,15 @@ class Plotter:
                     plt.plot(x, self.df[column + '_smooth'], marker = marker, label = f'{column} smooth')
                 plt.legend()
         plt.xlim(x[0], x[len(x) - 1])
-        if show: plt.show()
+        if show:
+            plt.show()
 
-    def show():
+    def show(self):
         plt.show()
 
     def save(folder_name = '.', params = None):
-        if params:
-            params = '_'.join([f'{k}_{v}' for k, v in params.items()])
-            for i in plt.get_fignums():
-                plt.figure(i)
-                plt.savefig(f'{folder_name}/{params}/plot{i}_{params}.png')
-        else:
-            for i in plt.get_fignums():
-                plt.figure(i)
-                plt.savefig(f'{folder_name}/plot{i}.png')
+        folder_name = f'{folder_name}/{params["model_id"]}' if params else folder_name
+        for i in plt.get_fignums():
+            title = plt.figure(i, figsize=(20, 12)).get_label()
+            plt.savefig(f'{folder_name}/{title}.png')
         plt.close('all')
