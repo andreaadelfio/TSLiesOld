@@ -2,7 +2,6 @@
 import os
 from scripts.utils import File
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
 import gc
 from datetime import date
@@ -25,35 +24,37 @@ import tensorflow.keras.losses as losses
 from tensorflow.python.ops import math_ops
 from tensorflow.python.framework import ops
 from sklearn.neighbors import KNeighborsRegressor
-
-def loss_median(y_t, f):
-    """
-    Median Absolute Error. If q=0.5 the metric is Median Absolute Error.
-    :param y_t: target value
-    :param f: predicted value
-    :return: Median Absolute Error
-    """
-    q = 0.50
-    y_pred = ops.convert_to_tensor_v2_with_dispatch(f)
-    y_true = math_ops.cast(y_t, y_pred.dtype)
-    err = (y_true - y_pred)
-    # err = (math_ops.pow(y_true, 1.5) - math_ops.pow(y_pred, 1.5))
-    # return K.mean(K.maximum(q * err, (q - 1) * err), axis=-1)
-    return K.mean(math_ops.maximum(q * err, (q - 1) * err), axis=-1) # + \
-          # math_ops.sqrt(K.mean(math_ops.squared_difference(y_pred, y_true), axis=-1))
+from sklearn.multioutput import MultiOutputRegressor
 
 
-def loss_max(y_true, y_predict):
-    """
-    Take the maximum of the MAE detectors.
-    :param y_true: y target
-    :param y_predict: y predicted by the NN
-    :return: max_i(MAE_i)
-    """
-    # Define Loss as max_i(det_ran_error)
-    loss_mae_none = losses.MeanAbsoluteError(reduction=losses.Reduction.NONE)
-    a = math.reduce_max(loss_mae_none(y_true, y_predict))  # axis=0
-    return a
+# def loss_median(y_t, f):
+#     """
+#     Median Absolute Error. If q=0.5 the metric is Median Absolute Error.
+#     :param y_t: target value
+#     :param f: predicted value
+#     :return: Median Absolute Error
+#     """
+#     q = 0.50
+#     y_pred = ops.convert_to_tensor_v2_with_dispatch(f)
+#     y_true = math_ops.cast(y_t, y_pred.dtype)
+#     err = (y_true - y_pred)
+#     # err = (math_ops.pow(y_true, 1.5) - math_ops.pow(y_pred, 1.5))
+#     # return K.mean(K.maximum(q * err, (q - 1) * err), axis=-1)
+#     return K.mean(math_ops.maximum(q * err, (q - 1) * err), axis=-1) # + \
+#           # math_ops.sqrt(K.mean(math_ops.squared_difference(y_pred, y_true), axis=-1))
+
+
+# def loss_max(y_true, y_predict):
+#     """
+#     Take the maximum of the MAE detectors.
+#     :param y_true: y target
+#     :param y_predict: y predicted by the NN
+#     :return: max_i(MAE_i)
+#     """
+#     # Define Loss as max_i(det_ran_error)
+#     loss_mae_none = losses.MeanAbsoluteError(reduction=losses.Reduction.NONE)
+#     a = math.reduce_max(loss_mae_none(y_true, y_predict))  # axis=0
+#     return a
 
 
 class NN:
@@ -62,6 +63,8 @@ class NN:
         self.col_selected = col_selected
         self.df_data = df_data
 
+        if not os.path.exists(f'{MODEL_NN_FOLDER_NAME}'):
+            os.makedirs(f'{MODEL_NN_FOLDER_NAME}')
         self.y = None
         self.X = None
         self.X_train = self.X_test = self.y_train = self.y_test = None
@@ -71,48 +74,39 @@ class NN:
         self.model_id = None
 
         self.params = None
+        self.norm = None
+        self.drop = None
         self.units_1 = None
-        self.norm_1 = None
-        self.drop_1 = None
         self.units_2 = None
-        self.norm_2 = None
-        self.drop_2 = None
         self.units_3 = None
-        self.norm_3 = None
-        self.drop_3 = None
         self.bs = None
         self.do = None
         self.opt_name = None
         self.lr = None
         self.loss_type = None
         self.epochs = None
-    
-    
+        self.mae_tr_list = None
+
     def trim_hyperparams_combinations(self, hyperparams_combinations):
         hyperparams_combinations_tmp = []
+        seen = set()
         if os.path.exists(MODEL_NN_FOLDER_NAME + '/models_params.csv'):
             os.remove(MODEL_NN_FOLDER_NAME + '/models_params.csv')
-        if os.path.exists(MODEL_NN_FOLDER_NAME + '/summary.txt'):
-            os.remove(MODEL_NN_FOLDER_NAME + '/summary.txt')
         with open(MODEL_NN_FOLDER_NAME + '/models_params.csv', 'a') as f:
-            f.write('\t'.join(['model_id', 'units_1', 'norm_1', 'drop_1', 'units_2', 'norm_2', 'drop_2', 'units_3', 'norm_3', 'drop_3', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type']) + '\n')
-            for model_id, (units_1, norm_1, drop_1, units_2, norm_2, drop_2, units_3, norm_3, drop_3, epochs, bs, do, opt_name, lr, loss_type) in enumerate(hyperparams_combinations):
-                if units_1 == 0 and units_2 == 0 and units_3 == 0:
-                    model_id -= 1
-                    continue
-                if units_1 == 0 and (norm_1 == 1 or drop_1 == 1):
-                    model_id -= 1
-                    continue
-                if units_2 == 0 and (norm_2 == 1 or drop_2 == 1):
-                    model_id -= 1
-                    continue
-                if units_3 == 0 and (norm_3 == 1 or drop_3 == 1):
-                    model_id -= 1
-                    continue
-                hyperparams_combinations_tmp.append((model_id, units_1, norm_1, drop_1, units_2, norm_2, drop_2, units_3, norm_3, drop_3, epochs, bs, do, opt_name, lr, loss_type))
-                f.write('\t'.join([str(value) for value in hyperparams_combinations_tmp[-1]] + ['\n']))
+            f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'norm', 'drop', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
+        for model_id, (units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type) in enumerate(hyperparams_combinations):
+            # sorted_tuple = tuple(sorted([units_1, units_2, units_3]))
+            # if sorted_tuple not in seen and sorted_tuple[0:-1] == (0, 0) and sorted_tuple[-1] != 0:
+            #     seen.add(sorted_tuple)
+            # else:
+            #     model_id -= 1
+            #     continue
+            if units_1 == 0 and units_2 == 0 and units_3 == 0:
+                model_id -= 1
+                continue
+            hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
         return hyperparams_combinations_tmp
-    
+
     def set_hyperparams(self, params):
         self.params = params
         self.model_id = params['model_id']
@@ -127,13 +121,10 @@ class NN:
         self.lr = params['lr']
         self.loss_type = params['loss_type']
         self.epochs = params['epochs']
-        self.norm_1 = params['norm_1']
-        self.drop_1 = params['drop_1']
-        self.norm_2 = params['norm_2']
-        self.drop_2 = params['drop_2']
-        self.norm_3 = params['norm_3']
-        self.drop_3 = params['drop_3']
-        
+        self.norm = params['norm']
+        self.drop = params['drop']
+        self.mae_tr_list = []
+
     def create_model(self):
         # Load the data
         self.y = self.df_data[self.col_range].astype('float32')
@@ -150,28 +141,28 @@ class NN:
         inputs = Input(shape=(self.X_train.shape[1],))
         if self.units_1:
             hidden = Dense(self.units_1, activation='relu')(inputs)
-            if self.norm_1:
+            if self.norm:
                 hidden = BatchNormalization()(hidden)
-            if self.drop_1:
+            if self.drop:
                 hidden = Dropout(self.do)(hidden)
         else:
             hidden = inputs
-        
+
 
         if self.units_2:
             hidden = Dense(self.units_2, activation='relu')(hidden)
-            if self.norm_2:
+            if self.norm:
                 hidden = BatchNormalization()(hidden)
-            if self.drop_2:
+            if self.drop:
                 hidden = Dropout(self.do)(hidden)
 
         if self.units_3:
             hidden = Dense(self.units_3, activation='relu')(hidden)
-            if self.norm_3:
+            if self.norm:
                 hidden = BatchNormalization()(hidden)
-            if self.drop_3:
+            if self.drop:
                 hidden = Dropout(self.do)(hidden)
-        outputs = Dense(len(self.col_range), activation='relu')(hidden)
+        outputs = Dense(len(self.col_range), activation='linear')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
         plot_model(self.nn_r, to_file=f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/schema.png', show_shapes=True, show_layer_names=True, rankdir='LR')
@@ -213,10 +204,10 @@ class NN:
 
 
     def train(self):
-        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=50)
+        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=10, start_from_epoch=50)
         mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras', monitor='val_loss', mode='min',
                                 verbose=0, save_best_only=True)
-        
+
         if not self.lr:
             history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
                                 validation_split=0.3, callbacks=[es, mc])
@@ -225,7 +216,7 @@ class NN:
             history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
                                 validation_split=0.3, callbacks=[es, mc, call_lr])
         nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
-        
+
         # Compute MAE per each detector and range
         pred_train = nn_r.predict(self.X_train)
         pred_test = nn_r.predict(self.X_test)
@@ -233,6 +224,7 @@ class NN:
         text = ''
         for col in self.col_range:
             mae_tr = MAE(self.y_train.iloc[:, idx], pred_train[:, idx])
+            self.mae_tr_list.append(mae_tr)
             mae_te = MAE(self.y_test.iloc[:, idx], pred_test[:, idx])
             diff_i = (self.y_test.iloc[:, idx] - pred_test[:, idx])
             mean_diff_i = (diff_i).mean()
@@ -241,18 +233,22 @@ class NN:
             median_diff_i = (diff_i).median()
             text += f"MAE_train_{col} : {mae_tr:0.5f}\t" + \
                     f"MAE_test_{col} : {mae_te:0.5f}\t" + \
-                    f"mean_diff_test_pred_{col} : {mean_diff_i:0.5f}" + \
-                    f"MeAE_train_{col} {meae_tr:0.5f}" + \
-                    f"MeAE_test_{col} {meae_te:0.5f}" + \
+                    f"mean_diff_test_pred_{col} : {mean_diff_i:0.5f}\t" + \
+                    f"MeAE_train_{col} {meae_tr:0.5f}\t" + \
+                    f"MeAE_test_{col} {meae_te:0.5f}\t" + \
                     f"median_diff_test_pred_{col} {median_diff_i:0.5f}\n"
             idx = idx + 1
 
         # plot training history
-        plt.figure("history", layout="tight")
+        plt.figure("history_loss", layout="tight")
         plt.plot(history.history['loss'][4:], label=f'train {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
         plt.plot(history.history['val_loss'][4:], label=f'test {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
         plt.legend()
-        
+        plt.figure("history_accuracy", layout="tight")
+        plt.plot(history.history['accuracy'][4:], label=f'train {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
+        plt.plot(history.history['val_accuracy'][4:], label=f'test {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
+        plt.legend()
+
         nn_r.save(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
         self.nn_r = nn_r
         # open text file and write params
@@ -280,67 +276,11 @@ class NN:
         File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/bkg')
         return df_ori, y_pred
 
-    def plot(self, df_ori, y_pred, det_rng='top'):
-        with sns.plotting_context("talk"):
-            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12), num=det_rng, tight_layout=True)
-            fig.subplots_adjust(hspace=0)
-            # fig.suptitle(det_rng)
-
-            axs[0].plot(pd.to_datetime(df_ori['datetime']), df_ori[det_rng], 'k-.')
-            axs[0].plot(pd.to_datetime(df_ori['datetime']), y_pred[det_rng], 'r-')
-
-            axs[0].set_title('foreground and background')
-            axs[0].set_ylabel('Count Rate')
-
-            axs[1].plot(pd.to_datetime(df_ori['datetime']), df_ori[det_rng] - y_pred[det_rng], 'k-.')
-            axs[1].plot(pd.to_datetime(df_ori['datetime']).ffill(), [0 for _ in df_ori['datetime'].ffill()], 'k-')
-            axs[1].set_xlabel('time (YYYY-MM-DD hh:mm:ss)')
-            plt.xticks(rotation=0)
-            axs[1].set_ylabel('Residuals')
-
-        # Plot y_pred vs y_true
-        with sns.plotting_context("talk"):
-            fig = plt.figure("pred_vs_true", layout="tight")
-            fig.set_size_inches(24, 12)
-            plt.axis('equal')
-            plt.plot(df_ori[self.col_range], y_pred[self.col_range], '.', alpha=0.2)
-            min_y, max_y = min(y_pred[self.col_range].min()), max(y_pred[self.col_range].max())
-            plt.plot([min_y, max_y], [min_y, max_y], '-')
-            plt.xlabel('True signal')
-            plt.ylabel('Predicted signal')
-        plt.legend(self.col_range)
-
-    
     def update_summary(self):
-        with open(f'{MODEL_NN_FOLDER_NAME}/summary.txt', "a") as text_file:
-            text = f'#########################\n{self.params}\n\n{self.text}\n\n'
-            text_file.write(text)
-# from sklearn.neighbors import KNeighborsRegressor, check_array, _get_weights
+        with open(MODEL_NN_FOLDER_NAME + '/models_params.csv', 'a') as f:
+            list_tmp = list(self.params.values()) + self.mae_tr_list
+            f.write('\t'.join([str(value) for value in list_tmp] + ['\n']))
 
-# class MedianKNNRegressor(KNeighborsRegressor):
-#     def predict(self, X):
-#         X = check_array(X, accept_sparse='csr')
-
-#         neigh_dist, neigh_ind = self.kneighbors(X)
-
-#         weights = _get_weights(neigh_dist, self.weights)
-
-#         _y = self._y
-#         if _y.ndim == 1:
-#             _y = _y.reshape((-1, 1))
-
-#         ######## Begin modification
-#         if weights is None:
-#             y_pred = np.median(_y[neigh_ind], axis=1)
-#         else:
-#             # y_pred = weighted_median(_y[neigh_ind], weights, axis=1)
-#             raise NotImplementedError("weighted median")
-#         ######### End modification
-
-#         if self._y.ndim == 1:
-#             y_pred = y_pred.ravel()
-
-#         return y_pred    
 
 class MedianKNeighborsRegressor(KNeighborsRegressor):
     def predict(self, X):
@@ -378,3 +318,28 @@ class MedianKNeighborsRegressor(KNeighborsRegressor):
             y_pred = y_pred.ravel()
 
         return y_pred
+
+
+class MultiMedianKNeighborsRegressor():
+    def __init__(self, df_data, col_range, col_selected):
+        self.col_range = col_range
+        self.col_selected = col_selected
+        self.df_data = df_data
+
+        self.y = None
+        self.X = None
+        self.multi_reg = None
+
+    def create_model(self, n_neighbors=5):
+        self.y = self.df_data[self.col_range].astype('float32')
+        self.X = self.df_data[self.col_selected].astype('float32')
+        self.multi_reg = MultiOutputRegressor(MedianKNeighborsRegressor(n_neighbors=n_neighbors))
+
+    def train(self):
+        self.multi_reg.fit(self.X, self.y)
+
+    def predict(self, start = 0, end = -1):
+        df_data = self.df_data[start:end]
+        df_ori = df_data[self.col_range].reset_index(drop=True)
+        y_pred = self.multi_reg.predict(df_data[self.col_selected])
+        return df_ori, y_pred

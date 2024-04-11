@@ -12,10 +12,7 @@ from scripts.plotter import Plotter
 from scripts.sunmonitor import SunMonitor
 from scripts.utils import Data, File
 from scripts.config import SOLAR_FILE_PATH, TILE_SIGNAL_FILE_PATH, SC_FILE_PATH, INPUTS_OUTPUTS_FILE_PATH, MODEL_NN_FOLDER_NAME
-from scripts.nn import NN
-# from nn import MedianKNeighborsRegressor
-# from sklearn.multioutput import MultiOutputRegressor
-# from sklearn.neighbors import KNeighborsRegressor
+from scripts.nn import NN, MultiMedianKNeighborsRegressor
 
 ########### Main ############
 if __name__ == '__main__':
@@ -80,58 +77,57 @@ if __name__ == '__main__':
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-05 18:10:00', stop='2023-12-10 18:40:00')
     # File.write_df_on_file(inputs_outputs_df, './inputs_outputs_df')
     # print('Plotting...', end='')
-    # Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = False, with_smooth = True)
+    # Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = True, smoothing_key='smooth')
     # Plotter.show()
     # print(' done')
 
     ############## NN ###############
-    col_range = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+    col_range_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+    col_range = ['top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']
     col_selected = ['SC_POSITION_0', 'SC_POSITION_1', 'SC_POSITION_2', 'LAT_GEO', 'LON_GEO', 'RAD_GEO', 'RA_ZENITH', 'DEC_ZENITH', 'B_MCILWAIN', 'L_MCILWAIN', 'GEOMAG_LAT', 'LAMBDA', 'RA_SCZ',
                     'DEC_SCZ', 'RA_SCX', 'DEC_SCX', 'RA_NPOLE', 'DEC_NPOLE', 'ROCK_ANGLE', 'QSJ_1', 'QSJ_2', 'QSJ_3', 'QSJ_4', 'RA_SUN', 'DEC_SUN', 'SC_VELOCITY_0', 'SC_VELOCITY_1', 'SC_VELOCITY_2', 'SOLAR']
     nn = NN(inputs_outputs_df, col_range, col_selected)
-    units_1_values = [0, 50, 90, 120]
-    units_2_values = [0, 50, 90, 120]
-    units_3_values = [0, 10, 30, 50, 70, 90, 120]
-    epochs_values = [150]
+    units_1_values = [0]#, 50, 90]
+    units_2_values = [0]#, 50, 90]
+    units_3_values = [0, 10, 30, 50, 70, 90]
+    epochs_values = [60]
     bs_values = [1000]
     do_values = [0.02]
-    norm_1_values = [0, 1]
-    drop_1_values = [0, 1]
-    norm_2_values = [0, 1]
-    drop_2_values = [0, 1]
-    norm_3_values = [0, 1]
-    drop_3_values = [0, 1]
+    norm_values = [0, 1]
+    drop_values = [0, 1]
     opt_name_values = ['Adam']
-    lr_values = [0.00009]
-    loss_type_values = ['mae', 'mse']
-    hyperparams_combinations = list(itertools.product(units_1_values, norm_1_values, drop_1_values, units_2_values, norm_2_values, drop_2_values, units_3_values, norm_3_values, drop_3_values, epochs_values, bs_values, do_values, opt_name_values, lr_values, loss_type_values))
+    lr_values = [None]#0.00009]
+    loss_type_values = ['mae']
+    hyperparams_combinations = list(itertools.product(units_1_values, units_2_values, units_3_values, norm_values, drop_values, epochs_values, bs_values, do_values, opt_name_values, lr_values, loss_type_values))
     hyperparams_combinations = nn.trim_hyperparams_combinations(hyperparams_combinations)
 
-    for model_id, units_1, norm_1, drop_1, units_2, norm_2, drop_2, units_3, norm_3, drop_3, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
-        params = {'model_id': model_id, 'units_1': units_1, 'norm_1': norm_1, 'drop_1': drop_1, 'units_2': units_2, 'norm_2': norm_2, 'drop_2': drop_2, 'units_3': units_3, 'norm_3': norm_3, 'drop_3': drop_3, 'epochs': epochs, 'bs': bs, 'do': do, 'opt_name': opt_name, 'lr': lr, 'loss_type': loss_type}
+    for model_id, units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
+        params = {'model_id': model_id, 'units_1': units_1, 'units_2': units_2, 'units_3': units_3, 'norm': norm, 'drop': drop, 'epochs': epochs, 'bs': bs, 'do': do, 'opt_name': opt_name, 'lr': lr, 'loss_type': loss_type}
         nn.set_hyperparams(params)
         nn.create_model()
         nn.train()
         nn.update_summary()
-        df_ori, y_pred = nn.predict(start=50000, end=70000)
-        y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in col_range})
-        inputs_outputs_df = Data.merge_dfs(df_ori[col_range + ['datetime']], y_pred[[
-                                           'top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth', 'datetime']])
-        Plotter(df=inputs_outputs_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',', show=False, with_smooth=True)
-        nn.plot(df_ori, y_pred, det_rng='top')
-        nn.plot(df_ori, y_pred, det_rng='Xpos')
-        nn.plot(df_ori, y_pred, det_rng='Xneg')
-        nn.plot(df_ori, y_pred, det_rng='Ypos')
-        nn.plot(df_ori, y_pred, det_rng='Yneg')
         Plotter.save(MODEL_NN_FOLDER_NAME, params)
+        for start, end in [(60000, 73000), (73000, -1)]:
+            df_ori, y_pred = nn.predict(start=start, end=end)
+            # y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in col_range_raw})
+            tiles_df = Data.merge_dfs(inputs_outputs_df[start:end][col_range_raw + ['datetime', 'SOLAR']], y_pred[
+                                        col_range + ['datetime']])
+            Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',', show=False, smoothing_key='smooth')
+            for col in col_range_raw:
+                Plotter().plot_tile(tiles_df, det_rng=col, smoothing_key = 'smooth')
+            Plotter().plot_pred_true(tiles_df, col_range)
+            Plotter.save(MODEL_NN_FOLDER_NAME, params, (start, end))
 
-    # y = inputs_outputs_df[col_range].astype('float32')
-    # X = inputs_outputs_df[col_selected].astype('float32')
-    # n_points = -1
-    # clf = MultiOutputRegressor(MedianKNeighborsRegressor(n_neighbors=20)).fit(X, y)
-    # pred_df = clf.predict(X[:n_points])
-    # plt.figure()
-    # plt.plot(inputs_outputs_df['datetime'][:n_points], y.iloc[:n_points, 0])
-    # plt.plot(inputs_outputs_df['datetime'][:n_points], pred_df[:n_points, 0])
-    # plt.show()
-    # plt.plot(inputs_outputs_df['datetime'][:2000], pred_df[0, :2000])
+
+    multi_reg = MultiMedianKNeighborsRegressor(inputs_outputs_df, col_range, col_selected)
+    multi_reg.create_model(n_neighbors=5)
+    multi_reg.train()
+    df_ori, y_pred = multi_reg.predict()
+    tiles_df = Data.merge_dfs(df_ori, y_pred)
+    Plotter().plot_tile(tiles_df, det_rng='top')
+    Plotter().plot_tile(tiles_df, det_rng='Xpos')
+    Plotter().plot_tile(tiles_df, det_rng='Xneg')
+    Plotter().plot_tile(tiles_df, det_rng='Ypos')
+    Plotter().plot_tile(tiles_df, det_rng='Yneg')
+    Plotter().show()
