@@ -1,11 +1,12 @@
 
 import os
-from scripts.utils import File
+from scripts.utils import Logger, logger_decorator
 import matplotlib.pyplot as plt
 import pandas as pd
 import gc
 from datetime import date
 import numpy as np
+import shap
 # Preprocess
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error as MAE, median_absolute_error as MeAE
@@ -27,37 +28,10 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.multioutput import MultiOutputRegressor
 
 
-# def loss_median(y_t, f):
-#     """
-#     Median Absolute Error. If q=0.5 the metric is Median Absolute Error.
-#     :param y_t: target value
-#     :param f: predicted value
-#     :return: Median Absolute Error
-#     """
-#     q = 0.50
-#     y_pred = ops.convert_to_tensor_v2_with_dispatch(f)
-#     y_true = math_ops.cast(y_t, y_pred.dtype)
-#     err = (y_true - y_pred)
-#     # err = (math_ops.pow(y_true, 1.5) - math_ops.pow(y_pred, 1.5))
-#     # return K.mean(K.maximum(q * err, (q - 1) * err), axis=-1)
-#     return K.mean(math_ops.maximum(q * err, (q - 1) * err), axis=-1) # + \
-#           # math_ops.sqrt(K.mean(math_ops.squared_difference(y_pred, y_true), axis=-1))
-
-
-# def loss_max(y_true, y_predict):
-#     """
-#     Take the maximum of the MAE detectors.
-#     :param y_true: y target
-#     :param y_predict: y predicted by the NN
-#     :return: max_i(MAE_i)
-#     """
-#     # Define Loss as max_i(det_ran_error)
-#     loss_mae_none = losses.MeanAbsoluteError(reduction=losses.Reduction.NONE)
-#     a = math.reduce_max(loss_mae_none(y_true, y_predict))  # axis=0
-#     return a
-
-
 class NN:
+    logger = Logger('NN').get_logger()
+
+    @logger_decorator(logger)
     def __init__(self, df_data, col_range, col_selected):
         self.col_range = col_range
         self.col_selected = col_selected
@@ -87,26 +61,28 @@ class NN:
         self.epochs = None
         self.mae_tr_list = None
 
+    @logger_decorator(logger)
     def trim_hyperparams_combinations(self, hyperparams_combinations):
         hyperparams_combinations_tmp = []
-        seen = set()
+        uniques = set()
+        
         if os.path.exists(MODEL_NN_FOLDER_NAME + '/models_params.csv'):
             os.remove(MODEL_NN_FOLDER_NAME + '/models_params.csv')
         with open(MODEL_NN_FOLDER_NAME + '/models_params.csv', 'a') as f:
             f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'norm', 'drop', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
         for model_id, (units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type) in enumerate(hyperparams_combinations):
-            # sorted_tuple = tuple(sorted([units_1, units_2, units_3]))
-            # if sorted_tuple not in seen and sorted_tuple[0:-1] == (0, 0) and sorted_tuple[-1] != 0:
-            #     seen.add(sorted_tuple)
-            # else:
-            #     model_id -= 1
-            #     continue
-            if units_1 == 0 and units_2 == 0 and units_3 == 0:
+            sorted_tuple = tuple([value for value in [units_1, units_2, units_3] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
+            if len(sorted_tuple) == 8 or sorted_tuple in uniques:
                 model_id -= 1
                 continue
-            hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
+            else:
+                print(sorted_tuple)
+                uniques.add(sorted_tuple)
+                hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
+
         return hyperparams_combinations_tmp
 
+    @logger_decorator(logger)
     def set_hyperparams(self, params):
         self.params = params
         self.model_id = params['model_id']
@@ -125,6 +101,7 @@ class NN:
         self.drop = params['drop']
         self.mae_tr_list = []
 
+    @logger_decorator(logger)
     def create_model(self):
         # Load the data
         self.y = self.df_data[self.col_range].astype('float32')
@@ -147,7 +124,6 @@ class NN:
                 hidden = Dropout(self.do)(hidden)
         else:
             hidden = inputs
-
 
         if self.units_2:
             hidden = Dense(self.units_2, activation='relu')(hidden)
@@ -176,24 +152,9 @@ class NN:
         elif self.opt_name == 'SGD':
             opt = SGD()
 
-        if self.loss_type == 'max':
-            # Define Loss as max_i(det_ran_error)
-            loss = loss_max
-        elif self.loss_type == 'median':
-            # Define Loss as average of Median Absolute Error for each detector_range
-            loss = loss_median
-        elif self.loss_type == 'mean' or self.loss_type == 'mae':
-            # Define Loss as average of Mean Absolute Error for each detector_range
-            loss = 'mae'
-            # loss = keras.losses.MeanAbsoluteError()
-        elif self.loss_type == 'huber':
-            loss = keras.losses.Huber(delta=1)
-        else:
-            # Define Loss as average of Mean Squared Error for each detector_range
-            loss = 'mse'
+        self.nn_r.compile(loss=self.loss_type, optimizer=opt, metrics=['accuracy'])
 
-        self.nn_r.compile(loss=loss, optimizer=opt)
-
+    @logger_decorator(logger)
     def scheduler(self, epoch, lr_actual):
         if epoch < 4:
             return self.lr*12.5
@@ -202,19 +163,19 @@ class NN:
         if 12 <= epoch:
             return self.lr/2
 
-
+    @logger_decorator(logger)
     def train(self):
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=10, start_from_epoch=50)
         mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras', monitor='val_loss', mode='min',
                                 verbose=0, save_best_only=True)
 
         if not self.lr:
-            history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
-                                validation_split=0.3, callbacks=[es, mc])
+            callbacks = [es, mc]
         else:
             call_lr = LearningRateScheduler(self.scheduler)
-            history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
-                                validation_split=0.3, callbacks=[es, mc, call_lr])
+            callbacks = [es, mc, call_lr]
+        history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
+                        validation_split=0.3, callbacks=callbacks)
         nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
 
         # Compute MAE per each detector and range
@@ -239,16 +200,6 @@ class NN:
                     f"median_diff_test_pred_{col} {median_diff_i:0.5f}\n"
             idx = idx + 1
 
-        # plot training history
-        plt.figure("history_loss", layout="tight")
-        plt.plot(history.history['loss'][4:], label=f'train {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
-        plt.plot(history.history['val_loss'][4:], label=f'test {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
-        plt.legend()
-        plt.figure("history_accuracy", layout="tight")
-        plt.plot(history.history['accuracy'][4:], label=f'train {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
-        plt.plot(history.history['val_accuracy'][4:], label=f'test {self.units_1}-{self.units_2}-{self.units_3} {self.opt_name}')
-        plt.legend()
-
         nn_r.save(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
         self.nn_r = nn_r
         # open text file and write params
@@ -259,7 +210,9 @@ class NN:
         with open(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/performance.txt', "w") as text_file:
             text_file.write(text)
         self.text = text
+        return history.history
 
+    @logger_decorator(logger)
     def predict(self, start = 0, end = -1):
         df_data = self.df_data[start:end]
         pred_x_tot = self.nn_r.predict(self.scaler.transform(df_data[self.col_selected]))
@@ -272,17 +225,56 @@ class NN:
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
-        File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/frg')
-        File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/bkg')
+        # File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/frg')
+        # File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/bkg')
         return df_ori, y_pred
 
+    @logger_decorator(logger)
     def update_summary(self):
         with open(MODEL_NN_FOLDER_NAME + '/models_params.csv', 'a') as f:
             list_tmp = list(self.params.values()) + self.mae_tr_list
             f.write('\t'.join([str(value) for value in list_tmp] + ['\n']))
 
+    @logger_decorator(logger)
+    def explain(self, time_r=range(0, 10), det_rng=None):
+        """
+        Explanation for instances in time range 'time_r'.
+        :param time_r: index timestamp.
+        :param det_rng: detector and range to explain.
+        :return: None
+            Plot summary_plot more than one instances.
+            Plot waterfall is one instance.
+        """
+        # Define dataset of background and explanation
+        X_back = shap.sample(self.df_data.loc[:, self.col_selected].astype('float32'), nsamples=42, random_state=42)
+        X_back_std =  pd.DataFrame(self.scaler.transform(X_back),  columns=self.col_selected)
+        X_expl = self.df_data.loc[time_r, self.col_selected].astype('float32')
+        X_expl_std = pd.DataFrame(self.scaler.transform(X_expl), columns=self.col_selected)
+        # Explainer shap
+        e = shap.KernelExplainer(self.nn_r, X_back_std)
+        shap_values = e.shap_values(X_expl_std, n_sample=20)
+        # Gradient based
+        # e = shap.GradientExplainer(self.nn_r, X_back_std)
+        # shap_values = e.shap_values(X_expl_std.values)
+        if len(time_r) > 1:
+            plt.figure()
+            shap.summary_plot(shap_values, X_expl_std)
+        else:
+            if det_rng is not None:
+                idx = np.where(np.array(self.col_range) == det_rng)[0][0]
+                plt.figure()
+                shap.plots._waterfall.waterfall_legacy(e.expected_value[idx], shap_values[idx][0],
+                                                       feature_names=self.col_selected)
+            else:
+                logging.warning("No Detector and range specified.")
+                plt.figure()
+                shap.summary_plot(shap_values, X_expl_std)
+
 
 class MedianKNeighborsRegressor(KNeighborsRegressor):
+    logger = Logger('MedianKNeighborsRegressor').get_logger()
+
+    @logger_decorator(logger)
     def predict(self, X):
         """Predict the target for the provided data.
 
@@ -321,6 +313,9 @@ class MedianKNeighborsRegressor(KNeighborsRegressor):
 
 
 class MultiMedianKNeighborsRegressor():
+    logger = Logger('MultiMedianKNeighborsRegressor').get_logger()
+
+    @logger_decorator(logger)
     def __init__(self, df_data, col_range, col_selected):
         self.col_range = col_range
         self.col_selected = col_selected
@@ -330,14 +325,17 @@ class MultiMedianKNeighborsRegressor():
         self.X = None
         self.multi_reg = None
 
+    @logger_decorator(logger)
     def create_model(self, n_neighbors=5):
         self.y = self.df_data[self.col_range].astype('float32')
         self.X = self.df_data[self.col_selected].astype('float32')
         self.multi_reg = MultiOutputRegressor(MedianKNeighborsRegressor(n_neighbors=n_neighbors))
 
+    @logger_decorator(logger)
     def train(self):
         self.multi_reg.fit(self.X, self.y)
 
+    @logger_decorator(logger)
     def predict(self, start = 0, end = -1):
         df_data = self.df_data[start:end]
         df_ori = df_data[self.col_range].reset_index(drop=True)

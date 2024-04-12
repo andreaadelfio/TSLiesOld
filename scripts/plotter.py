@@ -3,11 +3,15 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import seaborn as sns
+from utils import Logger, logger_decorator
 
 class Plotter:
     """
     This class provides methods for plotting data points and curves.
     """
+    logger = Logger('Plotter').get_logger()
+
+    @logger_decorator(logger)
     def __init__(self, x = None, y = None, df: pd.DataFrame = None, xy: dict = None, label = ''):
         """
         Initialize the Plotter object.
@@ -24,6 +28,7 @@ class Plotter:
         self.xy = xy
         self.label = label
 
+    @logger_decorator(logger)
     def plot(self, marker = '-', lw = 0, show = True):
         """
         Plot a single curve.
@@ -40,6 +45,7 @@ class Plotter:
         if show:
             plt.show()
 
+    @logger_decorator(logger)
     def plot_tiles(self, marker = '-', lw = 0.2, with_smooth = False, show = True):
         """
         Plot multiple curves as tiles.
@@ -63,6 +69,7 @@ class Plotter:
         if show:
             plt.show()
 
+    @logger_decorator(logger)
     def multiplot(self, marker = '-', lw = 0.1, with_smooth = False, show = True):
         """
         Plots multiple curves on the same figure.
@@ -83,6 +90,7 @@ class Plotter:
         if show:
             plt.show()
 
+    @logger_decorator(logger)
     def df_plot_tiles(self, x_col, excluded_cols = None, marker = '-', lw = 0.1, smoothing_key = 'smooth', show = True):
         """
         Plot multiple curves as tiles.
@@ -123,6 +131,7 @@ class Plotter:
         if show:
             plt.show()
 
+    @logger_decorator(logger)
     def df_multiplot(self, x_col, marker = '-', lw = 0.1, with_smooth = False, show = True):
         """
         Plots multiple curves on the same figure.
@@ -146,15 +155,14 @@ class Plotter:
             plt.show()
 
 
+    @logger_decorator(logger)
     def plot_tile(self, tiles_df, det_rng='top', smoothing_key = 'smooth'):
         with sns.plotting_context("talk"):
             fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12), num=det_rng, tight_layout=True)
             fig.subplots_adjust(hspace=0)
-            # fig.suptitle(det_rng)
 
             axs[0].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[det_rng], 'k-.')
             axs[0].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[f'{det_rng}_{smoothing_key}'], 'r-')
-
             axs[0].set_title('foreground and background')
             axs[0].set_ylabel('Count Rate')
 
@@ -164,7 +172,7 @@ class Plotter:
             plt.xticks(rotation=0)
             axs[1].set_ylabel('Residuals')
 
-        # Plot y_pred vs y_true
+    @logger_decorator(logger)
     def plot_pred_true(self, tiles_df, col_range=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']):
         with sns.plotting_context("talk"):
             col_range_prev = [col.split('_')[0] for col in col_range]
@@ -176,11 +184,30 @@ class Plotter:
             plt.plot([min_y, max_y], [min_y, max_y], '-')
             plt.xlabel('True signal')
             plt.ylabel('Predicted signal')
-        plt.legend(col_range_prev)
+        plt.legend(col_range_prev)  
 
+    @logger_decorator(logger)
+    def plot_history(self, history, feature):
+        plt.figure(f"history_{feature}", layout="tight")
+        plt.plot(history.history[feature])
+        plt.plot(history.history[f'val_{feature}'])
+        plt.ylabel(feature)
+        plt.xlabel('epoch')
+        plt.legend(['train', 'validation'], loc='upper left')
+
+    @logger_decorator(logger)
+    def show_models_params(self, folder_name, features = {'top': 0.0004, 'Xpos': 0.0007, 'Xneg': 0.0007, 'Ypos': 0.0007, 'Yneg': 0.0007}):
+        df = pd.read_csv(f'{folder_name}/models_params.csv', sep="\t").reset_index()
+        df = df.assign(**{df.columns.tolist()[i+1]: df[df.columns.tolist()[i]] for i in range(len(df.columns.tolist()) - 1)}).drop(columns = 'index')
+        for feature, value in features.items():
+            df = df[df[feature] < value]
+        print(df)
+        
+    @logger_decorator(logger)
     def show(self):
         plt.show()
 
+    @logger_decorator(logger)
     def save(folder_name = '.', params = None, indexes = None):
         folder_name = f'{folder_name}/{params["model_id"]}' if params else folder_name
         for i in plt.get_fignums():
@@ -188,4 +215,6 @@ class Plotter:
             name = f'{title}.png' if not indexes else f'{title}_{indexes[0]}_{indexes[1]}.png'
             plt.savefig(f'{folder_name}/{name}')
         plt.close('all')
-        
+
+if __name__ == '__main__':
+    Plotter().show_models_params('data/model_nn', features = {'epochs': 71})

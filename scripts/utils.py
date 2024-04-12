@@ -1,12 +1,11 @@
 """Utils module for the ACNBkg project."""
 import sys
 import os
+import pprint
 import logging
-from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 import pandas as pd
-from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
-
+from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
 
 class Logger():
     """
@@ -63,9 +62,16 @@ def logger_decorator(logger):
                     self.funcName = func.__name__
             logging.setLogRecordFactory(CustomLogRecord)
             logger.info(f'{func.__name__} - START')
-            result = func(*args, **kwargs)
-            logger.info(f'{func.__name__} - END')
-            return result
+            try:
+                result = func(*args, **kwargs)
+            except Exception as e:
+                logger.debug('Args: %s', pprint.pformat(args))
+                logger.debug('Kwargs: %s', pprint.pformat(kwargs))
+                logger.error(e)
+                raise
+            else:
+                logger.info(f'{func.__name__} - END')
+                return result
         return wrapper
     return decorator
 
