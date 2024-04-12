@@ -65,20 +65,20 @@ class NN:
     def trim_hyperparams_combinations(self, hyperparams_combinations):
         hyperparams_combinations_tmp = []
         uniques = set()
-        
+        model_id = 0
         if os.path.exists(MODEL_NN_FOLDER_NAME + '/models_params.csv'):
             os.remove(MODEL_NN_FOLDER_NAME + '/models_params.csv')
         with open(MODEL_NN_FOLDER_NAME + '/models_params.csv', 'a') as f:
             f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'norm', 'drop', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
-        for model_id, (units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type) in enumerate(hyperparams_combinations):
+        for units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
             sorted_tuple = tuple([value for value in [units_1, units_2, units_3] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
             if len(sorted_tuple) == 8 or sorted_tuple in uniques:
-                model_id -= 1
                 continue
             else:
                 print(sorted_tuple)
                 uniques.add(sorted_tuple)
                 hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
+                model_id += 1
 
         return hyperparams_combinations_tmp
 
@@ -210,7 +210,7 @@ class NN:
         with open(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/performance.txt', "w") as text_file:
             text_file.write(text)
         self.text = text
-        return history.history
+        return history
 
     @logger_decorator(logger)
     def predict(self, start = 0, end = -1):

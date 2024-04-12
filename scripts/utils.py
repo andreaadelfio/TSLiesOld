@@ -5,8 +5,11 @@ import pprint
 import logging
 from datetime import datetime, timedelta
 import pandas as pd
-from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
-
+try:
+    from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
+except:
+    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
+    
 class Logger():
     """
     A class that provides utility functions for logging.

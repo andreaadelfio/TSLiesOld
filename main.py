@@ -74,7 +74,7 @@ if __name__ == '__main__':
         # Plotter.show()
 
     ########### Plotting ############
-    inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-05 18:10:00', stop='2023-12-10 18:40:00')
+    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df, start='2023-12-05 18:10:00', stop='2023-12-10 18:40:00')
     # File.write_df_on_file(inputs_outputs_df, './inputs_outputs_df')
     # print('Plotting...', end='')
     # Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = ['START', 'MET'], marker = ',', show = True, smoothing_key='smooth')
@@ -85,13 +85,16 @@ if __name__ == '__main__':
     col_range_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
     # col_range = ['top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']
     col_range = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+    col_pred = [col + '_pred' for col in col_range_raw]
     col_selected = ['SC_POSITION_0', 'SC_POSITION_1', 'SC_POSITION_2', 'LAT_GEO', 'LON_GEO', 'RAD_GEO', 'RA_ZENITH', 'DEC_ZENITH', 'B_MCILWAIN', 'L_MCILWAIN', 'GEOMAG_LAT', 'LAMBDA', 'RA_SCZ',
                     'DEC_SCZ', 'RA_SCX', 'DEC_SCX', 'RA_NPOLE', 'DEC_NPOLE', 'ROCK_ANGLE', 'QSJ_1', 'QSJ_2', 'QSJ_3', 'QSJ_4', 'RA_SUN', 'DEC_SUN', 'SC_VELOCITY_0', 'SC_VELOCITY_1', 'SC_VELOCITY_2', 'SOLAR']
+    
     nn = NN(inputs_outputs_df, col_range, col_selected)
+
     units_1_values = [0, 50, 90]
     units_2_values = [0, 50, 90]
     units_3_values = [0, 10, 30, 50, 70, 90]
-    epochs_values = [7]
+    epochs_values = [70]
     bs_values = [1000]
     do_values = [0.02]
     norm_values = [0, 1]
@@ -113,16 +116,19 @@ if __name__ == '__main__':
         Plotter.save(MODEL_NN_FOLDER_NAME, params)
         for start, end in [(60000, 73000)]:#, (73000, -1)]:
             df_ori, y_pred = nn.predict(start=start, end=end)
-            # y_pred = y_pred.assign(**{f"{col}_smooth": y_pred[col] for col in col_range_raw})
-            tiles_df = Data.merge_dfs(inputs_outputs_df[start:end][col_range_raw + ['datetime', 'SOLAR']], y_pred[
-                                        col_range + ['datetime']])
-            Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',', show=False, smoothing_key='smooth')
+
+            y_pred = y_pred.assign(**{col: y_pred[col_init] for col, col_init in zip(col_pred, col_range)}).drop(columns=col_range)
+            tiles_df = Data.merge_dfs(inputs_outputs_df[start:end][col_range_raw + ['datetime', 'SOLAR']], y_pred)
+            Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',', show=False, smoothing_key='pred')
             for col in col_range_raw:
-                Plotter().plot_tile(tiles_df, det_rng=col, smoothing_key = 'smooth')
-            Plotter().plot_pred_true(tiles_df, col_range)
+                Plotter().plot_tile(tiles_df, det_rng=col, smoothing_key = 'pred')
+            print(tiles_df.columns.tolist())
+            Plotter().plot_pred_true(tiles_df, col_pred, col_range_raw)
             Plotter.save(MODEL_NN_FOLDER_NAME, params, (start, end))
 
-    Plotter().show_models_params(MODEL_NN_FOLDER_NAME)
+    # Plotter().show_models_params(MODEL_NN_FOLDER_NAME, features_dict={'1 layer': {'units_1': 10, 'units_2': 10}, '2 layers': {'units_1': 10}, '3 layers': {}})
+    # Plotter().show_models_params(MODEL_NN_FOLDER_NAME, features_dict={'1 layer': {'units_1': 10, 'units_2': 10}, '2 layers': {'units_1': 10}, '3 layers': {}})
+    # Plotter.save(MODEL_NN_FOLDER_NAME)
 
     # multi_reg = MultiMedianKNeighborsRegressor(inputs_outputs_df, col_range, col_selected)
     # multi_reg.create_model(n_neighbors=5)

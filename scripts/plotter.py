@@ -3,7 +3,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import seaborn as sns
-from scripts.utils import Logger, logger_decorator
+try:
+    from scripts.utils import Logger, logger_decorator
+except:
+    from utils import Logger, logger_decorator
 
 class Plotter:
     """
@@ -173,18 +176,17 @@ class Plotter:
             axs[1].set_ylabel('Residuals')
 
     @logger_decorator(logger)
-    def plot_pred_true(self, tiles_df, col_range=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']):
+    def plot_pred_true(self, tiles_df, col_pred=['top_pred', 'Xpos_pred', 'Xneg_pred', 'Ypos_pred', 'Yneg_pred'], col_range_raw=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']):
         with sns.plotting_context("talk"):
-            col_range_prev = [col.split('_')[0] for col in col_range]
             fig = plt.figure("pred_vs_true", layout="tight")
             fig.set_size_inches(24, 12)
             plt.axis('equal')
-            plt.plot(tiles_df[col_range_prev], tiles_df[col_range], '.', alpha=0.2)
-            min_y, max_y = min(tiles_df[col_range].min()), max(tiles_df[col_range].max())
+            plt.plot(tiles_df[col_range_raw], tiles_df[col_pred], '.', alpha=0.2)
+            min_y, max_y = min(tiles_df[col_pred].min()), max(tiles_df[col_pred].max())
             plt.plot([min_y, max_y], [min_y, max_y], '-')
             plt.xlabel('True signal')
             plt.ylabel('Predicted signal')
-        plt.legend(col_range_prev)  
+        plt.legend(col_range_raw)  
 
     @logger_decorator(logger)
     def plot_history(self, history, feature):
@@ -196,12 +198,33 @@ class Plotter:
         plt.legend(['train', 'validation'], loc='upper left')
 
     @logger_decorator(logger)
-    def show_models_params(self, folder_name, features = {'top': 0.0004, 'Xpos': 0.0007, 'Xneg': 0.0007, 'Ypos': 0.0007, 'Yneg': 0.0007}):
-        df = pd.read_csv(f'{folder_name}/models_params.csv', sep="\t").reset_index()
-        df = df.assign(**{df.columns.tolist()[i+1]: df[df.columns.tolist()[i]] for i in range(len(df.columns.tolist()) - 1)}).drop(columns = 'index')
-        for feature, value in features.items():
-            df = df[df[feature] < value]
-        print(df)
+    def show_models_params(self, folder_name, title, features_dict = {'loss': {'top': 0.001, 'Xpos': 0.001, 'Xneg': 0.001, 'Ypos': 0.001, 'Yneg': 0.001}}, show=True):
+        df_ori = pd.read_csv(f'{folder_name}/models_params.csv', sep="\t").reset_index()
+        df_ori = df_ori.assign(**{df_ori.columns.tolist()[i+1]: df_ori[df_ori.columns.tolist()[i]] for i in range(len(df_ori.columns.tolist()) - 1)}).drop(columns = 'index')
+        cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+        n_plots = len(cols)
+        n_cols = int(np.ceil(np.sqrt(n_plots)))
+        n_rows = int(np.ceil(n_plots / n_cols))
+        fig, axs = plt.subplots(n_rows, n_cols, tight_layout=True, figsize=(20, 12), num=title)
+        axs = axs.flatten()
+        for i, col in enumerate(cols):
+            data = []
+            labels = []
+            for label, features in features_dict.items():
+                df = df_ori
+                for feature, value in features.items():
+                    df = df[df[feature] < value]
+                data.append(df[col])
+                labels.append(label)
+            axs[i].hist(data, bins=int(len(df_ori)/3), alpha=0.5, label=labels, stacked=False)
+            axs[i].set_xlabel('loss')
+            axs[i].set_ylabel('count')
+            axs[i].set_title(col)
+            axs[i].legend()
+        for j in range(i + 1, len(axs)):
+            axs[j].axis('off')
+        if show:
+            plt.show()
         
     @logger_decorator(logger)
     def show(self):
@@ -217,4 +240,8 @@ class Plotter:
         plt.close('all')
 
 if __name__ == '__main__':
-    Plotter().show_models_params('data/model_nn_1', features = {'epochs': 71})
+    Plotter().show_models_params('data/model_nn_1', title = 'layers', features_dict={'1 layer': {'units_1': 10, 'units_2': 10}, '2 layers': {'units_1': 10}, '3 layers': {}}, show = False)
+    Plotter().show_models_params('data/model_nn_1', title = 'dropout', features_dict={'with dropout': {'drop': 0}, 'without dropout': {'drop': 1}}, show = False)
+    Plotter().show_models_params('data/model_nn_1', title = 'norm', features_dict={'with norm': {'norm': 0}, 'without norm': {'norm': 1}}, show = False)
+
+    Plotter.save('data/model_nn_1')
