@@ -83,14 +83,15 @@ if __name__ == '__main__':
 
     ############## NN ###############
     col_range_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
-    col_range = ['top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']
+    # col_range = ['top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']
+    col_range = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
     col_selected = ['SC_POSITION_0', 'SC_POSITION_1', 'SC_POSITION_2', 'LAT_GEO', 'LON_GEO', 'RAD_GEO', 'RA_ZENITH', 'DEC_ZENITH', 'B_MCILWAIN', 'L_MCILWAIN', 'GEOMAG_LAT', 'LAMBDA', 'RA_SCZ',
                     'DEC_SCZ', 'RA_SCX', 'DEC_SCX', 'RA_NPOLE', 'DEC_NPOLE', 'ROCK_ANGLE', 'QSJ_1', 'QSJ_2', 'QSJ_3', 'QSJ_4', 'RA_SUN', 'DEC_SUN', 'SC_VELOCITY_0', 'SC_VELOCITY_1', 'SC_VELOCITY_2', 'SOLAR']
     nn = NN(inputs_outputs_df, col_range, col_selected)
     units_1_values = [0, 50, 90]
     units_2_values = [0, 50, 90]
     units_3_values = [0, 10, 30, 50, 70, 90]
-    epochs_values = [70]
+    epochs_values = [7]
     bs_values = [1000]
     do_values = [0.02]
     norm_values = [0, 1]
@@ -106,8 +107,8 @@ if __name__ == '__main__':
         nn.set_hyperparams(params)
         nn.create_model()
         history = nn.train()
-        Plotter.plot_history(history, 'loss')
-        Plotter.plot_history(history, 'accuracy')
+        Plotter().plot_history(history, 'loss')
+        Plotter().plot_history(history, 'accuracy')
         nn.update_summary()
         Plotter.save(MODEL_NN_FOLDER_NAME, params)
         for start, end in [(60000, 73000)]:#, (73000, -1)]:

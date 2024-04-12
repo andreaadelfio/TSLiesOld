@@ -5,7 +5,7 @@ import pprint
 import logging
 from datetime import datetime, timedelta
 import pandas as pd
-from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
+from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
 
 class Logger():
     """

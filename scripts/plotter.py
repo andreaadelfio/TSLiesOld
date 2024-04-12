@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import seaborn as sns
-from utils import Logger, logger_decorator
+from scripts.utils import Logger, logger_decorator
 
 class Plotter:
     """
@@ -217,4 +217,4 @@ class Plotter:
         plt.close('all')
 
 if __name__ == '__main__':
-    Plotter().show_models_params('data/model_nn', features = {'epochs': 71})
+    Plotter().show_models_params('data/model_nn_1', features = {'epochs': 71})
