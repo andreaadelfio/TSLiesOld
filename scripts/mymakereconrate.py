@@ -224,8 +224,8 @@ def create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER):
     logger.info(f'Processing {output_filename} - done')
 
 def do_work(binning):
-    INPUT_RUNS_FOLDER = '/media/andrea/DISK4T1/ACD LAT Adelfio/data/LAT_ACD/merged input runs/'
-    OUTPUT_RUNS_FOLDER = '/media/andrea/DISK4T1/ACD LAT Adelfio/data/LAT_ACD/output runs/'
+    INPUT_RUNS_FOLDER = '/home/andrea/OneDrive/Workspace INFN/ACDBkg/data/LAT_ACD/input runs/'
+    OUTPUT_RUNS_FOLDER = '/home/andrea/OneDrive/Workspace INFN/ACDBkg/data/LAT_ACD/output runs/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
@@ -236,8 +236,8 @@ def do_work(binning):
         create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER)
 
 def do_work_parallel(binning):
-    INPUT_RUNS_FOLDER = '/media/andrea/DISK4T1/ACD LAT Adelfio/data/LAT_ACD/merged input runs/'
-    OUTPUT_RUNS_FOLDER = '/media/andrea/DISK4T1/ACD LAT Adelfio/data/LAT_ACD/output runs/'
+    INPUT_RUNS_FOLDER = '/home/andrea/OneDrive/Workspace INFN/ACDBkg/data/LAT_ACD/input runs/'
+    OUTPUT_RUNS_FOLDER = '/home/andrea/OneDrive/Workspace INFN/ACDBkg/data/LAT_ACD/output runs/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
@@ -273,6 +273,6 @@ def parser():
 if __name__ == '__main__':
     fileSizes = 'ACD_tiles_size2.txt'
     fill_dictSizes(fileSizes)
-    # do_work(1)
-    do_work_parallel(1)
+    do_work(1)
+    #do_work_parallel(1)
     print("... done, bye bye")

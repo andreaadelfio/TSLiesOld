@@ -209,6 +209,7 @@ class Data():
             df = pd.concat([df, Data.get_masked_dataframe(data=initial_dataframe, start=start, stop=end)], ignore_index=True)
         return df
 
+    @logger_decorator(logger)
     def convert_to_df(data_to_df) -> pd.DataFrame:
         """
         Converts the data containing the spacecraft data into a pd.DataFrame.
@@ -220,6 +221,19 @@ class Data():
             DataFrame: The dataframe containing the spacecraft data.
         """
         return pd.DataFrame({name: data_to_df.field(name).tolist() for name in data_to_df.dtype.names})
+
+    @logger_decorator(logger)
+    def get_good_quality(dataframe: pd.DataFrame) -> pd.DataFrame:
+        """
+        Returns the dataframe with good quality data.
+
+        Args:
+            dataframe (DataFrame): The input dataframe.
+
+        Returns:
+            DataFrame: The dataframe with good quality data.
+        """
+        return dataframe[dataframe['DATA_QUAL'] != 0]
 
     @logger_decorator(logger)
     def merge_dfs(first_dataframe: pd.DataFrame, second_dataframe: pd.DataFrame, on_column='datetime') -> pd.DataFrame:
