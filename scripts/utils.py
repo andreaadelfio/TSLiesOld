@@ -292,3 +292,8 @@ class File:
             for key, value in data.items():
                 file.write(f'{key}: {value}\n')
 
+if __name__ == '__main__':
+    from plotter import Plotter
+    inputs_outputs_df = File.read_df_from_file(INPUTS_OUTPUTS_FILE_PATH)
+    inputs_outputs_df = inputs_outputs_df[inputs_outputs_df['RA_ZENITH'] < 30][inputs_outputs_df['DEC_ZENITH'] < 15][inputs_outputs_df['DEC_ZENITH'] > -15]
+    Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')

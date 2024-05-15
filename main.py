@@ -145,12 +145,13 @@ if __name__ == '__main__':
     # Plotter().show_models_params(MODEL_NN_FOLDER_NAME, features_dict={'1 layer': {'units_1': 10, 'units_2': 10}, '2 layers': {'units_1': 10}, '3 layers': {}})
     # Plotter.save(MODEL_NN_FOLDER_NAME)
 
-    # multi_reg = MultiMedianKNeighborsRegressor(inputs_outputs_df, col_range, col_selected)
-    multi_reg = MultiMeanKNeighborsRegressor(inputs_outputs_df, col_range, col_selected)
-    multi_reg.create_model(5)
+    multi_reg = MultiMedianKNeighborsRegressor(inputs_outputs_df, col_range, col_selected)
+    # multi_reg = MultiMeanKNeighborsRegressor(inputs_outputs_df, col_range, col_selected)
+    multi_reg.create_model(20)
     multi_reg.train()
     start, end = 60000, 63000
     df_ori, y_pred = multi_reg.predict(start=start, end=end)
+    y_pred = pd.DataFrame(y_pred, columns=col_range)
     Plotter().plot_tile_knn(inputs_outputs_df[start:end].reset_index(), y_pred, det_rng='Xpos')
     Plotter().show()
-    Plotter.save(MODEL_NN_FOLDER_NAME)
+    # Plotter.save(MODEL_NN_FOLDER_NAME)

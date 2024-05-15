@@ -343,7 +343,7 @@ class MultiMeanKNeighborsRegressor():
     def create_model(self, n_neighbors=5):
         self.y = self.df_data[self.col_range].astype('float32')
         self.X = self.df_data[self.col_selected].astype('float32')
-        self.multi_reg = KNeighborsRegressor(n_neighbors=n_neighbors)
+        self.multi_reg = KNeighborsRegressor(n_neighbors=n_neighbors, n_jobs=5)
 
     @logger_decorator(logger)
     def train(self):

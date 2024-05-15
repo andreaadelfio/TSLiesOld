@@ -3,10 +3,15 @@ import pandas as pd
 from sunpy import timeseries as ts
 from sunpy.net import Fido
 from sunpy.net import attrs as a
-from scripts.plotter import Plotter
-from scripts.config import SOLAR_FOLDER_NAME
-from scripts.utils import File, Time, Logger, logger_decorator
-
+try:
+    from scripts.utils import Time, Logger, logger_decorator
+    from scripts.plotter import Plotter
+    from scripts.config import SOLAR_FOLDER_NAME
+except:
+    from utils import Time, Logger, logger_decorator
+    from plotter import Plotter
+    from config import SOLAR_FOLDER_NAME
+ 
 
 class SunMonitor:
     logger = Logger('SunMonitor').get_logger()
@@ -64,10 +69,7 @@ class SunMonitor:
 
 
 if __name__ == "__main__":
-    sm = SunMonitor(tstart = '2024-02-16 00:00:00', tend = '2024-02-17 00:00:00')
+    sm = SunMonitor(tstart = '2024-02-01 00:00:00', tend = '2024-02-08 00:00:00')
     file_goes = sm.fetch_goes_data()
     df = sm.find_goes_data(file_goes)
     Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime', excluded_cols=[], marker = ',')
-    File.write_df_on_file(df, SOLAR_FOLDER_NAME + '/solar_activity')
-    df = File.read_df_from_file(SOLAR_FOLDER_NAME + '/solar_activity')
-    print(df.dtypes)

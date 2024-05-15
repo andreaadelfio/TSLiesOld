@@ -14,13 +14,13 @@
 #     ls outAcdReconRates_*_??_*.root >>fileList
 
 
-from __future__ import print_function, division
-import ROOT
-from tqdm import tqdm
+# from __future__ import print_function, division
 import os
 import argparse
 import concurrent.futures
 import logging
+import ROOT
+from tqdm import tqdm
 
 logging.basicConfig(filename='mymakereconrate.log', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -164,7 +164,7 @@ def create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER):
     hist_triggers.Divide(identityFunc, binning)
 
     hist_dict = {}
-    histNorm_dict = {}
+    # histNorm_dict = {}
 
     for tileID in range(0, 89):
         hist_name = 'rate_tile'+str(tileID)
@@ -181,30 +181,29 @@ def create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER):
             identityFunc, binning*dict_tileSize[tileID])
         hist_dict[tileID].GetXaxis().SetTitle('met')
 
-        histNorm_dict[tileID] = hist_dict[tileID].Clone()
-        hist_nameNorm = 'NORMrate_tile'+str(tileID)
-        histNorm_dict[tileID].SetName(hist_nameNorm)
-        histNorm_dict[tileID].SetTitle(hist_nameNorm)
-        histNorm_dict[tileID].GetXaxis().SetTitle('met')
+        # histNorm_dict[tileID] = hist_dict[tileID].Clone()
+        # hist_nameNorm = 'NORMrate_tile'+str(tileID)
+        # histNorm_dict[tileID].SetName(hist_nameNorm)
+        # histNorm_dict[tileID].SetTitle(hist_nameNorm)
+        # histNorm_dict[tileID].GetXaxis().SetTitle('met')
 
-        histNorm_dict[tileID].Divide(hist_triggers)
+        # histNorm_dict[tileID].Divide(hist_triggers)
 
         output_rootfile.cd()
         hist_dict[tileID].Write()
-        histNorm_dict[tileID].Write()
+        # histNorm_dict[tileID].Write()
         # print(f'\rCompletion: {tileID/89*100:.2f}%', end='')
-    print()
 
     hist_top, hist_Xpos, hist_Xneg, hist_Ypos, hist_Yneg = mediaSides(
         hist_dict, identityFunc)
-    histNorm_top, histNorm_Xpos, histNorm_Xneg, histNorm_Ypos, histNorm_Yneg = mediaSides(
-        histNorm_dict, identityFunc)
+    # histNorm_top, histNorm_Xpos, histNorm_Xneg, histNorm_Ypos, histNorm_Yneg = mediaSides(
+    #     histNorm_dict, identityFunc)
 
-    histNorm_top.SetNameTitle('histNorm_top', 'histNorm_top')
-    histNorm_Xpos.SetNameTitle('histNorm_Xpos', 'histNorm_Xpos')
-    histNorm_Xneg.SetNameTitle('histNorm_Xneg', 'histNorm_Xneg')
-    histNorm_Ypos.SetNameTitle('histNorm_Ypos', 'histNorm_Ypos')
-    histNorm_Yneg.SetNameTitle('histNorm_Yneg', 'histNorm_Yneg')
+    # histNorm_top.SetNameTitle('histNorm_top', 'histNorm_top')
+    # histNorm_Xpos.SetNameTitle('histNorm_Xpos', 'histNorm_Xpos')
+    # histNorm_Xneg.SetNameTitle('histNorm_Xneg', 'histNorm_Xneg')
+    # histNorm_Ypos.SetNameTitle('histNorm_Ypos', 'histNorm_Ypos')
+    # histNorm_Yneg.SetNameTitle('histNorm_Yneg', 'histNorm_Yneg')
 
     hist_triggers.Write()
 
@@ -214,18 +213,18 @@ def create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER):
     hist_Ypos.Write()
     hist_Yneg.Write()
 
-    histNorm_top.Write()
-    histNorm_Xpos.Write()
-    histNorm_Xneg.Write()
-    histNorm_Ypos.Write()
-    histNorm_Yneg.Write()
+    # histNorm_top.Write()
+    # histNorm_Xpos.Write()
+    # histNorm_Xneg.Write()
+    # histNorm_Ypos.Write()
+    # histNorm_Yneg.Write()
 
     output_rootfile.Close()
     logger.info(f'Processing {output_filename} - done')
 
 def do_work(binning):
-    INPUT_RUNS_FOLDER = '/home/andrea/OneDrive/Workspace INFN/ACDBkg/data/LAT_ACD/input runs/'
-    OUTPUT_RUNS_FOLDER = '/home/andrea/OneDrive/Workspace INFN/ACDBkg/data/LAT_ACD/output runs/'
+    INPUT_RUNS_FOLDER = './data/LAT_ACD/input runs/'
+    OUTPUT_RUNS_FOLDER = './data/LAT_ACD/output runs/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
@@ -236,8 +235,8 @@ def do_work(binning):
         create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER)
 
 def do_work_parallel(binning):
-    INPUT_RUNS_FOLDER = '/home/andrea/OneDrive/Workspace INFN/ACDBkg/data/LAT_ACD/input runs/'
-    OUTPUT_RUNS_FOLDER = '/home/andrea/OneDrive/Workspace INFN/ACDBkg/data/LAT_ACD/output runs/'
+    INPUT_RUNS_FOLDER = './data/LAT_ACD/input runs/'
+    OUTPUT_RUNS_FOLDER = './data/LAT_ACD/output runs/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
