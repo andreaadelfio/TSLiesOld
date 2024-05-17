@@ -3,15 +3,20 @@ import ROOT
 import numpy as np
 import pandas as pd
 from scipy import fftpack
-from scripts.config import DATA_LATACD_FOLDER_PATH
-from scripts.utils import Time, Logger, logger_decorator
+try:
+    from scripts.config import DATA_LATACD_FOLDER_PATH
+    from scripts.utils import Time, Logger, logger_decorator
+except:
+    from config import DATA_LATACD_FOLDER_PATH
+    from utils import Time, Logger, logger_decorator
+
 
 class CatalogReader():
     """Class to read the catalog of runs and their properties"""
     logger = Logger('CatalogReader').get_logger()
 
     @logger_decorator(logger)
-    def __init__(self, data_dir = None, from_lat = True, start = 0, end = -1):
+    def __init__(self, data_dir = DATA_LATACD_FOLDER_PATH, start = 0, end = -1):
         """
         Initialize the CatalogReader object.
 
@@ -20,8 +25,6 @@ class CatalogReader():
         - start (int): The index of the first run directory to consider.
         - end (int): The index of the last run directory to consider.
         """
-        if from_lat:
-            data_dir = DATA_LATACD_FOLDER_PATH
         self.data_dir = data_dir
         self.runs_roots = [f'{self.data_dir}/{filename}' for filename in os.listdir(data_dir)]
         self.runs_roots.sort()
@@ -41,7 +44,7 @@ class CatalogReader():
         - runs_dirs (list): The list of run directories.
         """
         return self.runs_roots
-    
+
     @logger_decorator(logger)
     def get_runs_times(self):
         """
@@ -85,23 +88,22 @@ class CatalogReader():
         return self.runs_dict
 
     @logger_decorator(logger)
-    def add_smoothing(self, tile_signal_df):
-        """
-        """
-        histx = tile_signal_df['MET']
+    def add_smoothing(self, tile_signal):
+        '''This function adds the smoothed histograms to the signal dataframe.'''
+        histx = tile_signal['MET']
         time_step = histx[2] - histx[1]
         nyquist_freq = 0.5 / time_step
         freq_cut1 = 0.01 * nyquist_freq
-        for h_name in tile_signal_df.keys():
+        for h_name in tile_signal.keys():
             if h_name not in ('MET', 'datetime'):
-                histc = tile_signal_df[h_name].to_list()
+                histc = tile_signal[h_name].to_list()
                 sig_fft = fftpack.fft(histc)
                 sample_freq = fftpack.fftfreq(len(histc), d=time_step)
                 low_freq_fft1  = sig_fft.copy()
                 low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
                 filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
-                tile_signal_df[f'{h_name}_smooth'] = filtered_sig1
-        return tile_signal_df
+                tile_signal[f'{h_name}_smooth'] = filtered_sig1
+        return tile_signal
 
     @logger_decorator(logger)
     def get_signal_df_from_catalog(self, runs_dict = None):
@@ -123,6 +125,5 @@ class CatalogReader():
         return catalog_df
 
 if __name__ == '__main__':
-    cr = CatalogReader(DATA_LATACD_FOLDER_PATH, 0, 2)
-    runs_roots = cr.get_runs_roots()
-    cr.get_runs_dict(runs_roots)
+    cr = CatalogReader(start=0, end=2)
+    tile_signal_df = cr.get_signal_df_from_catalog()

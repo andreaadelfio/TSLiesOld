@@ -1,4 +1,4 @@
-"""Utils module for the ACNBkg project."""
+'''Utils module for the ACNBkg project.'''
 import sys
 import os
 import pprint
@@ -6,15 +6,15 @@ import logging
 from datetime import datetime, timedelta
 import pandas as pd
 try:
-    from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
+    from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER
 except:
-    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH
-    
+    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER
+
 class Logger():
-    """
+    '''
     A class that provides utility functions for logging.
 
-    """
+    '''
     def __init__(self, logger_name: str,
                  log_file_name: str = LOGGING_FILE_PATH,
                  log_level: int = logging.DEBUG):
@@ -23,7 +23,8 @@ class Logger():
 
         Args:
             logger_name (str): The name of the logger.
-            log_file_name (str): The name of the log file. Default is LOGGING_FILE_PATH from config.py.
+            log_file_name (str): The name of the log file. 
+                                 Default is LOGGING_FILE_PATH from config.py.
             log_level (int): The log level. Default is logging.DEBUG.
 
         Returns:
@@ -56,9 +57,11 @@ class Logger():
 
 
 def logger_decorator(logger):
+    '''Logger decorator'''
     def decorator(func):
         def wrapper(*args, **kwargs):
             class CustomLogRecord(logging.LogRecord):
+                '''Custom Log Record, changes pathname and funcName'''
                 def __init__(self, *args, **kwargs):
                     super().__init__(*args, **kwargs)
                     self.pathname = sys.modules.get(func.__module__).__file__
@@ -79,13 +82,16 @@ def logger_decorator(logger):
     return decorator
 
 class Time:
+    '''Class to handle time datatype
+    '''
     logger = Logger('Time').get_logger()
 
     fermi_ref_time = datetime(2001, 1, 1, 0, 0, 0)
+    fermi_launch_time = datetime(2008, 8, 7, 3, 35, 44)
 
-
+    @staticmethod
     def from_met_to_datetime(met_list: list) -> list:
-        """
+        '''
         Convert the MET to a datetime object.
 
         Parameters:
@@ -93,23 +99,26 @@ class Time:
 
         Returns:
         - datetime_list (list of datetime): The datetime object corresponding to the MET.
-        """
+        '''
         return [Time.fermi_ref_time + timedelta(seconds=int(met)) for met in met_list]
 
+    @staticmethod
     def from_met_to_datetime_str(met_list: list) -> list:
-        """
+        '''
         Convert the MET to a datetime object and return as string.
 
         Parameters:
         - met_list (list): The MET list to convert.
 
         Returns:
-        - datetime_list (list of str): The datetime object corresponding to the MET, represented as strings.
-        """
+        - datetime_list (list of str): The datetime object corresponding to the MET, 
+                                       represented as strings.
+        '''
         return [str(Time.fermi_ref_time + timedelta(seconds=int(met))) for met in met_list]
 
+    @staticmethod
     def remove_milliseconds_from_datetime(datetime_list: list) -> list:
-        """
+        '''
         Remove the milliseconds from the datetime object.
 
         Parameters:
@@ -117,32 +126,53 @@ class Time:
 
         Returns:
         - datetime_list (list of datetime): The datetime object without milliseconds.
-        """
+        '''
         return [dt.replace(microsecond=0) for dt in datetime_list]
 
-    def get_week_from_datetime(datetime_list: list) -> list:
-        """
+    @staticmethod
+    def get_week_from_datetime(datetime_dict: dict) -> list:
+        '''
         Get the week number from the datetime object.
 
         Parameters:
-        - datetime_list (list): The datetime list to convert.
+        - datetime_dict (list): The datetime list to convert.
 
         Returns:
         - week_list (list of int): The week number corresponding to the datetime.
-        """
-        for dt in datetime_list:
-            print((datetime.strptime(dt, "%Y-%m-%d %H:%M:%S") - Time.fermi_ref_time))
-        return [(Time.fermi_ref_time + datetime(dt)).isocalendar()[1] for dt in datetime_list]
+        '''
+        weeks_set = set()
+        for dt1, dt2 in datetime_dict.values():
+            weeks_set.add(((dt1 - Time.fermi_launch_time).days) // 7 + 10)
+            weeks_set.add(((dt2 - Time.fermi_launch_time).days) // 7 + 10)
+        return list(weeks_set)
+
+    @staticmethod
+    def get_datetime_from_week(week: int) -> tuple:
+        '''
+        Get the datetime from the week number.
+
+        Parameters:
+        - week (int): The week number.
+
+        Returns:
+        - datetime_tuple (tuple): The datetime tuple corresponding to the week.
+        '''
+        start = Time.fermi_launch_time + timedelta(weeks=week - 10)
+        end = start + timedelta(weeks=1)
+        return start, end
 
 class Data():
+    '''Class to handle data
+    '''
     logger = Logger('Data').get_logger()
-    """
+    '''
     A class that provides utility functions for data manipulation.
-    """
-    
+    '''
+
     @logger_decorator(logger)
+    @staticmethod
     def get_masked_dataframe(start, stop, data, column='datetime'):
-        """
+        '''
         Returns the masked data within the specified time range.
 
         Args:
@@ -153,13 +183,14 @@ class Data():
 
         Returns:
             DataFrame: The masked data within the specified time range.
-        """
+        '''
         mask = (data[column] >= start) & (data[column] <= stop)
         masked_data = data[mask]
         return pd.DataFrame(masked_data)
 
+    @staticmethod
     def get_excluded_dataframes(start, stop, data, column='datetime'):
-        """
+        '''
         Returns the excluded dataframes within the specified time range.
 
         Args:
@@ -170,13 +201,14 @@ class Data():
 
         Returns:
             list: The excluded dataframes within the specified time range.
-        """
+        '''
         mask = (data[column] < start) | (data[column] > stop)
         excluded_data = data[mask]
         return excluded_data
 
+    @staticmethod
     def get_masked_data(start, stop, data, column='datetime'):
-        """
+        '''
         Returns the masked data within the specified time range.
 
         Args:
@@ -186,15 +218,17 @@ class Data():
             column (str, optional): The column name representing the time. Defaults to 'datetime'.
 
         Returns:
-            dict: The masked data within the specified time range, with column names as keys and lists of values as values.
-        """
+            dict: The masked data within the specified time range, with column names as keys
+                  and lists of values as values.
+        '''
         mask = (data[column] >= start) & (data[column] <= stop)
         masked_data = data[mask]
         return {name: masked_data.field(name).tolist() for name in masked_data.names}
 
     @logger_decorator(logger)
+    @staticmethod
     def filter_dataframe_with_run_times(initial_dataframe, run_times):
-        """
+        '''
         Returns the spacecraft dataframe filtered on runs times.
 
         Args:
@@ -203,15 +237,18 @@ class Data():
 
         Returns:
             DataFrame: The filtered spacecraft dataframe.
-        """
+        '''
         df = pd.DataFrame()
         for start, end in run_times.values():
-            df = pd.concat([df, Data.get_masked_dataframe(data=initial_dataframe, start=start, stop=end)], ignore_index=True)
+            df = pd.concat([df, Data.get_masked_dataframe(data=initial_dataframe,
+                                                          start=start, stop=end)],
+                            ignore_index=True)
         return df
 
     @logger_decorator(logger)
-    def convert_to_df(data_to_df) -> pd.DataFrame:
-        """
+    @staticmethod
+    def convert_to_df(data_to_df: pd.DataFrame) -> pd.DataFrame:
+        '''
         Converts the data containing the spacecraft data into a pd.DataFrame.
 
         Args:
@@ -219,25 +256,15 @@ class Data():
 
         Returns:
             DataFrame: The dataframe containing the spacecraft data.
-        """
-        return pd.DataFrame({name: data_to_df.field(name).tolist() for name in data_to_df.dtype.names})
+        '''
+        name_data_dict = {name: data_to_df.field(name).tolist() for name in data_to_df.dtype.names}
+        return pd.DataFrame(name_data_dict)
 
     @logger_decorator(logger)
-    def get_good_quality(dataframe: pd.DataFrame) -> pd.DataFrame:
-        """
-        Returns the dataframe with good quality data.
-
-        Args:
-            dataframe (DataFrame): The input dataframe.
-
-        Returns:
-            DataFrame: The dataframe with good quality data.
-        """
-        return dataframe[dataframe['DATA_QUAL'] != 0]
-
-    @logger_decorator(logger)
-    def merge_dfs(first_dataframe: pd.DataFrame, second_dataframe: pd.DataFrame, on_column='datetime') -> pd.DataFrame:
-        """
+    @staticmethod
+    def merge_dfs(first_dataframe: pd.DataFrame, second_dataframe: pd.DataFrame,
+                  on_column='datetime') -> pd.DataFrame:
+        '''
         Merges two dataframes based on a common column.
 
         Args:
@@ -247,53 +274,87 @@ class Data():
 
         Returns:
             DataFrame: The merged dataframe.
-        """
+        '''
         return pd.merge(first_dataframe, second_dataframe, on=on_column, how='inner')
 
 class File:
+    '''Class to handle files
+    '''
     logger = Logger('File').get_logger()
 
     @logger_decorator(logger)
-    def write_df_on_file(df, filename=INPUTS_OUTPUTS_FILE_PATH, format='pk'):
-        """
+    @staticmethod
+    def write_df_on_file(df: pd.DataFrame, filename: str=INPUTS_OUTPUTS_FILE_PATH, fmt: str='pk'):
+        '''
         Write the dataframe to a file.
 
         Args:
             df (DataFrame): The dataframe to write.
-            filename (str, optional): The name of the file to write the dataframe to. Defaults to INPUTS_OUTPUTS_FILE_PATH.
-        """
-        if format == 'csv':
+            filename (str, optional): The name of the file to write the dataframe to.
+                                      Defaults to INPUTS_OUTPUTS_FILE_PATH.
+        '''
+        if fmt == 'csv':
             df.to_csv(filename + '.csv', index=False)
-        elif format == 'pk':
+        elif fmt == 'pk':
             df.to_pickle(filename + '.pk')
-        elif format == 'both':
+        elif fmt == 'both':
             df.to_csv(filename + '.csv', index=False)
             df.to_pickle(filename + '.pk')
 
     @logger_decorator(logger)
+    @staticmethod
     def read_df_from_file(filename=INPUTS_OUTPUTS_FILE_PATH):
-        """
+        '''
         Read the dataframe from a file.
 
         Args:
-            filename (str, optional): The name of the file to read the dataframe from. Defaults to INPUTS_OUTPUTS_FILE_PATH.
+            filename (str, optional): The name of the file to read the dataframe from.
+                                      Defaults to INPUTS_OUTPUTS_FILE_PATH.
 
         Returns:
             DataFrame: The dataframe read from the file.
-        """
+        '''
         if os.path.exists(filename + '.pk'):
             return pd.read_pickle(filename + '.pk')
-        else:
-            return None
+        return None
 
     @logger_decorator(logger)
-    def write_on_file(data, filename):
-        with open(filename, 'w') as file:
+    @staticmethod
+    def read_df_from_folder(folder_path=INPUTS_OUTPUTS_FOLDER):
+        '''
+        Read the dataframe from a file.
+
+        Args:
+            filename (str, optional): The name of the file to read the dataframe from.
+                                      Defaults to INPUTS_OUTPUTS_FILE_PATH.
+
+        Returns:
+            DataFrame: The dataframe read from the file.
+        '''
+        if os.path.exists(folder_path):
+            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path)]
+            dfs = [pd.read_pickle(file) for file in dir_list]
+            merged_dfs = pd.concat(dfs)
+        return merged_dfs
+
+    @logger_decorator(logger)
+    @staticmethod
+    def write_on_file(data: dict, filename: str):
+        '''Writes data on file
+
+        Args:
+            data (dict): disctionary containing data
+            filename (str): name of the file
+        '''
+        with open(filename, 'w', encoding='utf-8') as file:
             for key, value in data.items():
                 file.write(f'{key}: {value}\n')
 
 if __name__ == '__main__':
     from plotter import Plotter
     inputs_outputs_df = File.read_df_from_file(INPUTS_OUTPUTS_FILE_PATH)
-    inputs_outputs_df = inputs_outputs_df[inputs_outputs_df['RA_ZENITH'] < 30][inputs_outputs_df['DEC_ZENITH'] < 15][inputs_outputs_df['DEC_ZENITH'] > -15]
-    Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
+    Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime',
+                                                                            excluded_cols = [],
+                                                                            marker = ',',
+                                                                            show = True,
+                                                                            smoothing_key='smooth')

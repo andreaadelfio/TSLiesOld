@@ -337,11 +337,15 @@ class Plotter:
             plt.show()
         
     @logger_decorator(logger)
-    def show(self):
+    @staticmethod
+    def show():
+        '''Shows the plots'''
         plt.show()
 
     @logger_decorator(logger)
+    @staticmethod
     def save(folder_name = '.', params = None, indexes = None):
+        '''Saves the plots'''
         folder_name = f'{folder_name}/{params["model_id"]}' if params else folder_name
         for i in plt.get_fignums():
             title = plt.figure(i, figsize=(20, 12)).get_label()

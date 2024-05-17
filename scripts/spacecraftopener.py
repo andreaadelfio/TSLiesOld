@@ -12,15 +12,17 @@ Methods:
     get_dataframe(): Returns the dataframe containing the spacecraft data.
     get_masked_data(start, stop): Returns the masked data within the specified time range.
 '''
-
+import os
 import wget
 from astropy.io import fits
-from astropy.table import Table, vstack
 import pandas as pd
 import numpy as np
-from scripts.config import SC_LAT_WEEKLY_FILE_PATH, regenerate_lat_weekly
-from scripts.utils import Time, Data, Logger, logger_decorator
-
+try:
+    from scripts.config import SC_FOLDER_NAME
+    from scripts.utils import Time, Data, Logger, logger_decorator
+except:
+    from config import SC_FOLDER_NAME
+    from utils import Time, Data, Logger, logger_decorator
 
 class SpacecraftOpener:
     '''
@@ -37,40 +39,34 @@ class SpacecraftOpener:
         self.data = None
 
     @logger_decorator(logger)
-    def get_from_lat_weekly(self):
+    def get_sc_lat_weekly(self, week) -> list[str]:
         """
-        Retrieves data from LAT weekly files and writes them to a single FITS file.
+        Retrieves data from LAT weekly file names or downloads them if not found.
 
         Returns:
-            None
+            list[str]: The list of LAT weekly file names.
         """
-        sc_fits_list = []
-        SC_FILE_PATHS_FROM_LAT = regenerate_lat_weekly()
-        print(SC_FILE_PATHS_FROM_LAT)
-        for SC_FILE_PATH_FROM_LAT in SC_FILE_PATHS_FROM_LAT:
-            sc_fits_list.append(Table.read(SC_FILE_PATH_FROM_LAT))
-        vstack(sc_fits_list, join_type='outer', metadata_conflicts='warn').write(
-            SC_LAT_WEEKLY_FILE_PATH, format='fits', overwrite=True)
+        sc_weekly_content = os.listdir(SC_FOLDER_NAME)
+        filename = f'lat_1sec_spacecraft_weekly_w{week}_p310_v001.fits'
+        if filename not in sc_weekly_content:
+            self.download_lat_weekly(week)
+        filename = os.path.join(SC_FOLDER_NAME, filename)
+        return filename
+
 
     @logger_decorator(logger)
-    def download_lat_weekly(self, start, end):
+    def download_lat_weekly(self, week, dir_path=SC_FOLDER_NAME):
         """
         Downloads LAT weekly spacecraft data.
 
         Returns:
             None
         """
-        # command = f'wget -m -P {SC_FOLDER_NAME_FROM_LAT_WEEKLY} -nH --cut-dirs=4 -np -e robots=off '
-        url = 'https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/weekly/spacecraft/'
-        files_list = [
-            url + f'lat_1sec_spacecraft_weekly_w{i}_p310_v001.fits' for i in range(start, end)]
-        for file_url in files_list:
-            wget.download(file_url, out='.')  # SC_FOLDER_NAME_FROM_LAT_WEEKLY)
-        # command = command + ' '.join(files_list)
-        # subprocess.run(command, shell=True, check=False)
+        url = f'https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/weekly/1s_spacecraft/lat_1sec_spacecraft_weekly_w{week}_p310_v001.fits'
+        wget.download(url, out=dir_path)
 
     @logger_decorator(logger)
-    def open(self, sc_filename=SC_LAT_WEEKLY_FILE_PATH, excluded_columns=None):
+    def open(self, sc_filename, excluded_columns=None):
         """
         Opens the spacecraft data file and retrieves the necessary information.
 
@@ -134,5 +130,7 @@ class SpacecraftOpener:
 
 if __name__ == '__main__':
     sc = SpacecraftOpener()
-    # sc.download_lat_weekly(800, 802)
-    sc.get_from_lat_weekly()
+    files = sc.get_sc_lat_weekly([800, 801, 802])
+    for file in files:
+        sc.open(file)
+        print(sc.get_dataframe().head())

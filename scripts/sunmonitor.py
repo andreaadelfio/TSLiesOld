@@ -1,3 +1,4 @@
+'''This module handles the solar activity retrieval'''
 import os
 import pandas as pd
 from sunpy import timeseries as ts
@@ -11,9 +12,10 @@ except:
     from utils import Time, Logger, logger_decorator
     from plotter import Plotter
     from config import SOLAR_FOLDER_NAME
- 
+
 
 class SunMonitor:
+    '''Class to retrieve goes data'''
     logger = Logger('SunMonitor').get_logger()
 
     @logger_decorator(logger)
@@ -23,9 +25,8 @@ class SunMonitor:
 
     @logger_decorator(logger)
     def fetch_goes_data(self):
-        """
-        """
-        result_goes = Fido.search(a.Time(self.tstart, self.tend), a.Instrument("XRS"), a.Resolution("flx1s"))
+        '''Fetches data from the GOES server'''
+        result_goes = Fido.search(a.Time(self.tstart, self.tend), a.Instrument('XRS'), a.Resolution('flx1s'))
         files_to_fetch = {}
         files_list = []
         for i, url in enumerate(list(result_goes[0]['url'])):
@@ -39,27 +40,25 @@ class SunMonitor:
             for i in files_to_fetch.keys():
                 files_list += Fido.fetch(result_goes[0][i], path=SOLAR_FOLDER_NAME, progress=False)
         return files_list
-    
-    # @logger_decorator(logger)
-    def find_goes_data(self, file_goes_list):
-        """
+
+    @logger_decorator(logger)
+    def merge_goes_data(self, goes_list) -> pd.DataFrame:
+        '''
         Find and download GOES XRS data for a specific time period.
 
         Parameters:
-        tstart (str): Start time of the data retrieval period in the format 'YYYY-MM-DD HH:MM:SS'.
-        tend (str): End time of the data retrieval period in the format 'YYYY-MM-DD HH:MM:SS'.
+        goes_list (list): list of GOES files to be merged.
 
         Returns:
         pandas.DataFrame: A DataFrame containing the mean solar XRSB data for each datetime.
-        """
+        '''
         dfs = []
-        for file_goes in file_goes_list:
-            print(file_goes)
-            goes = ts.TimeSeries(file_goes)
+        for goes in goes_list:
+            goes = ts.TimeSeries(goes)
             df_goes = pd.DataFrame(goes.to_dataframe())
             df_goes.index.name = 'datetime'
             df_goes.reset_index(inplace=True)
-            df_goes = df_goes[(df_goes["xrsa_quality"] == 0) & (df_goes["xrsb_quality"] == 0)]
+            df_goes = df_goes[(df_goes['xrsa_quality'] == 0) & (df_goes['xrsb_quality'] == 0)]
             df_goes = df_goes[['datetime', 'xrsb']]
             df_goes['datetime'] = Time.remove_milliseconds_from_datetime(df_goes['datetime'])
             dfs.append(df_goes)
@@ -68,8 +67,8 @@ class SunMonitor:
         return df_mean
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sm = SunMonitor(tstart = '2024-02-01 00:00:00', tend = '2024-02-08 00:00:00')
     file_goes = sm.fetch_goes_data()
-    df = sm.find_goes_data(file_goes)
+    df = sm.merge_goes_data(file_goes)
     Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime', excluded_cols=[], marker = ',')
