@@ -1,34 +1,103 @@
-
+'''This module contains the classes for the Neural Network and K-Nearest Neighbors models.'''
 import os
-from scripts.utils import Logger, logger_decorator
-import matplotlib.pyplot as plt
-import pandas as pd
 import gc
-# from datetime import date
+import pandas as pd
 import numpy as np
-import shap
-# Preprocess
+# sklearn
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error as MAE, median_absolute_error as MeAE
 from sklearn.preprocessing import StandardScaler
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.neighbors import KNeighborsRegressor
 # Tensorflow, Keras
 from tensorflow.keras.optimizers import Adam, Nadam, RMSprop, SGD
 from tensorflow.keras import Input, Model
 from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler
 from tensorflow.keras.models import load_model
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.neighbors import KNeighborsRegressor
-# Explainability
 from tensorflow.keras.utils import plot_model
+# Explainability
+import matplotlib.pyplot as plt
+import lime.lime_tabular
+import shap
+# Scripts
 from scripts.config import MODEL_NN_FOLDER_NAME
-# from tensorflow.keras import backend as K
-# import tensorflow.keras.losses as losses
-# from tensorflow.python.ops import math_ops
-# from tensorflow.python.framework import ops
+from scripts.utils import Logger, logger_decorator, File
+
+
+def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selected, show=True):
+    '''Get the feature importance using LIME and SHAP and plots it with matplotlib barh.
+    
+    Parameters:
+    ----------
+        model_path (str): The path to the model.
+        inputs_outputs_df (pd.DataFrame): The input and output data.
+        col_range (list): The columns of the output data.
+        col_selected (list): The columns of the input data.
+        show (bool): Whether to show the plot.'''
+    model = load_model(model_path)
+    X_test = inputs_outputs_df[col_selected]
+    scaler = StandardScaler()
+    scaler.fit(X_test)
+    X_test =  pd.DataFrame(scaler.transform(X_test), columns=col_selected)
+
+    y_test = inputs_outputs_df[col_range]
+    NUM_SAMPLE = 100
+    X_back = X_test[60400:61100].sample(NUM_SAMPLE)
+    importance_dict = {col: 0 for col in X_back.columns}
+    # Create a Lime explainer object
+    explainer = lime.lime_tabular.LimeTabularExplainer(
+        training_data=np.array(X_back),
+        feature_names=X_back.columns,
+        class_names=list(y_test.columns),
+        mode='regression'
+    )
+
+    for i in range(NUM_SAMPLE):
+        for mylabel in [0, 1, 2, 3, 4]:
+            exp = explainer.explain_instance(
+                data_row=X_back.iloc[i],
+                mylabel=mylabel,
+                predict_fn=model.predict,
+                num_features=len(X_back.columns)
+            )
+            for feature, weight in exp.as_list(label=mylabel):
+                for col in importance_dict.keys():
+                    if col in feature:
+                        importance_dict[col] += np.abs(weight)
+                        break
+
+    for col, weight in importance_dict.items():
+        importance_dict[col] = weight / NUM_SAMPLE / 5
+
+    sorted_importance_dict = dict(sorted(importance_dict.items(), key=lambda item: item[1]))
+    plt.figure(num='Feature Importance with Lime')
+    plt.barh(list(sorted_importance_dict.keys()), list(sorted_importance_dict.values()))
+    plt.xlabel('Weight')
+    plt.ylabel('Feature')
+    plt.title('Feature Importance')
+
+    e = shap.KernelExplainer(model, X_back)
+    shap_values_orig = e(X_back)
+    shap_values_sum = np.mean(shap_values_orig.values, axis=2)
+    shap_values_sum = shap.Explanation(values=shap_values_sum,
+                                    base_values=shap_values_orig.base_values[0],
+                                    data=shap_values_orig.data,
+                                    feature_names=shap_values_orig.feature_names)
+    plt.figure(num='Feature Importance with SHAP')
+    shap.plots.bar(shap_values_sum, max_display=len(X_back.columns), show=False)
+
+    # idx = 0
+    # plt.figure(num='Waterfall plot with SHAP')
+    # shap.plots._waterfall.waterfall_legacy(e.expected_value[idx], shap_values_orig[0].T[idx],
+    #                                        feature_names=col_selected, max_display=len(col_selected))
+
+    if show:
+        plt.show()
 
 
 class NN:
+    '''The class for the Neural Network model.'''
     logger = Logger('NN').get_logger()
 
     @logger_decorator(logger)
@@ -63,6 +132,7 @@ class NN:
 
     @logger_decorator(logger)
     def trim_hyperparams_combinations(self, hyperparams_combinations):
+        '''Trims the hyperparameters combinations to avoid duplicates.'''
         hyperparams_combinations_tmp = []
         uniques = set()
         model_id = 0
@@ -83,7 +153,16 @@ class NN:
         return hyperparams_combinations_tmp
 
     @logger_decorator(logger)
-    def use_previous_hyperparams_combinations(self, hyperparams_combinations):
+    def use_previous_hyperparams_combinations(self, hyperparams_combinations) -> list:
+        '''Uses the previous hyperparameters combinations.
+        
+        Parameters:
+        ----------
+            hyperparams_combinations (list): The hyperparameters combinations.
+            
+        Returns:
+        --------
+            list: The hyperparameters combinations.'''
         hyperparams_combinations_tmp = []
         uniques = set()
         model_id = 0
@@ -103,6 +182,18 @@ class NN:
 
     @logger_decorator(logger)
     def set_hyperparams(self, params):
+        '''Sets the hyperparameters for the model.
+        
+        Parameters:
+        ----------
+            params (dict): The hyperparameters.
+            
+        Example::
+
+            params = {'model_id': 0, 'units_1': 128, 'units_2': 128, 'units_3': 128,
+                      'norm': True, 'drop': True, 'epochs': 100, 'bs': 32, 'do': 0.5,
+                      'opt_name': 'Adam', 'lr': 0.001, 'loss_type': 'mean_squared_error'}
+            nn.set_hyperparams(params)'''
         self.params = params
         self.model_id = params['model_id']
         if not os.path.exists(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}'):
@@ -122,18 +213,18 @@ class NN:
 
     @logger_decorator(logger)
     def create_model(self):
+        '''Creates the model.'''
         # Load the data
         self.y = self.df_data[self.col_range].astype('float32')
         self.X = self.df_data[self.col_selected].astype('float32')
-        # Splitting
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=0, shuffle=True)
-        # Scale
+
         scaler = StandardScaler()
         scaler.fit(self.X_train)
         self.scaler = scaler
         self.X_train = scaler.transform(self.X_train)
         self.X_test = scaler.transform(self.X_test)
-        # Num of inputs as columns of table
+
         inputs = Input(shape=(self.X_train.shape[1],))
         if self.units_1:
             hidden = Dense(self.units_1, activation='relu')(inputs)
@@ -160,8 +251,9 @@ class NN:
         outputs = Dense(len(self.col_range), activation='linear')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
-        plot_model(self.nn_r, to_file=f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/schema.png', show_shapes=True, show_layer_names=True, rankdir='LR')
-        # Optimizer
+        plot_model(self.nn_r, to_file=f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/schema.png',
+                   show_shapes=True, show_layer_names=True, rankdir='LR')
+
         if self.opt_name == 'Adam':
             opt = Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
         elif self.opt_name == 'Nadam':
@@ -174,7 +266,8 @@ class NN:
         self.nn_r.compile(loss=self.loss_type, optimizer=opt, metrics=['accuracy'])
 
     @logger_decorator(logger)
-    def scheduler(self, epoch, lr_actual):
+    def scheduler(self, epoch, lr_actual): # lr_actual ?????
+        '''The learning rate scheduler.'''
         if epoch < 4:
             return self.lr*12.5
         if 4 <= epoch < 12:
@@ -184,9 +277,11 @@ class NN:
 
     @logger_decorator(logger)
     def train(self):
-        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, patience=10, start_from_epoch=50)
-        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras', monitor='val_loss', mode='min',
-                                verbose=0, save_best_only=True)
+        '''Trains the model.'''
+        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, 
+                           patience=10, start_from_epoch=50)
+        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras', 
+                             monitor='val_loss', mode='min', verbose=0, save_best_only=True)
 
         if not self.lr:
             callbacks = [es, mc]
@@ -232,7 +327,13 @@ class NN:
         return history
 
     @logger_decorator(logger)
-    def predict(self, start = 0, end = -1):
+    def predict(self, start = 0, end = -1, write=True):
+        '''Predicts the output data.
+        
+        Parameters:
+        ----------
+            start (int): The starting index. Default is 0.
+            end (int): The ending index. Defualt is -1.'''
         df_data = self.df_data[start:end]
         pred_x_tot = self.nn_r.predict(self.scaler.transform(df_data[self.col_selected]))
         gc.collect()
@@ -244,18 +345,21 @@ class NN:
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
-        # File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/frg')
-        # File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/bkg')
+        if write:
+            File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/frg')
+            File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/bkg')
         return df_ori, y_pred
 
     @logger_decorator(logger)
     def update_summary(self):
+        '''Updates the summary file with the model parameters'''
         with open(MODEL_NN_FOLDER_NAME + '/models_params.csv', 'a') as f:
             list_tmp = list(self.params.values()) + self.mae_tr_list
             f.write('\t'.join([str(value) for value in list_tmp] + ['\n']))
 
 
 class MedianKNeighborsRegressor(KNeighborsRegressor):
+    '''The class for the Median K-Nearest Neighbors model.'''
     logger = Logger('MedianKNeighborsRegressor').get_logger()
 
     @logger_decorator(logger)
@@ -297,6 +401,7 @@ class MedianKNeighborsRegressor(KNeighborsRegressor):
 
 
 class MultiMedianKNeighborsRegressor():
+    '''The class for the Multi Median K-Nearest Neighbors model.'''
     logger = Logger('MultiMedianKNeighborsRegressor').get_logger()
 
     @logger_decorator(logger)

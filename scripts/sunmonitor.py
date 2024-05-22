@@ -26,7 +26,9 @@ class SunMonitor:
     @logger_decorator(logger)
     def fetch_goes_data(self):
         '''Fetches data from the GOES server'''
-        result_goes = Fido.search(a.Time(self.tstart, self.tend), a.Instrument('XRS'), a.Resolution('flx1s'))
+        result_goes = Fido.search(a.Time(self.tstart, self.tend),
+                                  a.Instrument('XRS'),
+                                  a.Resolution('flx1s'))
         files_to_fetch = {}
         files_list = []
         for i, url in enumerate(list(result_goes[0]['url'])):
@@ -47,9 +49,11 @@ class SunMonitor:
         Find and download GOES XRS data for a specific time period.
 
         Parameters:
+        ----------
         goes_list (list): list of GOES files to be merged.
 
         Returns:
+        -------
         pandas.DataFrame: A DataFrame containing the mean solar XRSB data for each datetime.
         '''
         dfs = []
@@ -71,4 +75,6 @@ if __name__ == '__main__':
     sm = SunMonitor(tstart = '2024-02-01 00:00:00', tend = '2024-02-08 00:00:00')
     file_goes = sm.fetch_goes_data()
     df = sm.merge_goes_data(file_goes)
-    Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime', excluded_cols=[], marker = ',')
+    Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime',
+                                                             excluded_cols=[],
+                                                             marker = ',')

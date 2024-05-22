@@ -1,9 +1,10 @@
-"""Plotter module for plotting data points and curves."""
+'''Plotter module for plotting data points and curves.'''
 import operator
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import seaborn as sns
+from sklearn.metrics import confusion_matrix
 try:
     from scripts.utils import Logger, logger_decorator
 except:
@@ -11,22 +12,23 @@ except:
 
 
 class Plotter:
-    """
+    '''
     This class provides methods for plotting data points and curves.
-    """
+    '''
     logger = Logger('Plotter').get_logger()
 
     @logger_decorator(logger)
     def __init__(self, x = None, y = None, df: pd.DataFrame = None, xy: dict = None, label = ''):
-        """
+        '''
         Initialize the Plotter object.
 
         Parameters:
-        - x (list): The x-coordinates of the data points (default: None).
-        - y (list): The y-coordinates of the data points (default: None).
-        - xy (dict): A dictionary of x, y, and smooth y values for multiple curves (default: None).
-        - label (str): The label for the plot (default: '').
-        """
+        ----------
+            x (list): The x-coordinates of the data points (default: None).
+            y (list): The y-coordinates of the data points (default: None).
+            xy (dict): A dictionary of x, y, and smooth y values for multiple curves (default: None).
+            label (str): The label for the plot (default: '').
+        '''
         self.x = x
         self.y = y
         self.df = df
@@ -35,12 +37,13 @@ class Plotter:
 
     @logger_decorator(logger)
     def plot(self, marker = '-', lw = 0, show = True):
-        """
+        '''
         Plot a single curve.
 
         Parameters:
-        - marker (str): The marker style for the plot (default: '-').
-        """
+        ----------
+            marker (str): The marker style for the plot (default: '-').
+        '''
         plt.figure()
         plt.tight_layout(pad = 0.4)
         plt.plot(self.x, self.y, marker = marker, lw = lw, label = self.label)
@@ -52,13 +55,14 @@ class Plotter:
 
     @logger_decorator(logger)
     def plot_tiles(self, marker = '-', lw = 0.2, with_smooth = False, show = True):
-        """
+        '''
         Plot multiple curves as tiles.
 
         Parameters:
-        - lw (float): Line width of the curves (default: 0.1).
-        - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
-        """
+        ----------
+            lw (float): Line width of the curves (default: 0.1).
+            with_smooth (bool): Whether to plot smoothed curves as well (default: False).
+        '''
         i = 0
         _, axs = plt.subplots(len(self.xy), 1, sharex=True)
         plt.tight_layout(pad = 0.4)
@@ -76,13 +80,14 @@ class Plotter:
 
     @logger_decorator(logger)
     def multiplot(self, marker = '-', lw = 0.1, with_smooth = False, show = True):
-        """
+        '''
         Plots multiple curves on the same figure.
 
         Parameters:
-        - lw (float): Line width of the curves (default: 0.1).
-        - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
-        """
+        ----------
+            lw (float): Line width of the curves (default: 0.1).
+            with_smooth (bool): Whether to plot smoothed curves as well (default: False).
+        '''
         plt.figure()
         plt.tight_layout(pad = 0.4)
         plt.title(self.label)
@@ -97,13 +102,14 @@ class Plotter:
 
     @logger_decorator(logger)
     def df_plot_corr_tiles(self, x_col, excluded_cols = None, marker = '-', ms = 1, lw = 0.1, smoothing_key = 'smooth', show = True):
-        """
+        '''
         Plot multiple curves as tiles.
 
         Parameters:
-        - lw (float): Line width of the curves (default: 0.1).
-        - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
-        """
+        ----------
+            lw (float): Line width of the curves (default: 0.1).
+            with_smooth (bool): Whether to plot smoothed curves as well (default: False).
+        '''
         if not excluded_cols:
             excluded_cols = []
         df_columns = [column for column in self.df.columns if f'_{smoothing_key}' not in column and column not in excluded_cols and column != 'datetime']
@@ -145,13 +151,14 @@ class Plotter:
 
     @logger_decorator(logger)
     def df_plot_tiles(self, x_col, excluded_cols = None, marker = '-', lw = 0.1, smoothing_key = 'smooth', show = True):
-        """
+        '''
         Plot multiple curves as tiles.
 
         Parameters:
-        - lw (float): Line width of the curves (default: 0.1).
-        - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
-        """
+        ----------
+            lw (float): Line width of the curves (default: 0.1).
+            with_smooth (bool): Whether to plot smoothed curves as well (default: False).
+        '''
         if not excluded_cols:
             excluded_cols = []
         df_columns = [column for column in self.df.columns if f'_{smoothing_key}' not in column and column not in excluded_cols and column != x_col]
@@ -186,13 +193,13 @@ class Plotter:
 
     @logger_decorator(logger)
     def df_plot_tiles_for_pres(self, x_col, excluded_cols = None, marker = '-', lw = 0.1, smoothing_key = 'smooth', show = True):
-        """
+        '''
         Plot multiple curves as tiles.
 
         Parameters:
         - lw (float): Line width of the curves (default: 0.1).
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
-        """
+        '''
         if not excluded_cols:
             excluded_cols = []
         df_columns = [column for column in self.df.columns if f'_{smoothing_key}' not in column and column not in excluded_cols and column != x_col]
@@ -227,13 +234,13 @@ class Plotter:
 
     @logger_decorator(logger)
     def df_multiplot(self, x_col, marker = '-', lw = 0.1, with_smooth = False, show = True):
-        """
+        '''
         Plots multiple curves on the same figure.
 
         Parameters:
         - lw (float): Line width of the curves (default: 0.1).
         - with_smooth (bool): Whether to plot smoothed curves as well (default: False).
-        """
+        '''
         plt.figure(self.label)
         plt.tight_layout(pad = 0.4)
         plt.title(self.label)
@@ -333,6 +340,27 @@ class Plotter:
             axs[i].legend()
         for j in range(i + 1, len(axs)):
             axs[j].axis('off')
+        if show:
+            plt.show()
+
+    @logger_decorator(logger)
+    def plot_correlation_matrix(self, inputs_outputs_df: pd.DataFrame, show = True):
+        '''Function to plot the correlation matrix.'''
+        correlations = inputs_outputs_df.corr()
+        plt.figure(figsize=(10, 8), num='correlations_matrix')
+        sns.heatmap(correlations, annot=True, cmap='coolwarm', fmt=".2f")
+        plt.xticks(rotation=90)
+        plt.yticks(rotation=0)
+        if show:
+            plt.show()
+
+    def plot_confusion_matric(self, y_true, y_pred, show = True):
+        '''Function to plot the confusion matrix.'''
+        cm = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(10, 8), num='confusion_matrix')
+        sns.heatmap(cm, annot=True, cmap='coolwarm', fmt=".2f")
+        plt.xticks(rotation=90)
+        plt.yticks(rotation=0)
         if show:
             plt.show()
         

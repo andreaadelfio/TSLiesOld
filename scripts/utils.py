@@ -21,13 +21,15 @@ class Logger():
         '''
         Initializes a Logger object.
 
-        Args:
+        Parameters:
+        ----------
             logger_name (str): The name of the logger.
             log_file_name (str): The name of the log file. 
                                  Default is LOGGING_FILE_PATH from config.py.
             log_level (int): The log level. Default is logging.DEBUG.
 
         Returns:
+        -------
             None
         '''
         if not os.path.exists(log_file_name):
@@ -37,7 +39,7 @@ class Logger():
         self.logger_name = logger_name
         self.logger = logging.getLogger(self.logger_name)
         self.logger.setLevel(self.log_level)
-        self.format = '%(asctime)s %(name)s [%(levelname)s]: %(pathname)s - %(funcName)s (%(lineno)d) : %(message)s'
+        self.format = '%(asctime)s %(name)s [%(levelname)s]: %(pathname)s - %(funcName)s : %(message)s'
         self.formatter = logging.Formatter(self.format)
         for handler in self.logger.handlers[:]:
             self.logger.removeHandler(handler)
@@ -51,10 +53,10 @@ class Logger():
         Returns the logger object.
 
         Returns:
+        -------
             logging.Logger: The logger object.
         '''
         return self.logger
-
 
 def logger_decorator(logger):
     '''Logger decorator'''
@@ -67,17 +69,18 @@ def logger_decorator(logger):
                     self.pathname = sys.modules.get(func.__module__).__file__
                     self.funcName = func.__name__
             logging.setLogRecordFactory(CustomLogRecord)
-            logger.info(f'{func.__name__} - START')
+            logger.info('START')
             try:
                 result = func(*args, **kwargs)
             except Exception as e:
+                logging.setLogRecordFactory(CustomLogRecord)
+                logger.error(e)
                 logger.debug('Args: %s', pprint.pformat(args))
                 logger.debug('Kwargs: %s', pprint.pformat(kwargs))
-                logger.error(e)
                 raise
-            else:
-                logger.info(f'{func.__name__} - END')
-                return result
+            logging.setLogRecordFactory(CustomLogRecord)
+            logger.info('END')
+            return result
         return wrapper
     return decorator
 
@@ -98,6 +101,7 @@ class Time:
         - met_list (list): The MET list to convert.
 
         Returns:
+        -------
         - datetime_list (list of datetime): The datetime object corresponding to the MET.
         '''
         return [Time.fermi_ref_time + timedelta(seconds=int(met)) for met in met_list]
@@ -111,6 +115,7 @@ class Time:
         - met_list (list): The MET list to convert.
 
         Returns:
+        -------
         - datetime_list (list of str): The datetime object corresponding to the MET, 
                                        represented as strings.
         '''
@@ -125,6 +130,7 @@ class Time:
         - datetime_list (list): The datetime list to convert.
 
         Returns:
+        -------
         - datetime_list (list of datetime): The datetime object without milliseconds.
         '''
         return [dt.replace(microsecond=0) for dt in datetime_list]
@@ -138,6 +144,7 @@ class Time:
         - datetime_dict (list): The datetime list to convert.
 
         Returns:
+        -------
         - week_list (list of int): The week number corresponding to the datetime.
         '''
         weeks_set = set()
@@ -155,6 +162,7 @@ class Time:
         - week (int): The week number.
 
         Returns:
+        -------
         - datetime_tuple (tuple): The datetime tuple corresponding to the week.
         '''
         start = Time.fermi_launch_time + timedelta(weeks=week - 10)
@@ -175,13 +183,15 @@ class Data():
         '''
         Returns the masked data within the specified time range.
 
-        Args:
+        Parameters:
+        ----------
             start (float): The start time of the desired data range.
             stop (float): The stop time of the desired data range.
             data (DataFrame): The input data.
             column (str, optional): The column name representing the time. Defaults to 'datetime'.
 
         Returns:
+        -------
             DataFrame: The masked data within the specified time range.
         '''
         mask = (data[column] >= start) & (data[column] <= stop)
@@ -193,13 +203,15 @@ class Data():
         '''
         Returns the excluded dataframes within the specified time range.
 
-        Args:
+        Parameters:
+        ----------
             start (float): The start time of the desired data range.
             stop (float): The stop time of the desired data range.
             data (DataFrame): The input data.
             column (str, optional): The column name representing the time. Defaults to 'datetime'.
 
         Returns:
+        -------
             list: The excluded dataframes within the specified time range.
         '''
         mask = (data[column] < start) | (data[column] > stop)
@@ -211,13 +223,15 @@ class Data():
         '''
         Returns the masked data within the specified time range.
 
-        Args:
+        Parameters:
+        ----------
             start (float): The start time of the desired data range.
             stop (float): The stop time of the desired data range.
             data (DataFrame): The input data.
             column (str, optional): The column name representing the time. Defaults to 'datetime'.
 
         Returns:
+        -------
             dict: The masked data within the specified time range, with column names as keys
                   and lists of values as values.
         '''
@@ -231,11 +245,13 @@ class Data():
         '''
         Returns the spacecraft dataframe filtered on runs times.
 
-        Args:
+        Parameters:
+        ----------
             initial_dataframe (DataFrame): The initial spacecraft data.
             run_times (DataFrame): The dataframe containing run times.
 
         Returns:
+        -------
             DataFrame: The filtered spacecraft dataframe.
         '''
         df = pd.DataFrame()
@@ -251,10 +267,12 @@ class Data():
         '''
         Converts the data containing the spacecraft data into a pd.DataFrame.
 
-        Args:
+        Parameters:
+        ----------
             data_to_df (ndarray): The data to convert.
 
         Returns:
+        -------
             DataFrame: The dataframe containing the spacecraft data.
         '''
         name_data_dict = {name: data_to_df.field(name).tolist() for name in data_to_df.dtype.names}
@@ -267,12 +285,14 @@ class Data():
         '''
         Merges two dataframes based on a common column.
 
-        Args:
+        Parameters:
+        ----------
             first_dataframe (DataFrame): The first dataframe.
             second_dataframe (DataFrame): The second dataframe.
             on_column (str, optional): The column to merge on. Defaults to 'datetime'.
 
         Returns:
+        -------
             DataFrame: The merged dataframe.
         '''
         return pd.merge(first_dataframe, second_dataframe, on=on_column, how='inner')
@@ -288,10 +308,17 @@ class File:
         '''
         Write the dataframe to a file.
 
-        Args:
+        Parameters:
+        ----------
             df (DataFrame): The dataframe to write.
             filename (str, optional): The name of the file to write the dataframe to.
                                       Defaults to INPUTS_OUTPUTS_FILE_PATH.
+            fmt (str, optional): The format to write the dataframe in.
+                                 Can be:
+                                    'csv' to write a .csv file;
+                                    'pk' to write a .pk file;
+                                    'both' to write in both formats.
+                                 Defaults to 'pk'.
         '''
         if fmt == 'csv':
             df.to_csv(filename + '.csv', index=False)
@@ -307,11 +334,13 @@ class File:
         '''
         Read the dataframe from a file.
 
-        Args:
+        Parameters:
+        ----------
             filename (str, optional): The name of the file to read the dataframe from.
                                       Defaults to INPUTS_OUTPUTS_FILE_PATH.
 
         Returns:
+        -------
             DataFrame: The dataframe read from the file.
         '''
         if os.path.exists(filename + '.pk'):
@@ -324,15 +353,17 @@ class File:
         '''
         Read the dataframe from a file.
 
-        Args:
+        Parameters:
+        ----------
             filename (str, optional): The name of the file to read the dataframe from.
                                       Defaults to INPUTS_OUTPUTS_FILE_PATH.
 
         Returns:
+        -------
             DataFrame: The dataframe read from the file.
         '''
         if os.path.exists(folder_path):
-            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path)]
+            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.pk')]
             dfs = [pd.read_pickle(file) for file in dir_list]
             merged_dfs = pd.concat(dfs)
         return merged_dfs
@@ -342,7 +373,8 @@ class File:
     def write_on_file(data: dict, filename: str):
         '''Writes data on file
 
-        Args:
+        Parameters:
+        ----------
             data (dict): disctionary containing data
             filename (str): name of the file
         '''

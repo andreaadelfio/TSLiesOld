@@ -9,10 +9,13 @@ from scripts.spacecraftopener import SpacecraftOpener
 from scripts.catalogreader import CatalogReader
 from scripts.plotter import Plotter
 from scripts.sunmonitor import SunMonitor
-from scripts.utils import Data, File, Time
+from scripts.utils import Data, File, Time, Logger, logger_decorator
 from scripts.config import INPUTS_OUTPUTS_FILE_PATH
 
 
+logger = Logger('Main Dataset').get_logger()
+
+@logger_decorator(logger)
 def get_good_data_quality(dataframe) -> pd.DataFrame:
     '''
     Returns the dataframe masked for good data quality.
@@ -22,7 +25,8 @@ def get_good_data_quality(dataframe) -> pd.DataFrame:
     '''
     return dataframe[dataframe['DATA_QUAL'] != 0]
 
-def get_tile_signal_df():
+@logger_decorator(logger)
+def get_tiles_signal_df():
     '''Get the tile signal dataframe from the catalog'''
     print('Catalog...', end='')
     cr = CatalogReader(start=0, end=2)
@@ -33,6 +37,7 @@ def get_tile_signal_df():
     print(' done')
     return tile_signal_df, weeks_list
 
+@logger_decorator(logger)
 def get_sc_params_df(week):
     '''Get the spacecraft parameters dataframe'''
     print('Sc params...', end='')
@@ -43,6 +48,7 @@ def get_sc_params_df(week):
     print(' done')
     return sc_params_df
 
+@logger_decorator(logger)
 def get_solar_signal_df(week):
     '''Get the solar signal dataframe from the GOES data'''
     print('Solar...', end='')
@@ -53,17 +59,20 @@ def get_solar_signal_df(week):
     print(' done')
     return solar_signal_df
 
+@logger_decorator(logger)
 def get_inputs_outputs_df():
     '''Get the inputs and outputs dataframe'''
-    tile_signal_df, weeks_list = get_tile_signal_df()
+    tile_signal_df, weeks_list = get_tiles_signal_df()
     for week in weeks_list:
         sc_params_df = get_sc_params_df(week)
         sc_params_df = get_good_data_quality(sc_params_df)
         solar_signal_df = get_solar_signal_df(week)
         inputs_outputs = Data.merge_dfs(tile_signal_df, sc_params_df)
         inputs_outputs = Data.merge_dfs(inputs_outputs, solar_signal_df)
-        File.write_df_on_file(inputs_outputs, filename=INPUTS_OUTPUTS_FILE_PATH + f'_w{week}')
-        print(' done')
+        File.write_df_on_file(inputs_outputs,
+                              filename=f'{INPUTS_OUTPUTS_FILE_PATH}_w{week}',
+                              fmt='csv')
+    print(' done')
     return inputs_outputs
 
 
@@ -87,6 +96,13 @@ if __name__ == '__main__':
                     'QSJ_3', 'QSJ_4', 'RA_SUN', 'DEC_SUN', 'SC_VELOCITY_0', 'SC_VELOCITY_1',
                     'SC_VELOCITY_2', 'SOLAR']
 
-    Plotter(df = inputs_outputs_df, label = 'Inputs').df_plot_tiles(x_col = 'datetime', excluded_cols = col_range_raw + col_range, marker = ',', smoothing_key='smooth', show = False)
-    Plotter(df = inputs_outputs_df, label = 'Outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = col_selected, marker = ',', smoothing_key='smooth', show = False)
+    Plotter(df = inputs_outputs_df, label = 'Inputs').df_plot_tiles(x_col = 'datetime',
+                                                                    excluded_cols = col_range_raw + col_range,
+                                                                    marker = ',',
+                                                                    smoothing_key='smooth',
+                                                                    show = False)
+    Plotter(df = inputs_outputs_df, label = 'Outputs').df_plot_tiles(x_col = 'datetime',
+                                                                     excluded_cols = col_selected,
+                                                                     marker = ',', smoothing_key='smooth',
+                                                                     show = False)
     Plotter.show()
