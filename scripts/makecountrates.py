@@ -146,7 +146,6 @@ def create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER):
     list_file = os.listdir(INPUT_ROOTS_FOLDER)
     list_file.sort()
     output_rootfile = ROOT.TFile(output_filename, 'recreate')
-    print(output_filename)
     logger.info(f'Processing {output_filename}')
     myTree = createTChain(list_file, 'myTree', INPUT_ROOTS_FOLDER)
 
@@ -190,14 +189,14 @@ def create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER):
         # histNorm_dict[tileID].Divide(hist_triggers)
 
         output_rootfile.cd()
-        hist_dict[tileID].Write()
+        # hist_dict[tileID].Write()
         # histNorm_dict[tileID].Write()
         # print(f'\rCompletion: {tileID/89*100:.2f}%', end='')
 
     hist_top, hist_Xpos, hist_Xneg, hist_Ypos, hist_Yneg = mediaSides(
         hist_dict, identityFunc)
     # histNorm_top, histNorm_Xpos, histNorm_Xneg, histNorm_Ypos, histNorm_Yneg = mediaSides(
-    #     histNorm_dict, identityFunc)
+        # histNorm_dict, identityFunc)
 
     # histNorm_top.SetNameTitle('histNorm_top', 'histNorm_top')
     # histNorm_Xpos.SetNameTitle('histNorm_Xpos', 'histNorm_Xpos')
@@ -223,28 +222,35 @@ def create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER):
     logger.info(f'Processing {output_filename} - done')
 
 def do_work(binning):
-    INPUT_RUNS_FOLDER = './data/LAT_ACD/input runs/'
+    INPUT_RUNS_FOLDER = './data/LAT_ACD/complete/'
     OUTPUT_RUNS_FOLDER = './data/LAT_ACD/output runs/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
-        input_folder_list.remove(f'testOutputs_{output_run.split(".root")[0]}')
+        if f'testOutputs_{output_run.split(".root")[0]}' in input_folder_list:
+            input_folder_list.remove(f'testOutputs_{output_run.split(".root")[0]}')
+    i = 0
     for run in input_folder_list:
         output_filename = f'{OUTPUT_RUNS_FOLDER}{run.split("_")[1]}.root'
         INPUT_ROOTS_FOLDER = INPUT_RUNS_FOLDER + run
-        create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER)
+        if len(os.listdir(INPUT_ROOTS_FOLDER)) > 0:
+            print(f'{run} - {100 * (i+1)/len(input_folder_list)}%')
+            create_root(run, binning, output_filename, INPUT_ROOTS_FOLDER)
+            i += 1
 
 def do_work_parallel(binning):
-    INPUT_RUNS_FOLDER = './data/LAT_ACD/input runs/'
-    OUTPUT_RUNS_FOLDER = './data/LAT_ACD/output runs/'
+    INPUT_RUNS_FOLDER = './data/LAT_ACD/complete/'
+    OUTPUT_RUNS_FOLDER = './data/LAT_ACD/output runs/parallel/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
+        run_folder = f'testOutputs_{output_run.split(".root")[0]}'
+        root_dir = os.path.join(INPUT_RUNS_FOLDER, run_folder)
         if output_run != 'parallel':
-	        input_folder_list.remove(f'testOutputs_{output_run.split(".root")[0]}')
-    OUTPUT_RUNS_FOLDER = OUTPUT_RUNS_FOLDER + 'parallel/'
+            if run_folder in input_folder_list or len(os.listdir(root_dir)) == 0:
+	            input_folder_list.remove(run_folder)
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(create_root, run, binning, f'{OUTPUT_RUNS_FOLDER}{run.split("_")[1]}.root', INPUT_RUNS_FOLDER + run) for run in input_folder_list]
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing runs"):
             try:
@@ -272,6 +278,6 @@ def parser():
 if __name__ == '__main__':
     fileSizes = 'ACD_tiles_size2.txt'
     fill_dictSizes(fileSizes)
-    do_work(1)
-    #do_work_parallel(1)
+    # do_work(1)
+    do_work_parallel(1)
     print("... done, bye bye")

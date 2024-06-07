@@ -5,10 +5,11 @@ import pprint
 import logging
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 try:
-    from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER
+    from scripts.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_PK_FOLDER
 except:
-    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER
+    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_PK_FOLDER
 
 class Logger():
     '''
@@ -263,7 +264,7 @@ class Data():
 
     @logger_decorator(logger)
     @staticmethod
-    def convert_to_df(data_to_df: pd.DataFrame) -> pd.DataFrame:
+    def convert_to_df(data_to_df: np.ndarray) -> pd.DataFrame:
         '''
         Converts the data containing the spacecraft data into a pd.DataFrame.
 
@@ -320,13 +321,22 @@ class File:
                                     'both' to write in both formats.
                                  Defaults to 'pk'.
         '''
+        path, filename = os.path.split(filename)
         if fmt == 'csv':
-            df.to_csv(filename + '.csv', index=False)
+            if not os.path.exists(os.path.join(path, 'csv')):
+                os.makedirs(os.path.join(path, 'csv'), exist_ok=True)
+            df.to_csv(os.path.join(path, 'csv', filename + '.csv'), index=False)
         elif fmt == 'pk':
-            df.to_pickle(filename + '.pk')
+            if not os.path.exists(os.path.join(path, 'pk')):
+                os.makedirs(os.path.join(path, 'pk'), exist_ok=True)
+            df.to_pickle(os.path.join(path, 'pk', filename + '.pk'))
         elif fmt == 'both':
-            df.to_csv(filename + '.csv', index=False)
-            df.to_pickle(filename + '.pk')
+            if not os.path.exists(os.path.join(path, 'csv')):
+                os.makedirs(os.path.join(path, 'csv'), exist_ok=True)
+            if not os.path.exists(os.path.join(path, 'pk')):
+                os.makedirs(os.path.join(path, 'pk'), exist_ok=True)
+            df.to_csv(os.path.join(path, 'csv', filename + '.csv'), index=False)
+            df.to_pickle(os.path.join(path, 'pk', filename + '.pk'))
 
     @logger_decorator(logger)
     @staticmethod
@@ -349,7 +359,7 @@ class File:
 
     @logger_decorator(logger)
     @staticmethod
-    def read_df_from_folder(folder_path=INPUTS_OUTPUTS_FOLDER):
+    def read_dfs_from_pk_folder(folder_path=INPUTS_OUTPUTS_PK_FOLDER):
         '''
         Read the dataframe from a file.
 
@@ -364,8 +374,9 @@ class File:
         '''
         if os.path.exists(folder_path):
             dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.pk')]
+            dir_list = sorted(dir_list, key=lambda x: int(x.split('_w')[-1].split('.')[0]))
             dfs = [pd.read_pickle(file) for file in dir_list]
-            merged_dfs = pd.concat(dfs)
+            merged_dfs = pd.concat(dfs, ignore_index=True)
         return merged_dfs
 
     @logger_decorator(logger)

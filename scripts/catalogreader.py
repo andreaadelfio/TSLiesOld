@@ -71,21 +71,58 @@ class CatalogReader():
         if runs_roots is None:
             runs_roots = self.runs_roots
         for fname in runs_roots:
-            # self.logger.debug(f'Processing {fname}')
             froot = ROOT.TFile.Open(fname, 'read')
             hist = froot.Get(self.h_names[0])
             histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
-            self.runs_dict[fname] = {'MET': histx}
-            self.runs_dict[fname]['datetime'] = Time.from_met_to_datetime(histx)
-            self.runs_times[fname] = (self.runs_dict[fname]['datetime'][0], self.runs_dict[fname]['datetime'][-1])
+            datetime = np.array(Time.from_met_to_datetime(histx))
+            names = ['datetime', 'MET']
+            arr_list = [datetime, histx]
+            
+            self.runs_times[fname] = (datetime[0], datetime[-1])
             for h_name in self.h_names:
                 hist = froot.Get(h_name)
                 if binning:
                     hist.Rebin(binning)
                 histc = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX() + 1)])
-                self.runs_dict[fname][h_name.split('hist_')[-1]] = histc
+
+                names.extend([h_name.split('hist_')[-1]])
+                arr_list.extend([histc])
+            self.runs_dict[fname] = np.rec.fromarrays(arrayList=arr_list, names=names)
             froot.Close()
         return self.runs_dict
+
+    # @logger_decorator(logger)
+    # def get_runs_dict(self, runs_roots = None, binning = None):
+    #     """
+    #     Get the dictionary of runs and their properties.
+
+    #     Parameters:
+    #     - runs_dirs (list): The list of run directories to consider.
+    #     - binning (int): The binning factor for the histograms (optional).
+    #     - smooth (bool): Flag indicating whether to apply smoothing to the histograms (optional).
+
+    #     Returns:
+    #     - runs_dict (dict): The dictionary of runs and their properties.
+    #     """
+    #     if runs_roots is None:
+    #         runs_roots = self.runs_roots
+    #     for fname in runs_roots:
+    #         # self.logger.debug(f'Processing {fname}')
+    #         # print(f'Processing {fname}')
+    #         froot = ROOT.TFile.Open(fname, 'read')
+    #         hist = froot.Get(self.h_names[0])
+    #         histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
+    #         self.runs_dict[fname] = {'MET': histx}
+    #         self.runs_dict[fname]['datetime'] = np.array(Time.from_met_to_datetime(histx))
+    #         self.runs_times[fname] = (self.runs_dict[fname]['datetime'][0], self.runs_dict[fname]['datetime'][-1])
+    #         for h_name in self.h_names:
+    #             hist = froot.Get(h_name)
+    #             if binning:
+    #                 hist.Rebin(binning)
+    #             histc = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX() + 1)])
+    #             self.runs_dict[fname][h_name.split('hist_')[-1]] = histc
+    #         froot.Close()
+    #     return self.runs_dict
 
     @logger_decorator(logger)
     def add_smoothing(self, tile_signal):
@@ -94,15 +131,14 @@ class CatalogReader():
         time_step = histx[2] - histx[1]
         nyquist_freq = 0.5 / time_step
         freq_cut1 = 0.01 * nyquist_freq
-        for h_name in tile_signal.keys():
-            if h_name not in ('MET', 'datetime'):
-                histc = tile_signal[h_name].to_list()
-                sig_fft = fftpack.fft(histc)
-                sample_freq = fftpack.fftfreq(len(histc), d=time_step)
-                low_freq_fft1  = sig_fft.copy()
-                low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
-                filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
-                tile_signal[f'{h_name}_smooth'] = filtered_sig1
+        for h_name in set(tile_signal.keys()) - {'MET', 'datetime'}:
+            histc = tile_signal[h_name].to_list()
+            sig_fft = fftpack.fft(histc)
+            sample_freq = fftpack.fftfreq(len(histc), d=time_step)
+            low_freq_fft1  = sig_fft.copy()
+            low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
+            filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
+            tile_signal[f'{h_name}_smooth'] = filtered_sig1
         return tile_signal
 
     @logger_decorator(logger)
@@ -116,14 +152,21 @@ class CatalogReader():
         Returns:
         - signal_dataframe (pd.DataFrame): The signal dataframe.
         """
+        import time
+        start = time.time()
         if runs_dict is None:
             runs_dict = self.get_runs_dict()
+        print(time.time() - start)
+        start = time.time()
         if len(runs_dict) > 1:
             catalog_df = pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
         else:
             catalog_df = pd.DataFrame(list(runs_dict.values())[0])
+        
+        print(time.time() - start)
+        catalog_df = catalog_df[catalog_df['Xpos'] != 0]
         return catalog_df
 
 if __name__ == '__main__':
-    cr = CatalogReader(start=0, end=2)
+    cr = CatalogReader(start=0, end=-1)
     tile_signal_df = cr.get_signal_df_from_catalog()

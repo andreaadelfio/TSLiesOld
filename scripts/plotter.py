@@ -7,8 +7,10 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix
 try:
     from scripts.utils import Logger, logger_decorator
+    from scripts.config import MODEL_NN_FOLDER_NAME
 except:
     from utils import Logger, logger_decorator
+    from config import MODEL_NN_FOLDER_NAME
 
 
 class Plotter:
@@ -344,7 +346,7 @@ class Plotter:
             plt.show()
 
     @logger_decorator(logger)
-    def plot_correlation_matrix(self, inputs_outputs_df: pd.DataFrame, show = True):
+    def plot_correlation_matrix(self, inputs_outputs_df: pd.DataFrame, show = True, save = False):
         '''Function to plot the correlation matrix.'''
         correlations = inputs_outputs_df.corr()
         plt.figure(figsize=(10, 8), num='correlations_matrix')
@@ -353,6 +355,8 @@ class Plotter:
         plt.yticks(rotation=0)
         if show:
             plt.show()
+        if save:
+            Plotter.save(MODEL_NN_FOLDER_NAME)
 
     def plot_confusion_matric(self, y_true, y_pred, show = True):
         '''Function to plot the confusion matrix.'''

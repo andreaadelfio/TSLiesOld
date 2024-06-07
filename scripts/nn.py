@@ -23,9 +23,10 @@ import shap
 # Scripts
 from scripts.config import MODEL_NN_FOLDER_NAME
 from scripts.utils import Logger, logger_decorator, File
+from scripts.plotter import Plotter
 
 
-def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selected, show=True):
+def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selected, show=True, save=True):
     '''Get the feature importance using LIME and SHAP and plots it with matplotlib barh.
     
     Parameters:
@@ -94,6 +95,9 @@ def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selecte
 
     if show:
         plt.show()
+    if save:
+        Plotter.save(MODEL_NN_FOLDER_NAME)
+
 
 
 class NN:
