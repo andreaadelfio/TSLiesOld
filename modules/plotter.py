@@ -6,8 +6,8 @@ import numpy as np
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 try:
-    from scripts.utils import Logger, logger_decorator
-    from scripts.config import MODEL_NN_FOLDER_NAME
+    from modules.utils import Logger, logger_decorator
+    from modules.config import MODEL_NN_FOLDER_NAME
 except:
     from utils import Logger, logger_decorator
     from config import MODEL_NN_FOLDER_NAME

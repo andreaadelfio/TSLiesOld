@@ -21,9 +21,9 @@ from matplotlib.path import Path
 import matplotlib.pyplot as plt
 
 try:
-    from scripts.config import SC_FOLDER_NAME
-    from scripts.utils import Time, Data, Logger, logger_decorator
-    from scripts.plotter import Plotter
+    from modules.config import SC_FOLDER_NAME
+    from modules.utils import Time, Data, Logger, logger_decorator
+    from modules.plotter import Plotter
 except:
     from config import SC_FOLDER_NAME
     from plotter import Plotter

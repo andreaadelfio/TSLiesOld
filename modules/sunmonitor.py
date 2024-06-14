@@ -5,9 +5,9 @@ from sunpy import timeseries as ts
 from sunpy.net import Fido
 from sunpy.net import attrs as a
 try:
-    from scripts.utils import Time, Logger, logger_decorator
-    from scripts.plotter import Plotter
-    from scripts.config import SOLAR_FOLDER_NAME
+    from modules.utils import Time, Logger, logger_decorator
+    from modules.plotter import Plotter
+    from modules.config import SOLAR_FOLDER_NAME
 except:
     from utils import Time, Logger, logger_decorator
     from plotter import Plotter

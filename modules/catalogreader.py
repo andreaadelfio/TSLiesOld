@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 from scipy import fftpack
 try:
-    from scripts.config import DATA_LATACD_FOLDER_PATH
-    from scripts.utils import Time, Logger, logger_decorator
+    from modules.config import DATA_LATACD_FOLDER_PATH
+    from modules.utils import Time, Logger, logger_decorator
 except:
     from config import DATA_LATACD_FOLDER_PATH
     from utils import Time, Logger, logger_decorator

@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 try:
-    from scripts.plotter import Plotter
-    from scripts.utils import Data
+    from modules.plotter import Plotter
+    from modules.utils import Data
 except:
     from plotter import Plotter
     from utils import Data
