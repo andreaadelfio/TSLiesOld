@@ -82,9 +82,9 @@ def get_inputs_outputs_df():
     return inputs_outputs
 
 
-########### Main ############
+# MARK: Main
 if __name__ == '__main__':
-    inputs_outputs_df = get_inputs_outputs_df()
+    #inputs_outputs_df = get_inputs_outputs_df()
     inputs_outputs_df = File.read_dfs_from_pk_folder()
     # # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
     # #                                               start='2023-12-07 04:00:00',

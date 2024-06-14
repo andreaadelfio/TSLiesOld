@@ -161,9 +161,7 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold):
         axs[0].plot(tiles_df['datetime'][start:end], np.sqrt(np.array(signif)*2), color="C0", label=f"detector {key}")
         axs[0].axhline(threshold, color="red")
         axs[0].set_ylabel(f'sigma level {key}')
-
         axs[0].set_title("Significance")
-        
 
         axs[1].step(tiles_df['datetime'][start:end], tiles_df[key][start:end], where='pre', label=key, color="black")
         axs[1].step(tiles_df['datetime'][start:end], tiles_df[key_pred][start:end], where='pre', label=key, color="red")
