@@ -4,12 +4,12 @@ Created date: 03/02/2024
 Modified date: 17/05/2024
 TODO:
 '''
-from scripts.spacecraftopener import SpacecraftOpener
-from scripts.catalogreader import CatalogReader
-from scripts.plotter import Plotter
-from scripts.sunmonitor import SunMonitor
-from scripts.utils import Data, File, Time, Logger, logger_decorator
-from scripts.config import INPUTS_OUTPUTS_FILE_PATH
+from modules.spacecraftopener import SpacecraftOpener
+from modules.catalogreader import CatalogReader
+from modules.plotter import Plotter
+from modules.sunmonitor import SunMonitor
+from modules.utils import Data, File, Time, Logger, logger_decorator
+from modules.config import INPUTS_OUTPUTS_FILE_PATH
 
 
 logger = Logger('Main Dataset').get_logger()

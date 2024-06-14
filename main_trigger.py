@@ -1,8 +1,8 @@
 ''' This script runs the model and plots the results. '''
-from scripts.nn import NN
-from scripts.utils import Data, File
-from scripts.plotter import Plotter
-from scripts.trigger import trigger
+from modules.nn import NN
+from modules.utils import Data, File
+from modules.plotter import Plotter
+from modules.trigger import trigger
 
 def run_trigger(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):
     '''Runs the model'''

@@ -6,10 +6,10 @@ TODO:
 """
 import itertools
 import pandas as pd
-from scripts.plotter import Plotter
-from scripts.utils import Data, File
-from scripts.config import MODEL_NN_FOLDER_NAME
-from scripts.nn import NN, MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor, get_feature_importance
+from modules.plotter import Plotter
+from modules.utils import Data, File
+from modules.config import MODEL_NN_FOLDER_NAME
+from modules.nn import NN, MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor, get_feature_importance
 
 def run_nn(inputs_outputs, cols_range, cols_range_raw, cols_pred, cols_selected):
     '''Runs the neural network model'''
