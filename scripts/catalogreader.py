@@ -91,39 +91,6 @@ class CatalogReader():
             froot.Close()
         return self.runs_dict
 
-    # @logger_decorator(logger)
-    # def get_runs_dict(self, runs_roots = None, binning = None):
-    #     """
-    #     Get the dictionary of runs and their properties.
-
-    #     Parameters:
-    #     - runs_dirs (list): The list of run directories to consider.
-    #     - binning (int): The binning factor for the histograms (optional).
-    #     - smooth (bool): Flag indicating whether to apply smoothing to the histograms (optional).
-
-    #     Returns:
-    #     - runs_dict (dict): The dictionary of runs and their properties.
-    #     """
-    #     if runs_roots is None:
-    #         runs_roots = self.runs_roots
-    #     for fname in runs_roots:
-    #         # self.logger.debug(f'Processing {fname}')
-    #         # print(f'Processing {fname}')
-    #         froot = ROOT.TFile.Open(fname, 'read')
-    #         hist = froot.Get(self.h_names[0])
-    #         histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
-    #         self.runs_dict[fname] = {'MET': histx}
-    #         self.runs_dict[fname]['datetime'] = np.array(Time.from_met_to_datetime(histx))
-    #         self.runs_times[fname] = (self.runs_dict[fname]['datetime'][0], self.runs_dict[fname]['datetime'][-1])
-    #         for h_name in self.h_names:
-    #             hist = froot.Get(h_name)
-    #             if binning:
-    #                 hist.Rebin(binning)
-    #             histc = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX() + 1)])
-    #             self.runs_dict[fname][h_name.split('hist_')[-1]] = histc
-    #         froot.Close()
-    #     return self.runs_dict
-
     @logger_decorator(logger)
     def add_smoothing(self, tile_signal):
         '''This function adds the smoothed histograms to the signal dataframe.'''
@@ -164,7 +131,7 @@ class CatalogReader():
             catalog_df = pd.DataFrame(list(runs_dict.values())[0])
         
         print(time.time() - start)
-        catalog_df = catalog_df[catalog_df['Xpos'] != 0]
+        # catalog_df = catalog_df[catalog_df['Xpos'] != 0]
         return catalog_df
 
 if __name__ == '__main__':

@@ -98,9 +98,37 @@ def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selecte
     if save:
         Plotter.save(MODEL_NN_FOLDER_NAME)
 
+class MLObject:
+    '''The class used to handle the Machine Learning.'''
+    def __init__(self):
+        self.nn_r = None
+        self.scaler = None
+
+    def set_model(self, model_path: str):
+        '''Sets the model from the model path.
+        
+        Parameters:
+        ----------
+            model_path (str): The path to the model.
+            
+        Returns:
+        --------
+            Model: The model.'''
+        self.nn_r = load_model(model_path)
+        return self.nn_r
+    
+    def set_scaler(self, X_train):
+        '''Sets the scaler for the model.
+        
+        Parameters:
+        ----------
+            X_train (pd.DataFrame): The training data.'''
+        scaler = StandardScaler()
+        scaler.fit(X_train)
+        self.scaler = scaler
 
 
-class NN:
+class NN(MLObject):
     '''The class for the Neural Network model.'''
     logger = Logger('NN').get_logger()
 
@@ -218,16 +246,16 @@ class NN:
     @logger_decorator(logger)
     def create_model(self):
         '''Creates the model.'''
-        # Load the data
         self.y = self.df_data[self.col_range].astype('float32')
         self.X = self.df_data[self.col_selected].astype('float32')
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=0, shuffle=True)
 
-        scaler = StandardScaler()
-        scaler.fit(self.X_train)
-        self.scaler = scaler
-        self.X_train = scaler.transform(self.X_train)
-        self.X_test = scaler.transform(self.X_test)
+        # scaler = StandardScaler()
+        # scaler.fit(self.X_train)
+        # self.scaler = scaler
+        self.set_scaler(self.X_train)
+        self.X_train = self.scaler.transform(self.X_train)
+        self.X_test = self.scaler.transform(self.X_test)
 
         inputs = Input(shape=(self.X_train.shape[1],))
         if self.units_1:
@@ -296,7 +324,6 @@ class NN:
                         validation_split=0.3, callbacks=callbacks)
         nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
 
-        # Compute MAE per each detector and range
         pred_train = nn_r.predict(self.X_train)
         pred_test = nn_r.predict(self.X_test)
         idx = 0

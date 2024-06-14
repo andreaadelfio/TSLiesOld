@@ -36,4 +36,3 @@ This script is used to define the neural network and knn models.
 8. :mod:`plotter.py`:
 This script is used to plot the results of the model.
 '''
-from . import *

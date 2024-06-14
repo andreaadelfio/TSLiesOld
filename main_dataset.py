@@ -59,11 +59,11 @@ def get_inputs_outputs_df():
     # tile_signal_df = Data.get_masked_dataframe(data=tile_signal_df,
     #                                               start='2024-01-05 04:00:00',
     #                                               stop='2024-01-06 04:00:00')
-    # Plotter(df = tile_signal_df, label = 'Inputs').df_plot_tiles(x_col = 'datetime',
-    #                                                                 excluded_cols = [],
-    #                                                                 marker = ',',
-    #                                                                 smoothing_key='smooth',
-    #                                                                 show = True)
+    Plotter(df = tile_signal_df, label = 'Inputs').df_plot_tiles(x_col = 'datetime',
+                                                                    excluded_cols = [],
+                                                                    marker = ',',
+                                                                    smoothing_key='smooth',
+                                                                    show = True)
     saa_exit_time = 0
     for week in [week for week in weeks_list if week not in ()]:
         sc_params_df, saa_exit_time = get_sc_params_df(week, saa_exit_time)
