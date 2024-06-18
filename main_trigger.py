@@ -10,7 +10,7 @@ def run_trigger(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):
     nn.set_scaler(inputs_outputs[x_cols])
     nn.set_model(model_path='data/model_nn/1/model.keras')
     start, end = 0, -1
-    _, y_pred = nn.predict(start, end)
+    _, y_pred = nn.predict(start, end, write=False)
 
     y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(y_cols_pred, y_cols)}).drop(columns=y_cols)
     tiles_df = Data.merge_dfs(inputs_outputs[start:end][y_cols_raw + ['datetime', 'SOLAR']], y_pred)
@@ -24,7 +24,7 @@ def run_trigger(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):
 
 
 if __name__ == '__main__':
-    inputs_outputs_df = File.read_dfs_from_pk_folder('/mnt/E28C2CB28C2C82E1/Users/Andrea/Documenti/inputs_outputs/pk')
+    inputs_outputs_df = File.read_dfs_from_pk_folder()
     inputs_outputs_df = inputs_outputs_df.dropna()
 
     y_cols_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']

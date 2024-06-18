@@ -18,15 +18,21 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import plot_model
 # Explainability
 import matplotlib.pyplot as plt
-import lime.lime_tabular
-import shap
+# import shap
 # Scripts
-from modules.config import MODEL_NN_FOLDER_NAME
-from modules.utils import Logger, logger_decorator, File
-from modules.plotter import Plotter
+try:
+    import modules.lime.lime_tabular as lime_tabular
+    from modules.config import MODEL_NN_FOLDER_NAME
+    from modules.utils import Logger, logger_decorator, File
+    from modules.plotter import Plotter
+except:
+    import lime.lime_tabular as lime_tabular
+    from config import MODEL_NN_FOLDER_NAME
+    from utils import Logger, logger_decorator, File
+    from plotter import Plotter
 
 
-def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selected, show=True, save=True):
+def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selected, num_sample = 100, show=True, save=True):
     '''Get the feature importance using LIME and SHAP and plots it with matplotlib barh.
     
     Parameters:
@@ -43,19 +49,18 @@ def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selecte
     X_test =  pd.DataFrame(scaler.transform(X_test), columns=col_selected)
 
     y_test = inputs_outputs_df[col_range]
-    NUM_SAMPLE = 100
-    X_back = X_test[60400:61100].sample(NUM_SAMPLE)
-    importance_dict = {col: 0 for col in X_back.columns}
-    # Create a Lime explainer object
-    explainer = lime.lime_tabular.LimeTabularExplainer(
+    X_back = X_test.sample(num_sample)
+    importance_dict = {face: {col: 0 for col in X_back.columns} for face in col_range}
+
+    explainer = lime_tabular.LimeTabularExplainer(
         training_data=np.array(X_back),
         feature_names=X_back.columns,
         class_names=list(y_test.columns),
         mode='regression'
     )
 
-    for i in range(NUM_SAMPLE):
-        for mylabel in [0, 1, 2, 3, 4]:
+    for i in range(num_sample):
+        for mylabel, face in enumerate(col_range):
             exp = explainer.explain_instance(
                 data_row=X_back.iloc[i],
                 mylabel=mylabel,
@@ -63,30 +68,42 @@ def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selecte
                 num_features=len(X_back.columns)
             )
             for feature, weight in exp.as_list(label=mylabel):
-                for col in importance_dict.keys():
+                for col in set(col_selected):
                     if col in feature:
-                        importance_dict[col] += np.abs(weight)
+                        importance_dict[face][col] += np.abs(weight) / num_sample
                         break
 
-    for col, weight in importance_dict.items():
-        importance_dict[col] = weight / NUM_SAMPLE / 5
+    summed_importance_dict = {col: 0 for col in importance_dict['top'].keys()}
+    for face in col_range:
+        for col, value in importance_dict[face].items():
+            summed_importance_dict[col] += value
 
-    sorted_importance_dict = dict(sorted(importance_dict.items(), key=lambda item: item[1]))
-    plt.figure(num='Feature Importance with Lime')
-    plt.barh(list(sorted_importance_dict.keys()), list(sorted_importance_dict.values()))
-    plt.xlabel('Weight')
-    plt.ylabel('Feature')
-    plt.title('Feature Importance')
+    summed_sorted_importance_dict = dict(sorted(summed_importance_dict.items(), key=lambda item: item[1]))
 
-    e = shap.KernelExplainer(model, X_back)
-    shap_values_orig = e(X_back)
-    shap_values_sum = np.mean(shap_values_orig.values, axis=2)
-    shap_values_sum = shap.Explanation(values=shap_values_sum,
-                                    base_values=shap_values_orig.base_values[0],
-                                    data=shap_values_orig.data,
-                                    feature_names=shap_values_orig.feature_names)
-    plt.figure(num='Feature Importance with SHAP')
-    shap.plots.bar(shap_values_sum, max_display=len(X_back.columns), show=False)
+    sorted_importance_dict = {face: dict(sorted(value.items(), key=lambda item: item[1])) for face, value in importance_dict.items()}
+    
+    plt.figure(num='Feature Importance with Lime', figsize=(10, 8))
+    left = {col: 0 for col in importance_dict['top']}
+    for i, key in enumerate(importance_dict.keys()):
+        sorted_importance_dict[key] = {k: sorted_importance_dict[key][k] for k in summed_sorted_importance_dict}
+        left_arr = [left[key] for key in sorted_importance_dict[key]]
+        bars = plt.barh(list(sorted_importance_dict[key].keys()), list(sorted_importance_dict[key].values()), left=left_arr, label=key)
+        for col in sorted_importance_dict[key]:
+            left[col] += sorted_importance_dict[key][col]
+    for bar, sum in zip(bars, summed_sorted_importance_dict.values()):
+        plt.text(sum * 1.002, bar.get_y() + bar.get_height() / 2, f'{sum:.4f}', va='center', color='grey')
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+
+    # e = shap.KernelExplainer(model, X_back)
+    # shap_values_orig = e(X_back)
+    # shap_values_sum = np.mean(shap_values_orig.values, axis=2)
+    # shap_values_sum = shap.Explanation(values=shap_values_sum,
+    #                                 base_values=shap_values_orig.base_values[0],
+    #                                 data=shap_values_orig.data,
+    #                                 feature_names=shap_values_orig.feature_names)
+    # plt.figure(num='Feature Importance with SHAP')
+    # shap.plots.bar(shap_values_sum, max_display=len(X_back.columns), show=False)
 
     # idx = 0
     # plt.figure(num='Waterfall plot with SHAP')
@@ -96,7 +113,7 @@ def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selecte
     if show:
         plt.show()
     if save:
-        Plotter.save(MODEL_NN_FOLDER_NAME)
+        Plotter.save(os.path.dirname(model_path))
 
 class MLObject:
     '''The class used to handle the Machine Learning.'''
@@ -116,15 +133,15 @@ class MLObject:
             Model: The model.'''
         self.nn_r = load_model(model_path)
         return self.nn_r
-    
-    def set_scaler(self, X_train):
+
+    def set_scaler(self, train: pd.DataFrame):
         '''Sets the scaler for the model.
         
         Parameters:
         ----------
-            X_train (pd.DataFrame): The training data.'''
+            train (pd.DataFrame): The training data.'''
         scaler = StandardScaler()
-        scaler.fit(X_train)
+        scaler.fit(train)
         self.scaler = scaler
 
 
@@ -147,7 +164,7 @@ class NN(MLObject):
         self.nn_r = None
         self.text = None
         self.model_id = None
-
+        self.model_path = None
         self.params = None
         self.norm = None
         self.drop = None
@@ -230,6 +247,7 @@ class NN(MLObject):
         self.model_id = params['model_id']
         if not os.path.exists(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}'):
             os.makedirs(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}')
+        self.model_path = f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras'
         self.units_1 = params['units_1']
         self.units_2 = params['units_2']
         self.units_3 = params['units_3']
@@ -250,9 +268,6 @@ class NN(MLObject):
         self.X = self.df_data[self.col_selected].astype('float32')
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=0, shuffle=True)
 
-        # scaler = StandardScaler()
-        # scaler.fit(self.X_train)
-        # self.scaler = scaler
         self.set_scaler(self.X_train)
         self.X_train = self.scaler.transform(self.X_train)
         self.X_test = self.scaler.transform(self.X_test)
@@ -310,9 +325,10 @@ class NN(MLObject):
     @logger_decorator(logger)
     def train(self):
         '''Trains the model.'''
+        
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, 
                            patience=10, start_from_epoch=50)
-        mc = ModelCheckpoint(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras', 
+        mc = ModelCheckpoint(self.model_path, 
                              monitor='val_loss', mode='min', verbose=0, save_best_only=True)
 
         if not self.lr:
@@ -322,7 +338,8 @@ class NN(MLObject):
             callbacks = [es, mc, call_lr]
         history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
                         validation_split=0.3, callbacks=callbacks)
-        nn_r = load_model(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
+        
+        nn_r = load_model(self.model_path)
 
         pred_train = nn_r.predict(self.X_train)
         pred_test = nn_r.predict(self.X_test)
@@ -345,13 +362,11 @@ class NN(MLObject):
                     f"median_diff_test_pred_{col} {median_diff_i:0.5f}\n"
             idx = idx + 1
 
-        nn_r.save(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/model.keras')
+        nn_r.save(self.model_path)
         self.nn_r = nn_r
-        # open text file and write params
         with open(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/params.txt', "w") as params_file:
             for key, value in self.params.items():
                 params_file.write(f'{key} : {value}\n')
-        # open text file and write mae performance
         with open(f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/performance.txt', "w") as text_file:
             text_file.write(text)
         self.text = text
@@ -387,7 +402,6 @@ class NN(MLObject):
         with open(MODEL_NN_FOLDER_NAME + '/models_params.csv', 'a') as f:
             list_tmp = list(self.params.values()) + self.mae_tr_list
             f.write('\t'.join([str(value) for value in list_tmp] + ['\n']))
-
 
 class MedianKNeighborsRegressor(KNeighborsRegressor):
     '''The class for the Median K-Nearest Neighbors model.'''
@@ -429,7 +443,6 @@ class MedianKNeighborsRegressor(KNeighborsRegressor):
             y_pred = y_pred.ravel()
 
         return y_pred
-
 
 class MultiMedianKNeighborsRegressor():
     '''The class for the Multi Median K-Nearest Neighbors model.'''
@@ -491,3 +504,12 @@ class MultiMeanKNeighborsRegressor():
         df_ori = df_data[self.col_range].reset_index(drop=True)
         y_pred = self.multi_reg.predict(df_data[self.col_selected])
         return df_ori, pd.DataFrame(y_pred, columns=self.col_range)
+
+if __name__ == '__main__':
+    inputs_outputs_df = File.read_dfs_from_pk_folder()
+
+    y_cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+    y_smooth_cols = ['top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']
+    x_cols = [col for col in inputs_outputs_df.columns if col not in y_cols + y_smooth_cols + ['datetime']]
+    MODEL_PATH = './data/model_nn/0/model.keras'
+    get_feature_importance(MODEL_PATH, inputs_outputs_df, y_cols, x_cols, num_sample=10, show=True)

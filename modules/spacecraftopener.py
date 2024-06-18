@@ -68,7 +68,7 @@ class SpacecraftOpener:
             None
         """
         url = f'https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/weekly/1s_spacecraft/lat_1sec_spacecraft_weekly_w{week}_p310_v001.fits'
-        wget.download(url, out=dir_path)
+        wget.download(url, out=dir_path, bar=None)
 
     @logger_decorator(logger)
     def open(self, sc_filename, excluded_columns=None):

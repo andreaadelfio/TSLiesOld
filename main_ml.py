@@ -16,10 +16,10 @@ def run_nn(inputs_outputs, cols_range, cols_range_raw, cols_pred, cols_selected)
     Plotter().plot_correlation_matrix(inputs_outputs, show=False, save=True)
 
     nn = NN(inputs_outputs, cols_range, cols_selected)
-    units_1_values = [90]
-    units_2_values = [90]
-    units_3_values = [30, 70]
-    epochs_values = [20]
+    units_1_values = [60, 90]
+    units_2_values = [60, 90]
+    units_3_values = [70]
+    epochs_values = [60]
     bs_values = [1000]
     do_values = [0.02]
     norm_values = [0]
@@ -46,7 +46,7 @@ def run_nn(inputs_outputs, cols_range, cols_range_raw, cols_pred, cols_selected)
         Plotter().plot_history(history, 'accuracy')
         nn.update_summary()
         Plotter.save(MODEL_NN_FOLDER_NAME, params)
-        for start, end in [(0, 73000)]:#(60000, 73000), (73000, -1)]:
+        for start, end in [(35000, 43000), (50000, 62000) , (507332, 568639)]:
             _, y_pred = nn.predict(start=start, end=end)
             # Plotter().plot_confusion_matric(inputs_outputs[start:end], y_pred, show=False)
 
@@ -56,9 +56,10 @@ def run_nn(inputs_outputs, cols_range, cols_range_raw, cols_pred, cols_selected)
                                                               show=False, smoothing_key='pred')
             for col in cols_range_raw:
                 Plotter().plot_tile(tiles_df, det_rng=col, smoothing_key = 'pred')
-            print(tiles_df.columns.tolist())
             Plotter().plot_pred_true(tiles_df, cols_pred, cols_range_raw)
             Plotter.save(MODEL_NN_FOLDER_NAME, params, (start, end))
+        if history.history['loss'][-1] < 0.005:
+            get_feature_importance(nn.model_path, inputs_outputs, cols_range, cols_selected, num_sample=100, show=False)
 
 def run_multimean_knn(inputs_outputs, cols_range, cols_selected):
     '''Runs the multi mean knn model'''
@@ -86,8 +87,7 @@ def run_multimedian_knn(inputs_outputs, cols_range, cols_selected):
 
 ########### Main ############
 if __name__ == '__main__':
-    inputs_outputs_df = File.read_dfs_from_pk_folder('/mnt/E28C2CB28C2C82E1/Users/Andrea/Documenti/inputs_outputs/pk')
-    # inputs_outputs_df = pd.read_pickle('data/model_nn/0_/pk/bkg.pk')
+    inputs_outputs_df = File.read_dfs_from_pk_folder()
 
     y_cols_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
     y_cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
@@ -99,11 +99,11 @@ if __name__ == '__main__':
     #                                               start='2023-12-06 05:30:22',
     #                                               stop='2023-12-06 09:15:28')
     inputs_outputs_df = inputs_outputs_df.dropna()
-    Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in inputs_outputs_df.columns if col in x_cols], marker = ',', show = True, smoothing_key='smooth')
+    # Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
 
     run_nn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
     # run_multimean_knn(inputs_outputs_df, y_cols, x_cols)
     # run_multimedian_knn(inputs_outputs_df, y_cols, x_cols)
 
-    MODEL_PATH = './data/model_nn/0/model.keras'
-    get_feature_importance(MODEL_PATH, inputs_outputs_df, y_cols, x_cols, show=False)
+    # MODEL_PATH = './data/model_nn/0/model.keras'
+    # get_feature_importance(MODEL_PATH, inputs_outputs_df, y_cols, x_cols, show=True)

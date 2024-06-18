@@ -115,7 +115,6 @@ class Plotter:
         if not excluded_cols:
             excluded_cols = []
         df_columns = [column for column in self.df.columns if f'_{smoothing_key}' not in column and column not in excluded_cols and column != 'datetime']
-        print(df_columns)
         n_plots = len(df_columns)
         n_cols = int(np.ceil(np.sqrt(n_plots)))
         n_rows = int(np.ceil(n_plots / n_cols))
@@ -349,10 +348,11 @@ class Plotter:
     def plot_correlation_matrix(self, inputs_outputs_df: pd.DataFrame, show = True, save = False):
         '''Function to plot the correlation matrix.'''
         correlations = inputs_outputs_df.corr()
-        plt.figure(figsize=(10, 8), num='correlations_matrix')
+        plt.figure(figsize=(20, 20), num='correlations_matrix')
         sns.heatmap(correlations, annot=True, cmap='coolwarm', fmt=".2f")
         plt.xticks(rotation=90)
         plt.yticks(rotation=0)
+        plt.tight_layout()
         if show:
             plt.show()
         if save:

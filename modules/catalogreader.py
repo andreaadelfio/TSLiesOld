@@ -74,7 +74,7 @@ class CatalogReader():
             froot = ROOT.TFile.Open(fname, 'read')
             hist = froot.Get(self.h_names[0])
             histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
-            datetime = np.array(Time.from_met_to_datetime(histx))
+            datetime = np.array(Time.from_met_to_datetime(histx - 1))
             names = ['datetime', 'MET']
             arr_list = [datetime, histx]
             
@@ -119,21 +119,16 @@ class CatalogReader():
         Returns:
         - signal_dataframe (pd.DataFrame): The signal dataframe.
         """
-        import time
-        start = time.time()
         if runs_dict is None:
             runs_dict = self.get_runs_dict()
-        print(time.time() - start)
-        start = time.time()
         if len(runs_dict) > 1:
             catalog_df = pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
         else:
             catalog_df = pd.DataFrame(list(runs_dict.values())[0])
         
-        print(time.time() - start)
-        # catalog_df = catalog_df[catalog_df['Xpos'] != 0]
+        catalog_df = catalog_df[catalog_df['Xpos'] != 0]
         return catalog_df
 
 if __name__ == '__main__':
-    cr = CatalogReader(start=0, end=-1)
+    cr = CatalogReader(start=0, end=1)
     tile_signal_df = cr.get_signal_df_from_catalog()
