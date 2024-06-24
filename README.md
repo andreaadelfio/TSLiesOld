@@ -1,4 +1,18 @@
-# ACDAnomalies: Anomaly Detection in the Fermi Anti-Coincidence Detector with Machine Learning techinques and Poisson-FOCuS triggering algorithm
+# ACDAnomalies
+
+## What is it?
+Anomaly Detection in the Fermi Anti-Coincidence Detector (ACD) with Machine Learning techinques and the Poisson-FOCuS triggering algorithm
+
+## Table of contents
+- [Main Features](#main-features)
+- [Installation and Dependencies](#installation-and-dependencies)
+- [Modules](#modules)
+- [Scripts](#scripts)
+- [Usage](#usage)
+- [Contibution](#contributing)
+- [Contact](#contact)
+
+## Main Features
 
 This repository contains a series of modules and scripts used for a series of tasks:
 - data preprocessing;
@@ -7,10 +21,19 @@ This repository contains a series of modules and scripts used for a series of ta
 - model evaluation;
 - triggering.
 
-The codes are organized in a modular way for easy importation and usage in the main scripts.
+## Installation and Dependencies
+
+To install this repository, clone it from [ACDAnomalies](https://github.com/andreaadelfio/ACDAnomalies) and install the required packages:
+```
+git clone https://github.com/andreaadelfio/ACDAnomalies.git
+cd ACDAnomalies
+pip install -r requirements.txt
+```
+A ROOT installation is required to use the [ROOT python library](https://root.cern/manual/python/). Check the [website](https://root.cern/install/).
 
 ## Modules
 
+The codes are organized in a modular way for easy importation and usage in the main scripts.
 All modules can be found in the [**/modules**](/modules) folder.
 
 1. [**config.py**](/modules/config.py): This module is used to define the configuration parameters for the project. The configuration parameters are defined as a series of constants.
@@ -59,15 +82,16 @@ ACDAnomalies
 > Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path to your ACDAnomalies, e.g. `DIR = /home/andreaadelfio/ACDAnomalies`).
 > 
 
-## Installation and Requirements
-
-To install this repository, clone it from [ACDAnomalies](https://github.com/andreaadelfio/ACDAnomalies) and install the required packages:
-```
-git clone https://github.com/andreaadelfio/ACDAnomalies.git
-cd ACDAnomalies
-pip install -r requirements.txt
-```
-
 ## Contributing
 
 Contributions are welcome. Please open an issue to discuss your idea or submit a pull request with your changes.
+
+## Contact
+
+If you need help on the project or you want to discuss about it, you can contact me at the following e-mails:
+- <and.adelfio@gmail.com>
+- <andrea.adelfio@pg.infn.it>
+
+<hr>
+
+[Go to Top](#table-of-contents)
