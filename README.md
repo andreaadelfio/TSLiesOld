@@ -13,13 +13,13 @@ The codes are organized in a modular way for easy importation and usage in the m
 
 1. [**config.py**](/modules/config.py): This module is used to define the configuration parameters for the project. The configuration parameters are defined as a series of constants.
 
-2. [**makecountrates.py**](/modules/makecountrates.py): This module is used to get the count rates for the ACD data in `root` format.
+2. [**makecountrates.py**](/modules/makecountrates.py): This module is used to get the count rates for the ACD data in [`root`](https://root.cern.ch/root/html600/notes/release-notes.html#ttreereader) format.
 
-3. [**catalogreader.py**](/modules/catalogreader.py): This module is used to read the ACD data and convert it into a `pandas.DataFrame`.
+3. [**catalogreader.py**](/modules/catalogreader.py): This module is used to read the ACD data and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
 
-4. [**spacecraft.py**](/modules/spacecraft.py): This module is used to retrieve the spacecraft data and convert it into a `pandas.DataFrame`.
+4. [**spacecraft.py**](/modules/spacecraft.py): This module is used to retrieve the spacecraft data and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
 
-5. [**sunmonitor.py**](/modules/sunmonitor.py): This module is used to retrieve the sun monitor data from GOES and convert it into a `pandas.DataFrame`.
+5. [**sunmonitor.py**](/modules/sunmonitor.py): This module is used to retrieve the sun monitor data from GOES and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
 
 6. [**nn.py**](/modules/nn.py): This modules is used to create, train and validate a Machine Learning model.
 
@@ -31,7 +31,13 @@ The codes are organized in a modular way for easy importation and usage in the m
 
 ## Usage
 
-To use these modules, import the required modules into your main script and call the necessary functions. You can find examples in the Scripts folder. Ensure that the configuration parameters in `config.py` are set correctly for your project and folders (see the `DIR` path).
+To use these modules, import the required modules into your main script and call the necessary functions. You can find examples in the [**scripts**](/scripts) folder. 
+
+> [!TIP]
+> Start from the scripts found in the [**scripts**](/scripts) folder.
+
+> [!IMPORTANT]
+> Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path).
 
 ## Scripts
 

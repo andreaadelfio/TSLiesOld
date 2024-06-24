@@ -3,6 +3,7 @@
 /logs
 /m_check
 /modules/lime
+/modules/__pycache__
 
 # Extensions
 *.pyc

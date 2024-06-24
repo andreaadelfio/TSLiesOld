@@ -130,5 +130,6 @@ class CatalogReader():
         return catalog_df
 
 if __name__ == '__main__':
-    cr = CatalogReader(start=0, end=1)
+    cr = CatalogReader(data_dir='data/LAT_ACD/output runs', start=0, end=-1)
     tile_signal_df = cr.get_signal_df_from_catalog()
+    print(len(tile_signal_df))
