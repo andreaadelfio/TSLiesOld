@@ -2,6 +2,7 @@
 /data
 /logs
 /m_check
+/modules/lime
 
 # Extensions
 *.pyc

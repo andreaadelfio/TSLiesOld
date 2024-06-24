@@ -1,5 +1,5 @@
 '''
-Configuration file for ACNBkg.scripts
+Configuration file for ACNBkg modules
 '''
 import os
 import pathlib

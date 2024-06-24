@@ -22,7 +22,7 @@ import logging
 import ROOT
 from tqdm import tqdm
 
-logging.basicConfig(filename='mymakereconrate.log', level=logging.INFO)
+logging.basicConfig(filename='logs/mymakereconrate.log', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 dict_tileSize = {}

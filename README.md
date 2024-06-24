@@ -1,22 +1,41 @@
-# Anomaly Detection in the Fermi Anti-Coincidence Detector with Machine Learning
+# Anomaly Detection in the Fermi Anti-Coincidence Detector with Machine Learning techinques and Poisson-FOCuS triggering algorithm
 
-This project contains a series of scripts used for data preprocessing, data augmentation, model training, and model evaluation. The scripts are organized in a modular way for easy importation and usage in the main script.
+This repository contains a series of modules and scripts used for a series of tasks:
+- data preprocessing;
+- data augmentation;
+- model training;
+- model evaluation;
+- triggering.
 
-## Scripts
+The codes are organized in a modular way for easy importation and usage in the main scripts.
 
-1. **config.py**: This script is used to define the configuration parameters for the project. The configuration parameters are defined as a series of constants.
+## Modules
 
-2. **makecountrates.py**: This script is used to calculate the count rates for the catalog data.
+1. [**config.py**](/modules/config.py): This module is used to define the configuration parameters for the project. The configuration parameters are defined as a series of constants.
 
-3. **catalogreader.py**: This script is used to read the catalog data and convert it into a pandas dataframe.
+2. [**makecountrates.py**](/modules/makecountrates.py): This module is used to get the count rates for the ACD data in `root` format.
 
-4. **spacecraft.py**: This script is used to retrieve the spacecraft data and convert it into a pandas dataframe.
+3. [**catalogreader.py**](/modules/catalogreader.py): This module is used to read the ACD data and convert it into a `pandas.DataFrame`.
 
-5. **sunmonitor.py**: This script is used to retrieve the sun monitor data from GOES and convert it into a pandas dataframe.
+4. [**spacecraft.py**](/modules/spacecraft.py): This module is used to retrieve the spacecraft data and convert it into a `pandas.DataFrame`.
+
+5. [**sunmonitor.py**](/modules/sunmonitor.py): This module is used to retrieve the sun monitor data from GOES and convert it into a `pandas.DataFrame`.
+
+6. [**nn.py**](/modules/nn.py): This modules is used to create, train and validate a Machine Learning model.
+
+7. [**trigger.py**](/modules/trigger.py): This module is used to find anomalies in the ACD data given the background model, with a triggering algorithm.
+
+8. [**plotter.py**](/modules/plotter.py): This module contains some plotting functions adapted to the specific cases.
+
+9. [**utils.py**](/modules/utils.py): This module continas some utility functions.
 
 ## Usage
 
-To use these scripts, import the required script into your main script and call the necessary functions. Ensure that the configuration parameters in `config.py` are set correctly for your project and folders (see the `DIR` path).
+To use these modules, import the required modules into your main script and call the necessary functions. You can find examples in the Scripts folder. Ensure that the configuration parameters in `config.py` are set correctly for your project and folders (see the `DIR` path).
+
+## Scripts
+
+This folder contains the main scripts that manage dataset preparation ([main_dataset.py](/scripts/main_dataset.py)), machine learning training ([main_ml.py](/scripts/main_ml.py)) and triggering algorithm separately ([main_trigger.py](/scripts/main_trigger.py)).
 
 ## Contributing
 
