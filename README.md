@@ -1,7 +1,7 @@
 # ACDAnomalies
 
 ## What is it?
-Anomaly Detection in the Fermi Anti-Coincidence Detector (ACD) with Machine Learning techinques and the Poisson-FOCuS triggering algorithm
+Anomaly Detection in the Fermi Anti-Coincidence Detector (ACD) with Machine Learning techinques and the Poisson-FOCuS triggering algorithm.
 
 ## Table of contents
 - [Main Features](#main-features)
