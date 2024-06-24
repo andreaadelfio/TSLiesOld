@@ -7,6 +7,7 @@ import pathlib
 USER = os.environ.get('USERNAME')
 
 DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__))).parent
+print(DIR)
 # DIR = '/media/andrea/DISK4T1/ACD LAT Adelfio/'
 
 # Folders: parent (data), children (solar, spacecraft, LAT_ACD/output runs)
@@ -32,7 +33,7 @@ INPUTS_OUTPUTS_PK_FOLDER = os.path.join(DATA_FOLDER_NAME, 'inputs_outputs', 'pk'
 
 
 LOGGING_FOLDER_NAME = 'logs'
-LOGGING_FILE_NAME = 'acdbkg.log'
+LOGGING_FILE_NAME = f'acdbkg_{USER}.log'
 LOGGING_FILE_REL_PATH = os.path.join(LOGGING_FOLDER_NAME, LOGGING_FILE_NAME)
 LOGGING_FILE_PATH = os.path.join(os.getcwd(), LOGGING_FILE_REL_PATH)
 

@@ -11,6 +11,8 @@ The codes are organized in a modular way for easy importation and usage in the m
 
 ## Modules
 
+All modules can be found in the [**/modules**](/modules) folder.
+
 1. [**config.py**](/modules/config.py): This module is used to define the configuration parameters for the project. The configuration parameters are defined as a series of constants.
 
 2. [**makecountrates.py**](/modules/makecountrates.py): This module is used to get the count rates for the ACD data in [`root`](https://root.cern.ch/root/html600/notes/release-notes.html#ttreereader) format.
@@ -29,19 +31,42 @@ The codes are organized in a modular way for easy importation and usage in the m
 
 9. [**utils.py**](/modules/utils.py): This module continas some utility functions.
 
-## Usage
-
-To use these modules, import the required modules into your main script and call the necessary functions. You can find examples in the [**scripts**](/scripts) folder. 
-
-> [!TIP]
-> Start from the scripts found in the [**scripts**](/scripts) folder.
-
-> [!IMPORTANT]
-> Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path).
-
 ## Scripts
 
-This folder contains the main scripts that manage dataset preparation ([main_dataset.py](/scripts/main_dataset.py)), machine learning training ([main_ml.py](/scripts/main_ml.py)) and triggering algorithm separately ([main_trigger.py](/scripts/main_trigger.py)).
+This folder contains the main scripts that manage dataset preparation ([**main_dataset.py**](/scripts/main_dataset.py)), machine learning training ([**main_ml.py**](/scripts/main_ml.py)) and triggering algorithm separately ([**main_trigger.py**](/scripts/main_trigger.py)).
+
+## Usage
+
+To use these modules, import the required modules into your main script and call the necessary functions. You can find examples in the [**/scripts**](/scripts) folder. 
+
+> [!TIP]
+> Start from the scripts found in the [**/scripts**](/scripts) folder.
+
+The **config.py** expects a certain directory structure, such as:
+``` bash
+ACDBkg
+├── data
+│   ├── LAT_ACD
+│   ├── solar
+│   ├── spacecraft
+│   ├── inputs_outputs
+├── logs
+├── modules
+└── scripts
+```
+
+> [!IMPORTANT]
+> Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path to your ACDBkg, e.g. `/home/andreaadelfio/ACDBkg`).
+> 
+
+## Installation and Requirements
+
+To install this repository, clone it from [ACDBkg](https://github.com/andreaadelfio/ACDBkg) and install the required packages:
+```
+git clone https://github.com/andreaadelfio/ACDBkg.git
+cd ACDBkg
+pip install -r requirements.txt
+```
 
 ## Contributing
 
