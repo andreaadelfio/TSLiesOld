@@ -1,4 +1,4 @@
-# Anomaly Detection in the Fermi Anti-Coincidence Detector with Machine Learning techinques and Poisson-FOCuS triggering algorithm
+# ACDAnomalies: Anomaly Detection in the Fermi Anti-Coincidence Detector with Machine Learning techinques and Poisson-FOCuS triggering algorithm
 
 This repository contains a series of modules and scripts used for a series of tasks:
 - data preprocessing;
@@ -44,7 +44,7 @@ To use these modules, import the required modules into your main script and call
 
 The **config.py** expects a certain directory structure, such as:
 ``` bash
-ACDBkg
+ACDAnomalies
 ├── data
 │   ├── LAT_ACD
 │   ├── solar
@@ -56,15 +56,15 @@ ACDBkg
 ```
 
 > [!IMPORTANT]
-> Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path to your ACDBkg, e.g. `/home/andreaadelfio/ACDBkg`).
+> Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path to your ACDAnomalies, e.g. `DIR = /home/andreaadelfio/ACDAnomalies`).
 > 
 
 ## Installation and Requirements
 
-To install this repository, clone it from [ACDBkg](https://github.com/andreaadelfio/ACDBkg) and install the required packages:
+To install this repository, clone it from [ACDAnomalies](https://github.com/andreaadelfio/ACDAnomalies) and install the required packages:
 ```
-git clone https://github.com/andreaadelfio/ACDBkg.git
-cd ACDBkg
+git clone https://github.com/andreaadelfio/ACDAnomalies.git
+cd ACDAnomalies
 pip install -r requirements.txt
 ```
 
