@@ -13,7 +13,6 @@ from modules.nn import NN, MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRe
 
 def run_nn(inputs_outputs, cols_range, cols_range_raw, cols_pred, cols_selected):
     '''Runs the neural network model'''
-    Plotter().plot_correlation_matrix(inputs_outputs, show=False, save=True)
 
     nn = NN(inputs_outputs, cols_range, cols_selected)
     units_1_values = [60, 90]
@@ -28,6 +27,8 @@ def run_nn(inputs_outputs, cols_range, cols_range_raw, cols_pred, cols_selected)
     lr_values = [0.00009]
     loss_type_values = ['mae']
 
+    Plotter().plot_correlation_matrix(inputs_outputs, show=False, save=True)
+    
     hyperparams_combinations = list(itertools.product(units_1_values, units_2_values,
                                                       units_3_values, norm_values,
                                                       drop_values, epochs_values,
@@ -93,7 +94,7 @@ if __name__ == '__main__':
     y_cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
     y_smooth_cols = ['top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']
     y_pred_cols = [col + '_pred' for col in y_cols_raw]
-    x_cols = [col for col in inputs_outputs_df.columns if col not in y_cols + y_smooth_cols + ['datetime']]
+    x_cols = [col for col in inputs_outputs_df.columns if col not in y_cols + y_smooth_cols + ['datetime', 'TIME_FROM_SAA', 'SUN_IS_OCCULTED', 'LIVETIME', 'MET', 'START', 'STOP', 'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'SAA_EXIT']]
 
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
     #                                               start='2023-12-06 05:30:22',

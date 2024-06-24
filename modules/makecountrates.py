@@ -239,9 +239,11 @@ def do_work(binning):
             i += 1
 
 def do_work_parallel(binning):
-    INPUT_RUNS_FOLDER = './data/LAT_ACD/complete/'
+    INPUT_RUNS_FOLDER = './data/LAT_ACD/merged input runs/'
     OUTPUT_RUNS_FOLDER = './data/LAT_ACD/output runs/parallel/'
     input_folder_list = os.listdir(INPUT_RUNS_FOLDER)
+    if not os.path.exists(OUTPUT_RUNS_FOLDER):
+        os.makedirs(OUTPUT_RUNS_FOLDER)
     output_folder_list = os.listdir(OUTPUT_RUNS_FOLDER)
     for output_run in output_folder_list:
         run_folder = f'testOutputs_{output_run.split(".root")[0]}'
@@ -250,7 +252,7 @@ def do_work_parallel(binning):
             if run_folder in input_folder_list or len(os.listdir(root_dir)) == 0:
 	            input_folder_list.remove(run_folder)
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(create_root, run, binning, f'{OUTPUT_RUNS_FOLDER}{run.split("_")[1]}.root', INPUT_RUNS_FOLDER + run) for run in input_folder_list]
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing runs"):
             try:
