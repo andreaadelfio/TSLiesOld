@@ -131,10 +131,10 @@ def focus(X, threshold, plot=False):
 def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
     """Run the trigger algorithm on the dataset.
     """
-    if not os.path.exists('data/focus'):
-        os.makedirs('data/focus')
-    if not os.path.exists('data/focus/plots'):
-        os.makedirs('data/focus/plots')
+    if not os.path.exists('data/anomalies'):
+        os.makedirs('data/anomalies')
+    if not os.path.exists('data/anomalies/plots'):
+        os.makedirs('data/anomalies/plots')
 
     bsize = 500
     anomalies_dict = []
@@ -199,16 +199,16 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
         plt.tight_layout()
         figs.subplots_adjust(hspace=0)
 
-        figs.savefig(f'data/focus/plots/{key}_{signal["datetime"][changepoint]}.png')
+        figs.savefig(f'data/anomalies/plots/{key}_{signal["datetime"][changepoint]}.png')
         plt.close(figs)
         if model:
             col_range = y_cols
             col_selected = [col for col in signal.columns if col not in y_cols + y_pred_cols + ['datetime', 'TIME_FROM_SAA', 'SUN_IS_OCCULTED', 'LIVETIME', 'MET', 'START', 'STOP', 'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'SAA_EXIT', 'IN_SAA']]
-            get_feature_importance(f"data/focus/plots/{key}_{signal['datetime'][changepoint]}_lime.png", inputs_outputs_df = signal[changepoint:stopping_time], col_range = col_range, col_selected = col_selected, model = model, show=False, num_sample=10)
-            get_feature_importance(f"data/focus/plots/{key}_{signal['datetime'][stopping_time+50]}_lime.png", inputs_outputs_df = signal[changepoint+50:stopping_time+50], col_range = col_range, col_selected = col_selected, model = model, show=False, num_sample=10)
+            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][changepoint]}_lime.png", inputs_outputs_df = signal[changepoint:stopping_time], col_range = col_range, col_selected = col_selected, model = model, show=False, num_sample=10)
+            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][stopping_time+50]}_lime.png", inputs_outputs_df = signal[changepoint+50:stopping_time+50], col_range = col_range, col_selected = col_selected, model = model, show=False, num_sample=10)
 
     focus_res = pd.DataFrame(anomalies_dict, columns=['face', 'start', 'changepoint', 'stopping_time', 'start_datetime', 'stop_datetime', 'significance', 'sigma', 'threshold'])
-    focus_res.to_csv('data/focus/anomalies.csv', index=False)
+    focus_res.to_csv('data/anomalies/detections.csv', index=False)
     return anomalies_dict
 
 

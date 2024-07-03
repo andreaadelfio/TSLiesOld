@@ -69,7 +69,7 @@ The **config.py** expects a certain directory structure, such as:
 ``` bash
 ACDAnomalies
 ├── data
-│   ├── focus
+│   ├── anomalies
 │   ├── inputs_outputs
 │   ├── LAT_ACD
 │   ├── model_nn
