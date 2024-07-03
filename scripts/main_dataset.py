@@ -1,9 +1,16 @@
 '''Main file to run the project
 Author: Andrea Adelfio
 Created date: 03/02/2024
-Modified date: 17/05/2024
+Modified date: 27/06/2024
 TODO:
 '''
+
+import sys
+import os
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 from modules.spacecraftopener import SpacecraftOpener
 from modules.catalogreader import CatalogReader
 from modules.plotter import Plotter
@@ -19,7 +26,7 @@ logger = Logger('Main Dataset').get_logger()
 def get_tiles_signal_df():
     '''Get the tile signal dataframe from the catalog'''
     print('Catalog...', end='')
-    cr = CatalogReader(data_dir='data/LAT_ACD/output runs v2', start=0, end=-1)
+    cr = CatalogReader(data_dir='data/LAT_ACD/output runs v3', start=0, end=-1)
     tile_signal_df = cr.get_signal_df_from_catalog()
     tile_signal_df = cr.add_smoothing(tile_signal_df)
     runs_times = cr.get_runs_times()
@@ -59,11 +66,11 @@ def get_inputs_outputs_df():
     # tile_signal_df = Data.get_masked_dataframe(data=tile_signal_df,
     #                                               start='2024-01-05 04:00:00',
     #                                               stop='2024-01-06 04:00:00')
-    Plotter(df = tile_signal_df, label = 'Inputs').df_plot_tiles(x_col = 'datetime',
-                                                                    excluded_cols = [],
-                                                                    marker = ',',
-                                                                    smoothing_key='smooth',
-                                                                    show = True)
+    # Plotter(df = tile_signal_df, label = 'Inputs').df_plot_tiles(x_col = 'datetime',
+    #                                                                 excluded_cols = [],
+    #                                                                 marker = ',',
+    #                                                                 smoothing_key='smooth',
+    #                                                                 show = True)
     saa_exit_time = 0
     for week in [week for week in weeks_list if week not in ()]:
         sc_params_df, saa_exit_time = get_sc_params_df(week, saa_exit_time)
@@ -75,6 +82,7 @@ def get_inputs_outputs_df():
         #                                                                 marker = ',',
         #                                                                 smoothing_key='smooth',
         #                                                                 show = True)
+        print(inputs_outputs.isna().sum())  # Stampa il conteggio dei valori NaN per ogni colonna
         File.write_df_on_file(inputs_outputs,
                               filename=f'{INPUTS_OUTPUTS_FILE_PATH}_w{week}',
                               fmt='both')
@@ -86,22 +94,12 @@ def get_inputs_outputs_df():
 if __name__ == '__main__':
     inputs_outputs_df = get_inputs_outputs_df()
     # inputs_outputs_df = File.read_dfs_from_pk_folder()
-    # # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
-    # #                                               start='2023-12-07 04:00:00',
-    # #                                               stop='2023-12-08 04:00:00')
+    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
+    #                                               start='2023-12-31 21:50:00',
+    #                                               stop='2023-12-31 22:10:00')
     # # File.write_df_on_file(inputs_outputs_df, './inputs_outputs_df')
 
 
-    # col_range_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
-    # col_range = ['top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']
-    # # col_selected = ['SC_POSITION_0', 'SC_POSITION_1', 'SC_POSITION_2', 'LAT_GEO', 'LON_GEO',
-    # #                 'RAD_GEO', 'RA_ZENITH', 'DEC_ZENITH', 'B_MCILWAIN', 'L_MCILWAIN', 
-    # #                 'GEOMAG_LAT', 'LAMBDA', 'RA_SCZ', 'START', 'STOP', 'MET', 'IN_SAA',
-    # #                 'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'LIVETIME', 'DEC_SCZ', 'RA_SCX',
-    # #                 'DEC_SCX', 'RA_NPOLE', 'DEC_NPOLE', 'ROCK_ANGLE', 'QSJ_1', 'QSJ_2',
-    # #                 'QSJ_3', 'QSJ_4', 'RA_SUN', 'DEC_SUN', 'SC_VELOCITY_0', 'SC_VELOCITY_1',
-    # #                 'SC_VELOCITY_2', 'SOLAR']
-    # col_selected = inputs_outputs_df.columns
 
     Plotter(df = inputs_outputs_df, label = 'Outputs').df_plot_tiles(x_col = 'datetime',
                                                                      excluded_cols = [],

@@ -109,7 +109,7 @@ class CatalogReader():
         return tile_signal
 
     @logger_decorator(logger)
-    def get_signal_df_from_catalog(self, runs_dict = None):
+    def get_signal_df_from_catalog(self, runs_dict = None, binning = None):
         """
         Get the signal dataframe from the catalog.
 
@@ -120,7 +120,7 @@ class CatalogReader():
         - signal_dataframe (pd.DataFrame): The signal dataframe.
         """
         if runs_dict is None:
-            runs_dict = self.get_runs_dict()
+            runs_dict = self.get_runs_dict(binning=binning)
         if len(runs_dict) > 1:
             catalog_df = pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
         else:

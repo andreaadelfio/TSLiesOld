@@ -382,7 +382,7 @@ class Plotter:
         for i in plt.get_fignums():
             title = plt.figure(i, figsize=(20, 12)).get_label()
             name = f'{title}.png' if not indexes else f'{title}_{indexes[0]}_{indexes[1]}.png'
-            plt.savefig(f'{folder_name}/{name}')
+            plt.savefig(f'{folder_name}/{name}' if not folder_name.endswith('png') else folder_name)
         plt.close('all')
 
 if __name__ == '__main__':

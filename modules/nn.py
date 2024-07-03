@@ -32,7 +32,7 @@ except:
     from plotter import Plotter
 
 
-def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selected, num_sample = 100, show=True, save=True):
+def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selected, num_sample = 100, model = None, show=True, save=True):
     '''Get the feature importance using LIME and SHAP and plots it with matplotlib barh.
     
     Parameters:
@@ -42,16 +42,20 @@ def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selecte
         col_range (list): The columns of the output data.
         col_selected (list): The columns of the input data.
         show (bool): Whether to show the plot.'''
-    model = load_model(model_path)
     X_test = inputs_outputs_df[col_selected]
-    scaler = StandardScaler()
-    scaler.fit(X_test)
+    if model is None:
+        model = load_model(model_path)
+        scaler = StandardScaler()
+        scaler.fit(X_test)
+    else:
+        scaler = model.scaler
+        model = model.nn_r
     X_test =  pd.DataFrame(scaler.transform(X_test), columns=col_selected)
 
     y_test = inputs_outputs_df[col_range]
     X_back = X_test.sample(num_sample)
     importance_dict = {face: {col: 0 for col in X_back.columns} for face in col_range}
-
+    print(X_back.columns)
     explainer = lime_tabular.LimeTabularExplainer(
         training_data=np.array(X_back),
         feature_names=X_back.columns,
@@ -82,7 +86,8 @@ def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selecte
 
     sorted_importance_dict = {face: dict(sorted(value.items(), key=lambda item: item[1])) for face, value in importance_dict.items()}
     
-    plt.figure(num='Feature Importance with Lime', figsize=(10, 8))
+    file_name = 'Feature Importance with Lime' if model_path.endswith('.keras') else model_path
+    plt.figure(num=file_name, figsize=(10, 8))
     left = {col: 0 for col in importance_dict['top']}
     for i, key in enumerate(importance_dict.keys()):
         sorted_importance_dict[key] = {k: sorted_importance_dict[key][k] for k in summed_sorted_importance_dict}
@@ -113,13 +118,14 @@ def get_feature_importance(model_path, inputs_outputs_df, col_range, col_selecte
     if show:
         plt.show()
     if save:
-        Plotter.save(os.path.dirname(model_path))
+        Plotter.save(os.path.dirname(model_path) if model_path.endswith('.keras') else model_path)
 
 class MLObject:
     '''The class used to handle the Machine Learning.'''
     def __init__(self):
         self.nn_r = None
         self.scaler = None
+        self.model_path = None
 
     def set_model(self, model_path: str):
         '''Sets the model from the model path.
@@ -131,6 +137,7 @@ class MLObject:
         Returns:
         --------
             Model: The model.'''
+        self.model_path = model_path
         self.nn_r = load_model(model_path)
         return self.nn_r
 
@@ -313,13 +320,13 @@ class NN(MLObject):
         self.nn_r.compile(loss=self.loss_type, optimizer=opt, metrics=['accuracy'])
 
     @logger_decorator(logger)
-    def scheduler(self, epoch, lr_actual): # lr_actual ?????
+    def scheduler(self, epoch):
         '''The learning rate scheduler.'''
-        if epoch < 4:
+        if epoch < 0.04 * self.epochs:
             return self.lr*12.5
-        if 4 <= epoch < 12:
+        if 0.04 * self.epochs <= epoch < 0.12 * self.epochs:
             return self.lr*2
-        if 12 <= epoch:
+        if 0.12 * self.epochs <= epoch:
             return self.lr/2
 
     @logger_decorator(logger)
@@ -327,7 +334,7 @@ class NN(MLObject):
         '''Trains the model.'''
         
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, 
-                           patience=10, start_from_epoch=50)
+                           patience=10, start_from_epoch=80)
         mc = ModelCheckpoint(self.model_path, 
                              monitor='val_loss', mode='min', verbose=0, save_best_only=True)
 
@@ -392,8 +399,11 @@ class NN(MLObject):
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
         if write:
-            File.write_df_on_file(df_ori, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/frg')
-            File.write_df_on_file(y_pred, f'{MODEL_NN_FOLDER_NAME}/{self.model_id}/bkg')
+            path = f'{MODEL_NN_FOLDER_NAME}/{self.model_id}'
+            if not self.model_id:
+                path = os.path.dirname(self.model_path)
+            File.write_df_on_file(df_ori, f'{path}/frg')
+            File.write_df_on_file(y_pred, f'{path}/bkg')
         return df_ori, y_pred
 
     @logger_decorator(logger)
