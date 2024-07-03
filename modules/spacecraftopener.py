@@ -174,8 +174,7 @@ class SpacecraftOpener:
         was_in_saa = np.roll(time_from_saa, shift=1)
         time_from_saa = (time_from_saa & ~was_in_saa).astype(float)
         exit_time = sc_df.loc[time_from_saa == 1, 'START']
-        if prev_lon_lat == 0:
-            exit_time[0] = 0
+        exit_time[0] = sc_df['START'][0] if prev_lon_lat != 0 else 0 # to be checked
         exit_time = exit_time.reindex(sc_df.index).ffill()
         time_from_saa = sc_df['START'] - exit_time
         sc_df['TIME_FROM_SAA'] = time_from_saa
@@ -219,7 +218,7 @@ if __name__ == '__main__':
     import time
     prev_lon_lat = 0
     dfs = []
-    for week in [815]:
+    for week in [811, 812, 813]:
         start = time.time()
         sco = SpacecraftOpener()
         file = sco.get_sc_lat_weekly(week)
@@ -231,58 +230,4 @@ if __name__ == '__main__':
         print(time.time() - start)
         dfs.append(sc_params_df)
     catalog_df = pd.concat(dfs, ignore_index=True)
-    Plotter(df = catalog_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in catalog_df.columns if col not in ['SUN_IS_OCCULTED', 'RA_SUN', 'RA_ZENITH']], marker = ',', show = True, smoothing_key='smooth')
-
-
-    from matplotlib import patheffects
-    from matplotlib.colors import LogNorm
-    from matplotlib.dates import DateFormatter
-    from matplotlib.offsetbox import TextArea, DrawingArea, OffsetImage,AnnotationBbox
-    from IPython.display import display, clear_output, Image
-    from IPython.utils.text import columnize
-    from ipywidgets import interactive, interact
-    import ipywidgets as widgets
-    import healpy as hp
-    import geopandas
-    import os,sys
-    import time, datetime
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import astropy.io.fits as pyfits
-    from astropy.table import Table
-    from astropy import units as u
-    from astropy.coordinates import SkyCoord, search_around_sky, get_sun
-    from astropy.visualization.wcsaxes import SphericalCircle
-    from astropy.time import Time
-
-    stop_datetime = catalog_df['datetime'].iloc[-1]
-    start_datetime = catalog_df['datetime'].iloc[0]
-    time_step = catalog_df['datetime'].iloc[1] - catalog_df['datetime'].iloc[0]
-    ra_sun = catalog_df['RA_SUN'].to_numpy()
-    dec_sun = catalog_df['DEC_SUN'].to_numpy()
-    c = SkyCoord(ra=ra_sun, dec=dec_sun, unit=(u.degree, u.degree), frame='fk5')
-    lat_sun = c.galactic.b
-    lon_sun = c.galactic.l
-
-    ra_zenith = catalog_df['RA_ZENITH'].to_numpy()
-    dec_zenith = catalog_df['DEC_ZENITH'].to_numpy()
-    c = SkyCoord(ra=ra_zenith, dec=dec_zenith, unit=(u.degree, u.degree), frame='fk5')
-    lat_zenith = c.galactic.b
-    lon_zenith = c.galactic.l
-    nstep = int((stop_datetime-start_datetime)/time_step)
-    
-    play = widgets.Play(value=0,min=0,max=nstep,step=1,interval=500,description="Press play",disabled=False)
-    intslider = widgets.IntSlider(min=0, max=nstep, step=1, value=0,description="Tempo (days)", continuous_update=False)
-    def plot_sky(t):
-        fig = plt.figure(figsize=(8,6))
-        hp.graticule(verbose=False)
-        hp.projplot(lon_sun[:t], lat_sun[:t], lonlat=True, color='orange', ls='--');
-        hp.projplot(lon_zenith[:t], lat_zenith[:t], lonlat=True, color='orange', ls='--');
-        hp.projscatter(lon_sun[t], lat_sun[t], lonlat=True, color='r', marker='o');
-        hp.projscatter(lon_zenith[t], lat_zenith[t], lonlat=True, color='r', marker='o');
-        plt.show()
-
-    w = interactive(plot_sky, t=intslider)
-    output = w.children[-1]
-    output.layout.height = '380px'
-    display(w)
+    Plotter(df = catalog_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in catalog_df.columns if col not in ['TIME_FROM_SAA', 'RA_SUN', 'RA_ZENITH']], marker = ',', show = True, smoothing_key='smooth')

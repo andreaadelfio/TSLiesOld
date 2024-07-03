@@ -69,10 +69,12 @@ The **config.py** expects a certain directory structure, such as:
 ``` bash
 ACDAnomalies
 ├── data
-│   ├── LAT_ACD
-│   ├── solar
-│   ├── spacecraft
+│   ├── focus
 │   ├── inputs_outputs
+│   ├── LAT_ACD
+│   ├── model_nn
+│   ├── solar
+│   └── spacecraft
 ├── logs
 ├── modules
 └── scripts
@@ -85,6 +87,17 @@ ACDAnomalies
 ## Contributing
 
 Contributions are welcome. Please open an issue to discuss your idea or submit a pull request with your changes.
+
+### TO-DO:
+```
+- check cuFFT, cuDNN, cuBLAS
+- check the articles in lectures
+- check if __init__.py are actually necessary (https://sentry.io/answers/what-is-init-py-for-in-python/, https://martinxpn.medium.com/what-are-packages-in-python-and-what-is-the-role-of-init-py-files-82-100-days-of-python-325a992b2b13)
+- improve the trigger plotting
+- improve get_feature_importance
+- separate get_feature_importance based on SHAP / lime use
+- add catalog compilation
+```
 
 ## Contact
 

@@ -1,6 +1,7 @@
 # Folders
 /data
 /logs
+/lectures
 /m_check
 /modules/lime
 /modules/__pycache__
