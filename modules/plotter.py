@@ -7,10 +7,10 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix
 try:
     from modules.utils import Logger, logger_decorator
-    from modules.config import MODEL_NN_FOLDER_NAME
+    from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME
 except:
     from utils import Logger, logger_decorator
-    from config import MODEL_NN_FOLDER_NAME
+    from config import BACKGROUND_PREDICTION_FOLDER_NAME
 
 
 class Plotter:
@@ -258,52 +258,52 @@ class Plotter:
 
 
     @logger_decorator(logger)
-    def plot_tile(self, tiles_df, det_rng='top', smoothing_key = 'smooth'):
+    def plot_tile(self, tiles_df, face='top', smoothing_key = 'smooth'):
         with sns.plotting_context("talk"):
-            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12), num=det_rng, tight_layout=True)
+            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12), num=face, tight_layout=True)
             fig.subplots_adjust(hspace=0)
 
-            axs[0].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[det_rng], 'k-.')
-            axs[0].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[f'{det_rng}_{smoothing_key}'], 'r-')
+            axs[0].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[face], 'k-.')
+            axs[0].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[f'{face}_{smoothing_key}'], 'r-')
             axs[0].set_title('foreground and background')
             axs[0].set_ylabel('Count Rate')
 
-            axs[1].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[det_rng] - tiles_df[f'{det_rng}_{smoothing_key}'], 'k-.')
+            axs[1].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[face] - tiles_df[f'{face}_{smoothing_key}'], 'k-.')
             axs[1].plot(pd.to_datetime(tiles_df['datetime']).ffill(), [0 for _ in tiles_df['datetime'].ffill()], 'k-')
             axs[1].set_xlabel('time (YYYY-MM-DD hh:mm:ss)')
             plt.xticks(rotation=0)
             axs[1].set_ylabel('Residuals')
 
     @logger_decorator(logger)
-    def plot_tile_knn(self, inputs_outputs_df, y_pred, det_rng='top'):
+    def plot_tile_knn(self, inputs_outputs_df, y_pred, face='top'):
         '''Function to plot the tile for the KNN model.'''
         with sns.plotting_context("talk"):
-            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12), num=det_rng, tight_layout=True)
+            fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12), num=face, tight_layout=True)
             fig.subplots_adjust(hspace=0)
 
-            axs[0].plot(pd.to_datetime(inputs_outputs_df['datetime']), inputs_outputs_df[det_rng], 'k-.')
-            axs[0].plot(pd.to_datetime(inputs_outputs_df['datetime']), y_pred[det_rng], 'r-')
+            axs[0].plot(pd.to_datetime(inputs_outputs_df['datetime']), inputs_outputs_df[face], 'k-.')
+            axs[0].plot(pd.to_datetime(inputs_outputs_df['datetime']), y_pred[face], 'r-')
             axs[0].set_title('foreground and background')
             axs[0].set_ylabel('Count Rate')
 
-            axs[1].plot(pd.to_datetime(inputs_outputs_df['datetime']), inputs_outputs_df[det_rng] - y_pred[det_rng], 'k-.')
+            axs[1].plot(pd.to_datetime(inputs_outputs_df['datetime']), inputs_outputs_df[face] - y_pred[face], 'k-.')
             axs[1].plot(pd.to_datetime(inputs_outputs_df['datetime']).ffill(), [0 for _ in inputs_outputs_df['datetime'].ffill()], 'k-')
             axs[1].set_xlabel('time (YYYY-MM-DD hh:mm:ss)')
             plt.xticks(rotation=0)
             axs[1].set_ylabel('Residuals')
 
     @logger_decorator(logger)
-    def plot_pred_true(self, tiles_df, col_pred=['top_pred', 'Xpos_pred', 'Xneg_pred', 'Ypos_pred', 'Yneg_pred'], col_range_raw=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']):
+    def plot_pred_true(self, tiles_df, col_pred=['top_pred', 'Xpos_pred', 'Xneg_pred', 'Ypos_pred', 'Yneg_pred'], y_cols_raw=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']):
         with sns.plotting_context("talk"):
             fig = plt.figure("pred_vs_true", layout="tight")
             fig.set_size_inches(24, 12)
             plt.axis('equal')
-            plt.plot(tiles_df[col_range_raw], tiles_df[col_pred], '.', alpha=0.2)
+            plt.plot(tiles_df[y_cols_raw], tiles_df[col_pred], '.', alpha=0.2)
             min_y, max_y = min(tiles_df[col_pred].min()), max(tiles_df[col_pred].max())
             plt.plot([min_y, max_y], [min_y, max_y], '-')
             plt.xlabel('True signal')
             plt.ylabel('Predicted signal')
-        plt.legend(col_range_raw)  
+        plt.legend(y_cols_raw)  
 
     @logger_decorator(logger)
     def plot_history(self, history, feature):
@@ -356,7 +356,7 @@ class Plotter:
         if show:
             plt.show()
         if save:
-            Plotter.save(MODEL_NN_FOLDER_NAME)
+            Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME)
 
     def plot_confusion_matric(self, y_true, y_pred, show = True):
         '''Function to plot the confusion matrix.'''

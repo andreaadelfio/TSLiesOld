@@ -26,7 +26,7 @@ logger = Logger('Main Dataset').get_logger()
 def get_tiles_signal_df():
     '''Get the tile signal dataframe from the catalog'''
     print('Catalog...', end='')
-    cr = CatalogReader(data_dir='data/LAT_ACD/output runs v3', start=0, end=-1)
+    cr = CatalogReader(data_dir='data/LAT_ACD/output runs', start=0, end=-1)
     tile_signal_df = cr.get_signal_df_from_catalog()
     tile_signal_df = cr.add_smoothing(tile_signal_df)
     runs_times = cr.get_runs_times()
