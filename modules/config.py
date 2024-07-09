@@ -15,8 +15,9 @@ DATA_FOLDER_NAME = os.path.join(DIR, 'data')
 SOLAR_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'solar')
 SC_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'spacecraft/LAT/weekly')
 DATA_LATACD_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/output runs')
-MODEL_NN_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'model_nn')
+BACKGROUND_PREDICTION_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'background_prediction')
 
+# Folders: parent (data), children (solar, spacecraft, LAT_ACD/output runs)
 SOLAR_FILENAME = 'solar_activity'
 SOLAR_FILE_PATH = os.path.join(SOLAR_FOLDER_NAME, SOLAR_FILENAME)
 

@@ -6,11 +6,11 @@ import os
 try:
     from modules.plotter import Plotter
     from modules.utils import Data
-    from modules.nn import get_feature_importance
+    from modules.background_predictor import get_feature_importance
 except:
     from plotter import Plotter
     from utils import Data
-    from nn import get_feature_importance
+    from modules.background_predictor import get_feature_importance
 
 
 class Quadratic:
@@ -131,7 +131,7 @@ def focus(X, threshold, plot=False):
 def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
     """Run the trigger algorithm on the dataset.
     """
-    if not os.path.exists('data/anomalies'):
+    if not os.path.exists('data/anomalies'): # move folders string in config.py
         os.makedirs('data/anomalies')
     if not os.path.exists('data/anomalies/plots'):
         os.makedirs('data/anomalies/plots')
@@ -202,10 +202,9 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
         figs.savefig(f'data/anomalies/plots/{key}_{signal["datetime"][changepoint]}.png')
         plt.close(figs)
         if model:
-            col_range = y_cols
-            col_selected = [col for col in signal.columns if col not in y_cols + y_pred_cols + ['datetime', 'TIME_FROM_SAA', 'SUN_IS_OCCULTED', 'LIVETIME', 'MET', 'START', 'STOP', 'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'SAA_EXIT', 'IN_SAA']]
-            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][changepoint]}_lime.png", inputs_outputs_df = signal[changepoint:stopping_time], col_range = col_range, col_selected = col_selected, model = model, show=False, num_sample=10)
-            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][stopping_time+50]}_lime.png", inputs_outputs_df = signal[changepoint+50:stopping_time+50], col_range = col_range, col_selected = col_selected, model = model, show=False, num_sample=10)
+            x_cols = [col for col in signal.columns if col not in y_cols + y_pred_cols + ['datetime', 'TIME_FROM_SAA', 'SUN_IS_OCCULTED', 'LIVETIME', 'MET', 'START', 'STOP', 'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'SAA_EXIT', 'IN_SAA']]
+            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][changepoint]}_lime.png", inputs_outputs_df = signal[changepoint:stopping_time], y_cols = y_cols, x_cols = x_cols, model = model, show=False, num_sample=10)
+            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][stopping_time+50]}_lime.png", inputs_outputs_df = signal[changepoint+50:stopping_time+50], y_cols = y_cols, x_cols = x_cols, model = model, show=False, num_sample=10)
 
     focus_res = pd.DataFrame(anomalies_dict, columns=['face', 'start', 'changepoint', 'stopping_time', 'start_datetime', 'stop_datetime', 'significance', 'sigma', 'threshold'])
     focus_res.to_csv('data/anomalies/detections.csv', index=False)
@@ -216,8 +215,8 @@ if __name__ == '__main__':
     y_cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
     y_pred_cols = [col + '_pred' for col in y_cols]
 
-    fermi_data = pd.read_pickle('data/model_nn/1/pk/frg.pk')
-    nn_pred = pd.read_pickle('data/model_nn/1/pk/bkg.pk')
+    fermi_data = pd.read_pickle('data/background_prediction/1/pk/frg.pk')
+    nn_pred = pd.read_pickle('data/background_prediction/1/pk/bkg.pk')
     
     nn_pred = nn_pred.assign(**{col: nn_pred[cols_init] for col, cols_init in zip(y_pred_cols, y_cols)}).drop(columns=y_cols)
     tiles_df = Data.merge_dfs(nn_pred, fermi_data)
