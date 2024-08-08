@@ -5,10 +5,10 @@ import pandas as pd
 from scipy import fftpack
 try:
     from modules.config import DATA_LATACD_FOLDER_PATH
-    from modules.utils import Time, Logger, logger_decorator
+    from modules.utils import Time, Logger, logger_decorator, File
 except:
     from config import DATA_LATACD_FOLDER_PATH
-    from utils import Time, Logger, logger_decorator
+    from utils import Time, Logger, logger_decorator, File
 
 
 class CatalogReader():
@@ -16,7 +16,7 @@ class CatalogReader():
     logger = Logger('CatalogReader').get_logger()
 
     @logger_decorator(logger)
-    def __init__(self, data_dir = DATA_LATACD_FOLDER_PATH, start = 0, end = -1):
+    def __init__(self, h_names, data_dir = DATA_LATACD_FOLDER_PATH, start = 0, end = -1):
         """
         Initialize the CatalogReader object.
 
@@ -29,9 +29,7 @@ class CatalogReader():
         self.runs_roots = [f'{self.data_dir}/{filename}' for filename in os.listdir(data_dir)]
         self.runs_roots.sort()
         self.runs_roots = self.runs_roots[start:end]
-        # self.h_names = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
-        # self.h_names = [f'rate_tile{i};1' for i in range(89)]
-        self.h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
+        self.h_names = h_names
         self.runs_times = {}
         self.runs_dict = {}
 
@@ -56,9 +54,9 @@ class CatalogReader():
         return self.runs_times
 
     @logger_decorator(logger)
-    def get_runs_dict(self, runs_roots = None, binning = None):
+    def get_runs_dict_root(self, runs_roots = None, binning = None):
         """
-        Get the dictionary of runs and their properties.
+        Fills a dictionary with (run_id)->(signals) for each run.
 
         Parameters:
         - runs_dirs (list): The list of run directories to consider.
@@ -92,6 +90,22 @@ class CatalogReader():
         return self.runs_dict
 
     @logger_decorator(logger)
+    def get_runs_dict(self, binning = None) -> pd.DataFrame:
+        """
+        Get the pandas.Dataframe containing the signals for each run.
+
+        Parameters:
+        - binning (int): The binning factor for the histograms (optional, deprecated).
+
+        Returns:
+        - runs_dict (pandas.Dataframe): The dataframe containing the signals for each run.
+        """
+        catalog_df = File.read_dfs_from_pk_folder(folder_path=self.data_dir, custom_sorter=lambda x: int(os.path.basename(x).split('.')[0]))
+        catalog_df['datetime'] = np.array(Time.from_met_to_datetime(catalog_df['MET'] - 1))
+        self.runs_times['catalog'] = (catalog_df['datetime'][0], catalog_df['datetime'].iloc[-1])
+        return catalog_df
+
+    @logger_decorator(logger)
     def add_smoothing(self, tile_signal):
         '''This function adds the smoothed histograms to the signal dataframe.'''
         histx = tile_signal['MET']
@@ -109,6 +123,27 @@ class CatalogReader():
         return tile_signal
 
     @logger_decorator(logger)
+    def get_signal_df_from_catalog_root(self, runs_dict = None, binning = None):
+        """
+        Get the signal dataframe from the catalog.
+
+        Parameters:
+        - runs_dict (dict): The dictionary of runs and their properties.
+
+        Returns:
+        - signal_dataframe (pd.DataFrame): The signal dataframe.
+        """
+        if runs_dict is None:
+            runs_dict = self.get_runs_dict_root(binning=binning)
+        if len(runs_dict) > 1:
+            catalog_df = pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
+        else:
+            catalog_df = pd.DataFrame(list(runs_dict.values())[0])
+        
+        catalog_df = catalog_df[catalog_df['Xpos'] != 0]
+        return catalog_df
+
+    @logger_decorator(logger)
     def get_signal_df_from_catalog(self, runs_dict = None, binning = None):
         """
         Get the signal dataframe from the catalog.
@@ -120,16 +155,12 @@ class CatalogReader():
         - signal_dataframe (pd.DataFrame): The signal dataframe.
         """
         if runs_dict is None:
-            runs_dict = self.get_runs_dict(binning=binning)
-        if len(runs_dict) > 1:
-            catalog_df = pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
-        else:
-            catalog_df = pd.DataFrame(list(runs_dict.values())[0])
+            catalog_df = self.get_runs_dict(binning=binning)
         
         catalog_df = catalog_df[catalog_df['Xpos'] != 0]
         return catalog_df
 
 if __name__ == '__main__':
-    cr = CatalogReader(data_dir='data/LAT_ACD/output runs', start=0, end=-1)
+    cr = CatalogReader(h_names=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg'], data_dir='data/LAT_ACD/output runs dfs', start=0, end=-1)
     tile_signal_df = cr.get_signal_df_from_catalog()
     print(len(tile_signal_df))
