@@ -10,12 +10,12 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.neighbors import KNeighborsRegressor
 # Keras
-from keras.optimizers import Adam, Nadam, RMSprop, SGD
+from keras.optimizers import Adam, Nadam, RMSprop, SGD # pylint: disable=E0401
 from keras import Input, Model
-from keras.layers import Dense, Dropout, BatchNormalization, LSTM
-from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler
-from keras.models import load_model
-from keras.utils import plot_model
+from keras.layers import Dense, Dropout, BatchNormalization, LSTM # pylint: disable=E0401
+from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler # pylint: disable=E0401
+from keras.models import load_model # pylint: disable=E0401
+from keras.utils import plot_model # pylint: disable=E0401
 # Explainability
 import matplotlib.pyplot as plt
 # import shap

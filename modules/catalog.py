@@ -69,7 +69,7 @@ class CatalogReader():
         if runs_roots is None:
             runs_roots = self.runs_roots
         for fname in runs_roots:
-            froot = ROOT.TFile.Open(fname, 'read')
+            froot = ROOT.TFile.Open(fname, 'read') # pylint: disable=maybe-no-member
             hist = froot.Get(self.h_names[0])
             histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
             datetime = np.array(Time.from_met_to_datetime(histx - 1))

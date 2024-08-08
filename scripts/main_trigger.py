@@ -12,12 +12,12 @@ import numpy as np
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-from modules.background_predictor import RNNPredictor, FFNNPredictor
+from modules.background import RNNPredictor, FFNNPredictor
 from modules.utils import Data, File
 from modules.plotter import Plotter
 from modules.trigger import trigger
 
-from config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded
+from scripts.main_config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded
 
 
 def run_trigger_rnn(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):

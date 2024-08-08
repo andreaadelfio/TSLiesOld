@@ -17,9 +17,9 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 from modules.plotter import Plotter
 from modules.utils import Data, File
 from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME
-from modules.background_predictor import FFNNPredictor, RNNPredictor, MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor, get_feature_importance
+from modules.background import FFNNPredictor, RNNPredictor, MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor, get_feature_importance
 
-from config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded
+from scripts.main_config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded
 
 def run_rnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
     
@@ -134,7 +134,7 @@ def run_multimean_knn(inputs_outputs, y_cols, x_cols):
     start, end = 60000, 63000
     _, y_pred = multi_reg.predict(start=start, end=end)
     y_pred = pd.DataFrame(y_pred, columns=y_cols)
-    Plotter().plot_tile_knn(inputs_outputs[start:end].reset_index(), y_pred, det_rng='Xpos')
+    Plotter().plot_tile_knn(inputs_outputs[start:end].reset_index(), y_pred, face='Xpos')
     Plotter().show()
     Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME)
 
@@ -146,7 +146,7 @@ def run_multimedian_knn(inputs_outputs, y_cols, x_cols):
     start, end = 60000, 73000
     _, y_pred = multi_reg.predict(start=start, end=end)
     y_pred = pd.DataFrame(y_pred, columns=y_cols)
-    Plotter().plot_tile_knn(inputs_outputs[start:end].reset_index(), y_pred, det_rng='Xpos')
+    Plotter().plot_tile_knn(inputs_outputs[start:end].reset_index(), y_pred, face='Xpos')
     Plotter().show()
     Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME)
 

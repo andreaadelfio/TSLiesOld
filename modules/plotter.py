@@ -330,7 +330,7 @@ class Plotter:
             for label, features in features_dict.items():
                 df = df_ori
                 for feature, conditions in features.items():
-                    df = df[conditions["op"](df[feature], conditions["value"])]
+                    df = df[conditions["op"](df[feature], conditions["value"])] # pylint: disable=E1136
                 print(df)
                 data.append(df[col])
                 labels.append(label)

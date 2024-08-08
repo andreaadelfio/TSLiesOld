@@ -6,11 +6,11 @@ import os
 try:
     from modules.plotter import Plotter
     from modules.utils import Data
-    from modules.background_predictor import get_feature_importance
+    from modules.background import get_feature_importance
 except:
     from plotter import Plotter
     from utils import Data
-    from modules.background_predictor import get_feature_importance
+    from modules.background import get_feature_importance
 
 
 class Quadratic:
@@ -222,4 +222,4 @@ if __name__ == '__main__':
     Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',',
                                                         show=True, smoothing_key='pred')
 
-    trigger(tiles_df, y_cols, y_pred_cols, 1)
+    trigger(tiles_df, y_cols, y_pred_cols, 1, bsize=500)
