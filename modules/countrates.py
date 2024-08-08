@@ -1,20 +1,6 @@
-# legge lista di file root generati da lanciaReadRecon.py e
-# produce un file root con:
-# istogrammi dei rates per ogni tiles, e mediati sulle 5 facce
-# istogrammi dei rates  normalizzati  per ogni tiles, e mediati sulle 5 facce
-
-# usage:
-# python makeReconRates.py #  --listFile LISTFILE (txt file with list of root files)  --binning BINNING (binning in seconds)  --outfile OUTFILE     (outrootfile, default: out.root) --acdSizesFile ACDSIZESFILE  (files with acd tiles area, default=ACD_tiles_size2.txt),  --t0 T0  (t0, default: 0.0)
-
-# esempio:
-# python ../ACDTransients/makeReconRates.py --listFile fileList --binning 1 --outfile out.root --t0 0 --acdSizesFile ../ACDTransients/ACD_tiles_size2.txt
-
-# NB, la lista deve essere ordinata! (se  no la funzione get_time0_last non funziona... sarebbe da cambiare )
-# es: ls outAcdReconRates_*_?_*.root >fileList
-#     ls outAcdReconRates_*_??_*.root >>fileList
-
-
-# from __future__ import print_function, division
+'''
+This module contains the class to manipulate the runs from Fermi.
+'''
 import os
 import concurrent.futures
 import re
@@ -143,12 +129,12 @@ class ACDReconRates:
     @logger_decorator(logger)
     def createTChain(self, rootfiles, treeName, path, end = None):
         chain = ROOT.TChain(treeName) # pylint: disable=maybe-no-member
-        run = os.path.basename(path).split('_')[-1]
+        run = re.search(r"\d+", os.path.basename(path)).group(0)
+        print(run)
         for line in rootfiles:
             if not line.endswith('.root'):
                 rootfiles.remove(line)
-        # rootfiles.sort(key=lambda x: int(x.split(run)[-1].split('_')[1].split('.')[0]))
-        rootfiles.sort(key=lambda x: int(os.path.splitext(x)[0].split(run)[-1].strip('_')))
+        rootfiles.sort(key=lambda x: int(re.search(r"\d+", os.path.splitext(x)[0].split(run)[-1]).group(0)))
         for run in rootfiles[:end]:
             chain.Add(os.path.join(path, run))
         return chain
@@ -236,7 +222,7 @@ class ACDReconRates:
 
     def create_root_df(self, binning, output_filename, INPUT_ROOTS_FOLDER):
         tiles_faces = {'top': (64, 89), 'Xpos': (48, 64), 'Xneg': (32, 48), 'Ypos': (16, 32), 'Yneg': (0, 16)}
-        list_file = os.listdir(INPUT_ROOTS_FOLDER)[:10]
+        list_file = os.listdir(INPUT_ROOTS_FOLDER)
         myTree = self.createTChain(list_file,'myTree', INPUT_ROOTS_FOLDER)
         dict_np = ROOT.RDataFrame(myTree).AsNumpy() # pylint: disable=maybe-no-member
         df = pd.DataFrame(dict_np)
@@ -245,8 +231,7 @@ class ACDReconRates:
         notnull = df['acdE_acdtile'].apply(lambda x: any(x))
         df = df[notnull].reset_index(drop=True)
         if 'gltGemEngine' in df.columns:
-            trigger_type = (df['gltGemEngine'] != 3)
-            df = df[trigger_type].reset_index(drop=True)
+            df = df[df['gltGemEngine'] != 3].reset_index(drop=True)
 
         time0, time_last = df['time'].min(), df['time'].max()
         n_bins = int((time_last - time0) / binning)

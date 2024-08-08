@@ -1,4 +1,6 @@
-'''This module contains the classes for the Neural Network and K-Nearest Neighbors models.'''
+'''
+This module contains the classes for the Neural Network and K-Nearest Neighbors models.
+'''
 import os
 import gc
 import pandas as pd
@@ -579,7 +581,7 @@ class MedianKNeighborsRegressor(KNeighborsRegressor):
 
     @logger_decorator(logger)
     def predict(self, X):
-        """Predict the target for the provided data.
+        '''Predict the target for the provided data.
 
         Parameters
         ----------
@@ -591,7 +593,7 @@ class MedianKNeighborsRegressor(KNeighborsRegressor):
         -------
         y : ndarray of shape (n_queries,) or (n_queries, n_outputs), dtype=int
             Target values.
-        """
+        '''
         if self.weights == "uniform":
             # In that case, we do not need the distances to perform
             # the weighting so we do not compute them.

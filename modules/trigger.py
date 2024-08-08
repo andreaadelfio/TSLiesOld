@@ -1,4 +1,6 @@
-''' This module contains the implementation of the FOCuS algorithm for change point detection. '''
+'''
+This module contains the implementation of the FOCuS algorithm for change point detection.
+'''
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -129,8 +131,8 @@ def focus(X, threshold, plot=False):
     return 0, len(X)+1, len(X) #no change found by end of signal
 
 def trigger(tiles_df, y_cols, y_pred_cols, threshold, bsize, model = None):
-    """Run the trigger algorithm on the dataset.
-    """
+    '''Run the trigger algorithm on the dataset.
+    '''
     if not os.path.exists('data/anomalies'): # move folders string in config.py
         os.makedirs('data/anomalies')
     if not os.path.exists('data/anomalies/plots'):

@@ -1,7 +1,11 @@
+'''
+This module contains the class to manage the acd dataset.
+'''
 import os
 import ROOT
 import numpy as np
 import pandas as pd
+import re
 from scipy import fftpack
 try:
     from modules.config import DATA_LATACD_FOLDER_PATH
@@ -12,19 +16,19 @@ except:
 
 
 class CatalogReader():
-    """Class to read the catalog of runs and their properties"""
+    '''Class to read the catalog of runs and their properties'''
     logger = Logger('CatalogReader').get_logger()
 
     @logger_decorator(logger)
     def __init__(self, h_names, data_dir = DATA_LATACD_FOLDER_PATH, start = 0, end = -1):
-        """
+        '''
         Initialize the CatalogReader object.
 
         Parameters:
         - data_dir (str): The directory path where the catalog data is stored.
         - start (int): The index of the first run directory to consider.
         - end (int): The index of the last run directory to consider.
-        """
+        '''
         self.data_dir = data_dir
         self.runs_roots = [f'{self.data_dir}/{filename}' for filename in os.listdir(data_dir)]
         self.runs_roots.sort()
@@ -35,27 +39,27 @@ class CatalogReader():
 
     @logger_decorator(logger)
     def get_runs_roots(self):
-        """
+        '''
         Get the list of run directories.
 
         Returns:
         - runs_dirs (list): The list of run directories.
-        """
+        '''
         return self.runs_roots
 
     @logger_decorator(logger)
     def get_runs_times(self):
-        """
+        '''
         Get the dictionary of run times.
 
         Returns:
         - runs_times (dict): The dictionary of run times.
-        """
+        '''
         return self.runs_times
 
     @logger_decorator(logger)
     def get_runs_dict_root(self, runs_roots = None, binning = None):
-        """
+        '''
         Fills a dictionary with (run_id)->(signals) for each run.
 
         Parameters:
@@ -65,7 +69,7 @@ class CatalogReader():
 
         Returns:
         - runs_dict (dict): The dictionary of runs and their properties.
-        """
+        '''
         if runs_roots is None:
             runs_roots = self.runs_roots
         for fname in runs_roots:
@@ -91,7 +95,7 @@ class CatalogReader():
 
     @logger_decorator(logger)
     def get_runs_dict(self, binning = None) -> pd.DataFrame:
-        """
+        '''
         Get the pandas.Dataframe containing the signals for each run.
 
         Parameters:
@@ -99,8 +103,8 @@ class CatalogReader():
 
         Returns:
         - runs_dict (pandas.Dataframe): The dataframe containing the signals for each run.
-        """
-        catalog_df = File.read_dfs_from_pk_folder(folder_path=self.data_dir, custom_sorter=lambda x: int(os.path.basename(x).split('.')[0]))
+        '''
+        catalog_df = File.read_dfs_from_pk_folder(folder_path=self.data_dir, custom_sorter=lambda x: int(re.search(r"\d+", os.path.basename(x)).group(0)))
         catalog_df['datetime'] = np.array(Time.from_met_to_datetime(catalog_df['MET'] - 1))
         self.runs_times['catalog'] = (catalog_df['datetime'][0], catalog_df['datetime'].iloc[-1])
         return catalog_df
@@ -124,7 +128,7 @@ class CatalogReader():
 
     @logger_decorator(logger)
     def get_signal_df_from_catalog_root(self, runs_dict = None, binning = None):
-        """
+        '''
         Get the signal dataframe from the catalog.
 
         Parameters:
@@ -132,7 +136,7 @@ class CatalogReader():
 
         Returns:
         - signal_dataframe (pd.DataFrame): The signal dataframe.
-        """
+        '''
         if runs_dict is None:
             runs_dict = self.get_runs_dict_root(binning=binning)
         if len(runs_dict) > 1:
@@ -145,7 +149,7 @@ class CatalogReader():
 
     @logger_decorator(logger)
     def get_signal_df_from_catalog(self, runs_dict = None, binning = None):
-        """
+        '''
         Get the signal dataframe from the catalog.
 
         Parameters:
@@ -153,7 +157,7 @@ class CatalogReader():
 
         Returns:
         - signal_dataframe (pd.DataFrame): The signal dataframe.
-        """
+        '''
         if runs_dict is None:
             catalog_df = self.get_runs_dict(binning=binning)
         

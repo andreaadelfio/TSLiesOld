@@ -1,4 +1,6 @@
-'''Utils module for the ACNBkg project.'''
+'''
+Utils module for the ACNBkg project.
+'''
 import sys
 import os
 import pprint

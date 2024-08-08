@@ -1,4 +1,6 @@
-'''Plotter module for plotting data points and curves.'''
+'''
+Plotter module for plotting data points and curves.
+'''
 import operator
 import matplotlib.pyplot as plt
 import pandas as pd

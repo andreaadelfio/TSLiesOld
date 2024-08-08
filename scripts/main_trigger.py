@@ -1,9 +1,10 @@
-"""Main file to run the project
+'''
+Main file to run the project
 Author: Andrea Adelfio
 Created date: 24/06/2024
 Modified date: 27/06/2024
 TODO:
-"""
+'''
 
 import sys
 import os

@@ -37,20 +37,20 @@ class SpacecraftOpener:
 
     @logger_decorator(logger)
     def __init__(self):
-        """
+        '''
         Initializes a new instance of the SpacecraftOpener class.
-        """
+        '''
         self.raw_data: np.ndarray = None
         self.data = None
 
     @logger_decorator(logger)
     def get_sc_lat_weekly(self, week) -> list[str]:
-        """
+        '''
         Retrieves data from LAT weekly file names or downloads them if not found.
 
         Returns:
             list[str]: The list of LAT weekly file names.
-        """
+        '''
         sc_weekly_content = os.listdir(SC_FOLDER_NAME)
         filename = f'lat_1sec_spacecraft_weekly_w{week}_p310_v001.fits'
         if filename not in sc_weekly_content:
@@ -61,18 +61,18 @@ class SpacecraftOpener:
 
     @logger_decorator(logger)
     def download_lat_weekly(self, week, dir_path=SC_FOLDER_NAME):
-        """
+        '''
         Downloads LAT weekly spacecraft data.
 
         Returns:
             None
-        """
+        '''
         url = f'https://heasarc.gsfc.nasa.gov/FTP/fermi/data/lat/weekly/1s_spacecraft/lat_1sec_spacecraft_weekly_w{week}_p310_v001.fits'
         wget.download(url, out=dir_path, bar=None)
 
     @logger_decorator(logger)
     def open(self, sc_filename, excluded_columns=None):
-        """
+        '''
         Opens the spacecraft data file and retrieves the necessary information.
 
         Args:
@@ -80,19 +80,19 @@ class SpacecraftOpener:
 
         Returns:
             None
-        """
+        '''
         with fits.open(sc_filename) as hdulist:
             self.raw_data = hdulist[1].data
             self.data = self.init_data(excluded_columns=excluded_columns)
 
     @logger_decorator(logger)
     def init_data(self, excluded_columns=None) -> np.ndarray:
-        """
+        '''
         Returns the spacecraft data.
 
         Returns:
             numpy.ndarray: The spacecraft data.
-        """
+        '''
 
         cols_to_split = {
             name for name in self.raw_data.dtype.names if self.raw_data[name][0].size > 1}
@@ -117,31 +117,31 @@ class SpacecraftOpener:
 
     @logger_decorator(logger)
     def get_data(self) -> np.ndarray:
-        """
+        '''
         Returns the spacecraft data.
 
         Returns:
             numpy.ndarray: The spacecraft data.
-        """
+        '''
         return self.data
 
     @logger_decorator(logger)
     def get_dataframe(self) -> pd.DataFrame:
-        """
+        '''
         Returns the dataframe containing the spacecraft data.
 
         Returns:
             pandas.DataFrame: The dataframe containing the spacecraft data.
-        """
+        '''
         return Data.convert_to_df(self.data)
 
     @logger_decorator(logger)
     def saa_boundary(self):
-        """The coordinates of the SAA boundary in latitude and East longitude
+        '''The coordinates of the SAA boundary in latitude and East longitude
         
         Returns:
             (np.array, np.array): The latitude and East longitude values
-        """
+        '''
         lat_saa = np.array(
             [-28.000, -17.867, -7.733, 2.00, 6.500, 6.500, 5.00,
             1.000, -4.155, -5.880, -10.020, -17.404, -28.000, -28.000])
@@ -152,7 +152,7 @@ class SpacecraftOpener:
 
     @logger_decorator(logger)
     def add_saa_passage(self, sc_df: pd.DataFrame, prev_lon_lat) -> pd.DataFrame:
-        """
+        '''
         Adds the TIME_FROM_SAA column to the spacecraft data.
 
         Args:
@@ -160,7 +160,7 @@ class SpacecraftOpener:
 
         Returns:
             pd.DataFrame: The spacecraft data with the SAA column added.
-        """
+        '''
         lat_saa, lon_saa = self.saa_boundary()
         saa_path = Path(np.vstack((lon_saa, lat_saa)).T)
         sc_df_distance = np.sqrt((sc_df['LON_GEO'].diff())**2 + (sc_df['LAT_GEO'].diff())**2)
@@ -182,7 +182,7 @@ class SpacecraftOpener:
 
     @logger_decorator(logger)
     def add_sun_occultation(self, sc_df: pd.DataFrame) -> pd.DataFrame:
-        """
+        '''
         Adds the SUN_IS_OCCULTED column to the spacecraft data.
 
         Args:
@@ -190,7 +190,7 @@ class SpacecraftOpener:
 
         Returns:
             pd.DataFrame: The spacecraft data with the SUN_IS_OCCULTED column added.
-        """
+        '''
 
         ra_sun_rad = np.deg2rad(sc_df['RA_SUN'])
         dec_sun_rad = np.deg2rad(sc_df['DEC_SUN'])

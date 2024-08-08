@@ -1,4 +1,6 @@
-'''This module handles the solar activity retrieval'''
+'''
+This module handles the retrieval of the solar activity from the GOES satellite using the sunpy module.
+'''
 import os
 import pandas as pd
 from sunpy import timeseries as ts

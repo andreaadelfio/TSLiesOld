@@ -28,12 +28,6 @@ BACKGROUND_PREDICTION_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'background_p
 SOLAR_FILENAME = 'solar_activity'
 SOLAR_FILE_PATH = os.path.join(SOLAR_FOLDER_NAME, SOLAR_FILENAME)
 
-# TILE_SIGNAL_FILENAME = 'tile_signal'    # deprecated
-# TILE_SIGNAL_FILE_PATH = os.path.join(DATA_LATACD_FOLDER_PATH, TILE_SIGNAL_FILENAME)    # deprecated
-
-# SC_FILENAME = 'sc'     # deprecated
-# SC_FILE_PATH = os.path.join(SC_FOLDER_NAME, SC_FILENAME)    # deprecated
-
 INPUTS_OUTPUTS_FILENAME = 'inputs_outputs'
 INPUTS_OUTPUTS_FOLDER = os.path.join(DATA_FOLDER_NAME, 'inputs_outputs')
 INPUTS_OUTPUTS_FILE_PATH = os.path.join(INPUTS_OUTPUTS_FOLDER, INPUTS_OUTPUTS_FILENAME)
@@ -48,7 +42,7 @@ MODEL_NN_SAVED_FILE_NAME = 'saved_model.keras'
 if __name__ == '__main__':
     vars_copy = vars().copy()
     filtered_vars = [var for var in vars_copy if '__' not in var]
-    max_len = max(len(var) for var in filtered_vars)
+    max_len = max(map(len, filtered_vars))
 
     for var in filtered_vars:
         print(f"{var:<{max_len}} {vars_copy[var]}")

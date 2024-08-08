@@ -1,4 +1,5 @@
-'''Main file to run the project
+'''
+Main file to run the project
 Author: Andrea Adelfio
 Created date: 03/02/2024
 Modified date: 27/06/2024
