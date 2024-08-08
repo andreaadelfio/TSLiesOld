@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 try:
-    from modules.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_PK_FOLDER
+    from modules.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER
 except:
-    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_PK_FOLDER
+    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER
 
 class Logger():
     '''
@@ -152,7 +152,7 @@ class Time:
         for dt1, dt2 in datetime_dict.values():
             weeks_set.add(((dt1 - Time.fermi_launch_time).days) // 7 + 10)
             weeks_set.add(((dt2 - Time.fermi_launch_time).days) // 7 + 10)
-        return list(weeks_set)
+        return list(range(min(weeks_set), max(weeks_set) + 1))
 
     @staticmethod
     def get_datetime_from_week(week: int) -> tuple:
@@ -359,24 +359,48 @@ class File:
 
     @logger_decorator(logger)
     @staticmethod
-    def read_dfs_from_pk_folder(folder_path=INPUTS_OUTPUTS_PK_FOLDER):
+    def read_dfs_from_pk_folder(folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0])):
         '''
-        Read the dataframe from a file.
+        Read the dataframe from pickle files in a folder.
 
         Parameters:
         ----------
-            filename (str, optional): The name of the file to read the dataframe from.
-                                      Defaults to INPUTS_OUTPUTS_FILE_PATH.
+            folder_path (str, optional): The name of the folder to read the dataframe from.
+                                      Defaults to INPUTS_OUTPUTS_FOLDER.
 
         Returns:
         -------
             DataFrame: The dataframe read from the file.
         '''
+        folder_path = os.path.join(folder_path, 'pk')
         if os.path.exists(folder_path):
             dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.pk')]
-            dir_list = sorted(dir_list, key=lambda x: int(x.split('_w')[-1].split('.')[0]))
+            dir_list = sorted(dir_list, key=custom_sorter)
             dfs = [pd.read_pickle(file) for file in dir_list]
-            merged_dfs = pd.concat(dfs, ignore_index=True)
+            merged_dfs = pd.concat(dfs, ignore_index=True).drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug
+        return merged_dfs
+
+    @logger_decorator(logger)
+    @staticmethod
+    def read_dfs_from_csv_folder(folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0])):
+        '''
+        Read the dataframe from csv files in a folder.
+
+        Parameters:
+        ----------
+            folder_path (str, optional): The name of the folder to read the dataframe from.
+                                      Defaults to INPUTS_OUTPUTS_FOLDER.
+
+        Returns:
+        -------
+            DataFrame: The dataframe read from the file.
+        '''
+        folder_path = os.path.join(folder_path, 'csv')
+        if os.path.exists(folder_path):
+            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.csv')]
+            dir_list = sorted(dir_list, key=custom_sorter)
+            dfs = [pd.read_csv(file) for file in dir_list]
+            merged_dfs = pd.concat(dfs, ignore_index=True).drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug
         return merged_dfs
 
     @logger_decorator(logger)
