@@ -90,14 +90,21 @@ Contributions are welcome. Please open an issue to discuss your idea or submit a
 
 ### TO-DO:
 ```
+- use Riccardo's triggering algorithm
+- train on new periodic trigger signals
+- train on new energy signals
+- train on normalized signals
+- add catalog compilation # ???
+- merge anomalies from different faces
+- improve the trigger plotting
+- check sosc notebooks
 - add logs
 - add triggering folders to the config.py
 - check the articles in lectures
-- check if __init__.py are actually necessary (https://sentry.io/answers/what-is-init-py-for-in-python/, https://martinxpn.medium.com/what-are-packages-in-python-and-what-is-the-role-of-init-py-files-82-100-days-of-python-325a992b2b13)
-- improve the trigger plotting
+- check if __init__.py are necessary (https://sentry.io/answers/what-is-init-py-for-in-python/, https://martinxpn.medium.com/what-are-packages-in-python-and-what-is-the-role-of-init-py-files-82-100-days-of-python-325a992b2b13)
 - improve get_feature_importance
+- add feature importance difference before / after an anomaly
 - separate get_feature_importance based on SHAP / lime use
-- add catalog compilation # ???
 ```
 
 ## Contact
