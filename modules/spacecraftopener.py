@@ -201,7 +201,7 @@ class SpacecraftOpener:
         cos_theta = np.clip(cos_theta, -1.0, 1.0)
         theta_rad = np.arccos(cos_theta)
         theta_deg = np.rad2deg(theta_rad)
-        sc_df['SUN_IS_OCCULTED'] = (theta_deg > 90).astype(float)
+        sc_df['SUN_IS_OCCULTED'] = (theta_deg > 110).astype(float)
         return sc_df
 
     @logger_decorator(logger)

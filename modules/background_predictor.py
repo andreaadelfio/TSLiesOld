@@ -55,7 +55,6 @@ def get_feature_importance(model_path, inputs_outputs_df, y_cols, x_cols, num_sa
     y_test = inputs_outputs_df[y_cols]
     X_back = X_test.sample(num_sample)
     importance_dict = {face: {col: 0 for col in X_back.columns} for face in y_cols}
-    print(X_back.columns)
     explainer = lime_tabular.LimeTabularExplainer(
         training_data=np.array(X_back),
         feature_names=X_back.columns,
@@ -77,7 +76,7 @@ def get_feature_importance(model_path, inputs_outputs_df, y_cols, x_cols, num_sa
                         importance_dict[face][col] += np.abs(weight) / num_sample
                         break
 
-    summed_importance_dict = {col: 0 for col in importance_dict['top'].keys()}
+    summed_importance_dict = {col: 0 for col in importance_dict[y_cols[0]].keys()}
     for face in y_cols:
         for col, value in importance_dict[face].items():
             summed_importance_dict[col] += value
@@ -88,7 +87,7 @@ def get_feature_importance(model_path, inputs_outputs_df, y_cols, x_cols, num_sa
     
     file_name = 'Feature Importance with Lime' if model_path.endswith('.keras') else model_path
     plt.figure(num=file_name, figsize=(10, 8))
-    left = {col: 0 for col in importance_dict['top']}
+    left = {col: 0 for col in importance_dict[y_cols[0]]}
     for i, key in enumerate(importance_dict.keys()):
         sorted_importance_dict[key] = {k: sorted_importance_dict[key][k] for k in summed_sorted_importance_dict}
         left_arr = [left[key] for key in sorted_importance_dict[key]]
@@ -178,6 +177,7 @@ class FFNNPredictor(MLObject):
         self.units_1 = None
         self.units_2 = None
         self.units_3 = None
+        self.units_4 = None
         self.bs = None
         self.do = None
         self.opt_name = None
@@ -195,15 +195,15 @@ class FFNNPredictor(MLObject):
         if os.path.exists(BACKGROUND_PREDICTION_FOLDER_NAME + '/models_params.csv'):
             os.remove(BACKGROUND_PREDICTION_FOLDER_NAME + '/models_params.csv')
         with open(BACKGROUND_PREDICTION_FOLDER_NAME + '/models_params.csv', 'a') as f:
-            f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'norm', 'drop', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
-        for units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
-            sorted_tuple = tuple([value for value in [units_1, units_2, units_3] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
+            f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'units_4', 'norm', 'drop', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
+        for units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
+            sorted_tuple = tuple([value for value in [units_1, units_2, units_3, units_4] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
             if len(sorted_tuple) == 8 or sorted_tuple in uniques:
                 continue
             else:
                 print(sorted_tuple)
                 uniques.add(sorted_tuple)
-                hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
+                hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
                 model_id += 1
 
         return hyperparams_combinations_tmp
@@ -224,14 +224,14 @@ class FFNNPredictor(MLObject):
         model_id = 0
         if os.path.exists(BACKGROUND_PREDICTION_FOLDER_NAME):
             first = sorted(os.listdir(BACKGROUND_PREDICTION_FOLDER_NAME), key=(lambda x: int(x) if len(x) < 4 else 0))[-1]
-        for units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
-            sorted_tuple = tuple([value for value in [units_1, units_2, units_3] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
+        for units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
+            sorted_tuple = tuple([value for value in [units_1, units_2, units_3, units_4] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
             if len(sorted_tuple) == 8 or sorted_tuple in uniques:
                 continue
             else:
                 print(sorted_tuple)
                 uniques.add(sorted_tuple)
-                hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
+                hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
                 model_id += 1
         
         return hyperparams_combinations_tmp[int(first):]
@@ -258,6 +258,7 @@ class FFNNPredictor(MLObject):
         self.units_1 = params['units_1']
         self.units_2 = params['units_2']
         self.units_3 = params['units_3']
+        self.units_4 = params['units_4']
         self.bs = params['bs']
         self.do = params['do']
         self.opt_name = params['opt_name']
@@ -298,6 +299,13 @@ class FFNNPredictor(MLObject):
 
         if self.units_3:
             hidden = Dense(self.units_3, activation='relu')(hidden)
+            if self.norm:
+                hidden = BatchNormalization()(hidden)
+            if self.drop:
+                hidden = Dropout(self.do)(hidden)
+
+        if self.units_4:
+            hidden = Dense(self.units_4, activation='relu')(hidden)
             if self.norm:
                 hidden = BatchNormalization()(hidden)
             if self.drop:
@@ -551,13 +559,11 @@ class RNNPredictor(FFNNPredictor):
 
         df_ori = self.df_data[start:end][self.y_cols].reset_index(drop=True)
         y_pred = pd.DataFrame(pred_x_tot, columns=self.y_cols)
-        print(len(y_pred), len(self.df_data[start:end]['datetime'].values))
         df_ori['datetime'] = self.df_data[start:end]['datetime'].values
         y_pred['datetime'] = self.df_data[start+self.timesteps:end]['datetime'].values
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
-        print(len(y_pred))
         if write:
             path = f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}'
             if not self.model_id:

@@ -24,11 +24,11 @@ from config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded
 def run_rnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
     
     rnn = RNNPredictor(inputs_outputs, y_cols, x_cols, timestep=2)
-    units_1_values = [0]
-    units_2_values = [50]
-    units_3_values = [30]
+    units_1_values = [500]
+    units_2_values = [500]
+    units_3_values = [70]
     epochs_values = [100]
-    bs_values = [100, 2000]
+    bs_values = [1000]
     do_values = [0.02]
     norm_values = [0]
     drop_values = [0]
@@ -66,7 +66,7 @@ def run_rnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
             Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',',
                                                               show=False, smoothing_key='pred')
             for col in y_cols_raw:
-                Plotter().plot_tile(tiles_df, det_rng=col, smoothing_key = 'pred')
+                Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred')
             Plotter().plot_pred_true(tiles_df, cols_pred, y_cols_raw)
             Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params, (start, end))
         if history.history['loss'][-1] < 0.0042:
@@ -77,35 +77,36 @@ def run_ffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
     # inputs_outputs['MEDIAN'] = np.median(inputs_outputs[['top', 'Xneg', 'Ypos', 'Yneg']], axis=1)
 
     nn = FFNNPredictor(inputs_outputs, y_cols, x_cols)
-    units_1_values = [90, 100]
-    units_2_values = [80, 90, 100]
-    units_3_values = [50, 70]
-    epochs_values = [25]
+    units_1_values = [100]
+    units_2_values = [100]
+    units_3_values = [70]
+    units_4_values = [70]
+    epochs_values = [10]
     bs_values = [1000]
     do_values = [0.02]
     norm_values = [0]
     drop_values = [0]
     opt_name_values = ['Adam']
-    lr_values = [0.00009]
+    lr_values = [0.0009]
     loss_type_values = ['mae']
 
     Plotter().plot_correlation_matrix(inputs_outputs, show=False, save=True)
     
     hyperparams_combinations = list(itertools.product(units_1_values, units_2_values,
-                                                      units_3_values, norm_values,
+                                                      units_3_values, units_4_values, norm_values,
                                                       drop_values, epochs_values,
                                                       bs_values, do_values, opt_name_values,
                                                       lr_values, loss_type_values))
     hyperparams_combinations = nn.trim_hyperparams_combinations(hyperparams_combinations)
     # hyperparams_combinations = nn.use_previous_hyperparams_combinations(hyperparams_combinations)
-    for model_id, units_1, units_2, units_3, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
+    for model_id, units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
         params = {'model_id': model_id, 'units_1': units_1, 'units_2': units_2,
-                  'units_3': units_3, 'norm': norm, 'drop': drop, 'epochs': epochs,
+                  'units_3': units_3, 'units_4': units_4, 'norm': norm, 'drop': drop, 'epochs': epochs,
                   'bs': bs, 'do': do, 'opt_name': opt_name, 'lr': lr, 'loss_type': loss_type}
         nn.set_hyperparams(params)
         nn.create_model()
         history = nn.train()
-        if history.history['loss'][-1] > 0.0041:
+        if history.history['loss'][-1] > 0.00415:
             continue
         Plotter().plot_history(history, 'loss')
         Plotter().plot_history(history, 'accuracy')
@@ -119,10 +120,10 @@ def run_ffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
             Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',',
                                                               show=False, smoothing_key='pred')
             for col in y_cols_raw:
-                Plotter().plot_tile(tiles_df, det_rng=col, smoothing_key = 'pred')
+                Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred')
             Plotter().plot_pred_true(tiles_df, cols_pred, y_cols_raw)
             Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params, (start, end))
-        if history.history['loss'][-1] < 0.0041:
+        if history.history['loss'][-1] < 0.00415:
             get_feature_importance(nn.model_path, inputs_outputs, y_cols, x_cols, num_sample=10, show=False)
 
 def run_multimean_knn(inputs_outputs, y_cols, x_cols):
@@ -179,16 +180,16 @@ def run_median(inputs_outputs):
 
 ########### Main ############
 if __name__ == '__main__':
-    inputs_outputs_df = File.read_dfs_from_pk_folder()[:10000]
-    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
-    #                                               start='2023-12-06 05:30:22',
-    #                                               stop='2023-12-06 09:15:28')
+    inputs_outputs_df = File.read_dfs_from_pk_folder()
+    inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
+                                                  start='2023-10-06 05:30:22',
+                                                  stop='2024-03-06 09:15:28')
 
-    # Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
+    Plotter(df = inputs_outputs_df[['top', 'datetime', 'SUN_IS_OCCULTED']], label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
 
-    run_rnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
-    # run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
+    # run_rnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
+    run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
     # run_multimean_knn(inputs_outputs_df, y_cols, x_cols)
     # run_multimedian_knn(inputs_outputs_df, y_cols, x_cols)
     # run_median(inputs_outputs_df, y_cols)

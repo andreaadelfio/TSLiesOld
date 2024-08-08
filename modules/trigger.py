@@ -128,7 +128,7 @@ def focus(X, threshold, plot=False):
         
     return 0, len(X)+1, len(X) #no change found by end of signal
 
-def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
+def trigger(tiles_df, y_cols, y_pred_cols, threshold, bsize, model = None):
     """Run the trigger algorithm on the dataset.
     """
     if not os.path.exists('data/anomalies'): # move folders string in config.py
@@ -136,7 +136,6 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
     if not os.path.exists('data/anomalies/plots'):
         os.makedirs('data/anomalies/plots')
 
-    bsize = 500
     anomalies_dict = []
     for key, key_pred in zip(y_cols, y_pred_cols):
         anomalies = 0
@@ -149,7 +148,7 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
             sigma = np.std(sub_signal)
             significance, changepoint, stopping_time = focus(sub_signal, threshold * sigma)
             if changepoint is not None and stopping_time < bsize and significance > 0:
-                if count == old_count + old_stopping_time:
+                if count == old_count + old_stopping_time or count + changepoint <= old_count + old_stopping_time + 60:
                     last_anomaly = anomalies_dict.pop()
                     new_count = last_anomaly[1]
                     new_changepoint = last_anomaly[2]
@@ -165,14 +164,14 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
 
     support_vars = ['SUN_IS_OCCULTED', 'SOLAR']
     for key, count, changepoint, stopping_time, start_datetime, stop_datetime, significance, sigma, threshold in anomalies_dict:
-        start = count+changepoint-100
-        end = count+stopping_time+100
+        start = count+changepoint-300
+        end = count+stopping_time+300
         signal = tiles_df[start:end]
         changepoint = count+changepoint
         stopping_time = count+stopping_time
-        figs, axs = plt.subplots(6 + len(support_vars), 1, sharex=True, figsize=(18, 14), num=f'burst_{key}')
+        figs, axs = plt.subplots(6 + len(support_vars), 1, sharex=True, figsize=(13, 9), num=f'burst_{key}')
         plt.tight_layout()
-        axs[0].set_title(f'Anomaly in {key}, with s = {round(significance / sigma):.2f} $\\sigma$ at $T = ${start_datetime}/{stop_datetime}')
+        axs[0].set_title(f'Anomaly in {key}, with s = {round(significance / sigma):.2f} $\\sigma$ at $T = ${start_datetime} / {stop_datetime}')
 
         for i, (face, face_pred) in enumerate(zip(y_cols, y_pred_cols)):
             face_color = "black" if face != key else None
@@ -187,7 +186,7 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
         axs[1+i].fill((signal['datetime'][changepoint], signal['datetime'][stopping_time], signal['datetime'][stopping_time], signal['datetime'][changepoint]), (-5, -5, 15, 15), color="red", alpha=0.1, label="anomalous interval") 
         axs[1+i].axvline(signal['datetime'][stopping_time], color='C1', label="detection time $T$", lw=0.7)
         axs[1+i].axvline(signal['datetime'][changepoint], color='red', label="start point $\\tau$", lw=0.7)
-        axs[1+i].set_ylim(min(signal[key] - signal[f'{key}_pred']), 1.01 * max(signal[key] - signal[f'{key}_pred']))
+        axs[1+i].set_ylim(min(signal[key] - signal[f'{key}_pred']), 1.01 * max(max(signal[key] - signal[f'{key}_pred']), significance))
         axs[1+i].set_xlim(signal['datetime'][start], signal['datetime'].iloc[-1])
         axs[1+i].legend(loc="upper right")
 
@@ -199,7 +198,7 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold, model = None):
         plt.tight_layout()
         figs.subplots_adjust(hspace=0)
 
-        figs.savefig(f'data/anomalies/plots/{key}_{signal["datetime"][changepoint]}.png')
+        figs.savefig(f'data/anomalies/plots/{key}_{signal["datetime"][changepoint]}.png', dpi=800)
         plt.close(figs)
         if model:
             x_cols = [col for col in signal.columns if col not in y_cols + y_pred_cols + ['datetime', 'TIME_FROM_SAA', 'SUN_IS_OCCULTED', 'LIVETIME', 'MET', 'START', 'STOP', 'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'SAA_EXIT', 'IN_SAA']]

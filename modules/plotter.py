@@ -149,7 +149,7 @@ class Plotter:
             axs.tick_params(axis="x", labelrotation=45)
         if show:
             plt.show()
-
+    
     @logger_decorator(logger)
     def df_plot_tiles(self, x_col, excluded_cols = None, marker = '-', lw = 0.1, smoothing_key = 'smooth', show = True):
         '''
@@ -348,7 +348,7 @@ class Plotter:
     def plot_correlation_matrix(self, inputs_outputs_df: pd.DataFrame, show = True, save = False):
         '''Function to plot the correlation matrix.'''
         correlations = inputs_outputs_df.corr()
-        plt.figure(figsize=(20, 20), num='correlations_matrix')
+        plt.figure(figsize=(18, 18), num='correlations_matrix')
         sns.heatmap(correlations, annot=True, cmap='coolwarm', fmt=".2f")
         plt.xticks(rotation=90)
         plt.yticks(rotation=0)
@@ -358,7 +358,7 @@ class Plotter:
         if save:
             Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME)
 
-    def plot_confusion_matric(self, y_true, y_pred, show = True):
+    def plot_confusion_matrix(self, y_true, y_pred, show = True):
         '''Function to plot the confusion matrix.'''
         cm = confusion_matrix(y_true, y_pred)
         plt.figure(figsize=(10, 8), num='confusion_matrix')
@@ -367,7 +367,7 @@ class Plotter:
         plt.yticks(rotation=0)
         if show:
             plt.show()
-        
+
     @logger_decorator(logger)
     @staticmethod
     def show():
