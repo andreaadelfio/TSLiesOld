@@ -1,19 +1,23 @@
 '''
 This module contains the implementation of the FOCuS algorithm for change point detection.
 '''
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
 try:
     from modules.plotter import Plotter
-    from modules.utils import Data
+    from modules.utils import Data, Logger, logger_decorator
     from modules.background import get_feature_importance
+    from modules.config import TRIGGER_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 except:
     from plotter import Plotter
-    from utils import Data
-    from modules.background import get_feature_importance
+    from utils import Data, Logger, logger_decorator
+    from background import get_feature_importance
+    from config import TRIGGER_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 
+
+logger = Logger('Trigger').get_logger()
 
 class Quadratic:
     def __init__(self, a, b):
@@ -50,6 +54,7 @@ class Quadratic:
         return (self.b>other_quadratic.b)and(self.xmax()>other_quadratic.xmax())
 
 
+@logger_decorator(logger)
 def focus_step(quadratic_list, X_T):
     new_quadratic_list = []
     global_max = 0
@@ -90,6 +95,7 @@ def focus_step(quadratic_list, X_T):
         
     return new_quadratic_list, global_max, time_offset
 
+@logger_decorator(logger)
 def plot_quadratics(quadratic_list, threshold, T):
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
@@ -115,6 +121,7 @@ def plot_quadratics(quadratic_list, threshold, T):
         ax.legend()
     return fig
 
+@logger_decorator(logger)
 def focus(X, threshold, plot=False):
     quadratic_list = []
     
@@ -130,13 +137,14 @@ def focus(X, threshold, plot=False):
         
     return 0, len(X)+1, len(X) #no change found by end of signal
 
+@logger_decorator(logger)
 def trigger(tiles_df, y_cols, y_pred_cols, threshold, bsize, model = None):
     '''Run the trigger algorithm on the dataset.
     '''
-    if not os.path.exists('data/anomalies'): # move folders string in config.py
-        os.makedirs('data/anomalies')
-    if not os.path.exists('data/anomalies/plots'):
-        os.makedirs('data/anomalies/plots')
+    if not os.path.exists(TRIGGER_FOLDER_NAME):
+        os.makedirs(TRIGGER_FOLDER_NAME)
+    if not os.path.exists(PLOT_TRIGGER_FOLDER_NAME):
+        os.makedirs(PLOT_TRIGGER_FOLDER_NAME)
 
     anomalies_dict = []
     for key, key_pred in zip(y_cols, y_pred_cols):
@@ -200,15 +208,15 @@ def trigger(tiles_df, y_cols, y_pred_cols, threshold, bsize, model = None):
         plt.tight_layout()
         figs.subplots_adjust(hspace=0)
 
-        figs.savefig(f'data/anomalies/plots/{key}_{signal["datetime"][changepoint]}.png', dpi=800)
+        figs.savefig(os.path.join(PLOT_TRIGGER_FOLDER_NAME, f'{key}_{signal["datetime"][changepoint]}.png'), dpi=800)
         plt.close(figs)
         if model:
             x_cols = [col for col in signal.columns if col not in y_cols + y_pred_cols + ['datetime', 'TIME_FROM_SAA', 'SUN_IS_OCCULTED', 'LIVETIME', 'MET', 'START', 'STOP', 'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'SAA_EXIT', 'IN_SAA']]
-            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][changepoint]}_lime.png", inputs_outputs_df = signal[changepoint:stopping_time], y_cols = y_cols, x_cols = x_cols, model = model, show=False, num_sample=10)
-            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][stopping_time+50]}_lime.png", inputs_outputs_df = signal[changepoint+50:stopping_time+50], y_cols = y_cols, x_cols = x_cols, model = model, show=False, num_sample=10)
+            get_feature_importance(os.path.join(PLOT_TRIGGER_FOLDER_NAME, f"{key}_{signal['datetime'][changepoint]}_lime.png"), inputs_outputs_df = signal[changepoint:stopping_time], y_cols = y_cols, x_cols = x_cols, model = model, show=False, num_sample=10)
+            get_feature_importance(os.path.join(PLOT_TRIGGER_FOLDER_NAME, f"{key}_{signal['datetime'][stopping_time+50]}_lime.png"), inputs_outputs_df = signal[changepoint+50:stopping_time+50], y_cols = y_cols, x_cols = x_cols, model = model, show=False, num_sample=10)
 
     focus_res = pd.DataFrame(anomalies_dict, columns=['face', 'start', 'changepoint', 'stopping_time', 'start_datetime', 'stop_datetime', 'significance', 'sigma', 'threshold'])
-    focus_res.to_csv('data/anomalies/detections.csv', index=False)
+    focus_res.to_csv(os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'detections.csv'), index=False)
     return anomalies_dict
 
 

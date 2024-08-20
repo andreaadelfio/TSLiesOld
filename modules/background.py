@@ -161,7 +161,7 @@ class FFNNPredictor(MLObject):
     def __init__(self, df_data, y_cols, x_cols):
         self.y_cols = y_cols
         self.x_cols = x_cols
-        self.df_data = df_data
+        self.df_data: pd.DataFrame = df_data
 
         if not os.path.exists(f'{BACKGROUND_PREDICTION_FOLDER_NAME}'):
             os.makedirs(f'{BACKGROUND_PREDICTION_FOLDER_NAME}')
@@ -194,9 +194,9 @@ class FFNNPredictor(MLObject):
         hyperparams_combinations_tmp = []
         uniques = set()
         model_id = 0
-        if os.path.exists(BACKGROUND_PREDICTION_FOLDER_NAME + '/models_params.csv'):
-            os.remove(BACKGROUND_PREDICTION_FOLDER_NAME + '/models_params.csv')
-        with open(BACKGROUND_PREDICTION_FOLDER_NAME + '/models_params.csv', 'a') as f:
+        if os.path.exists(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv')):
+            os.remove(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv'))
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv'), 'a') as f:
             f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'units_4', 'norm', 'drop', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
         for units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
             sorted_tuple = tuple([value for value in [units_1, units_2, units_3, units_4] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
@@ -315,7 +315,7 @@ class FFNNPredictor(MLObject):
         outputs = Dense(len(self.y_cols), activation='linear')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
-        plot_model(self.nn_r, to_file=f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}/schema.png',
+        plot_model(self.nn_r, to_file=os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'schema.png'),
                    show_shapes=True, show_layer_names=True, rankdir='LR')
 
         if self.opt_name == 'Adam':
@@ -381,10 +381,10 @@ class FFNNPredictor(MLObject):
 
         nn_r.save(self.model_path)
         self.nn_r = nn_r
-        with open(f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}/params.txt', "w") as params_file:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'params.txt'), "w") as params_file:
             for key, value in self.params.items():
                 params_file.write(f'{key} : {value}\n')
-        with open(f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}/performance.txt', "w") as text_file:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'performance.txt'), "w") as text_file:
             text_file.write(text)
         self.text = text
         return history
@@ -409,17 +409,17 @@ class FFNNPredictor(MLObject):
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
         if write:
-            path = f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}'
+            path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id)
             if not self.model_id:
                 path = os.path.dirname(self.model_path)
-            File.write_df_on_file(df_ori, f'{path}/frg')
-            File.write_df_on_file(y_pred, f'{path}/bkg')
+            File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
+            File.write_df_on_file(y_pred, os.path.join(path, 'bkg'))
         return df_ori, y_pred
 
     @logger_decorator(logger)
     def update_summary(self):
         '''Updates the summary file with the model parameters'''
-        with open(BACKGROUND_PREDICTION_FOLDER_NAME + '/models_params.csv', 'a') as f:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv'), 'a') as f:
             list_tmp = list(self.params.values()) + self.mae_tr_list
             f.write('\t'.join([str(value) for value in list_tmp] + ['\n']))
 
@@ -529,22 +529,24 @@ class RNNPredictor(FFNNPredictor):
 
         nn_r.save(self.model_path)
         self.nn_r = nn_r
-        with open(f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}/params.txt', "w") as params_file:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'params.txt'), "w") as params_file:
             for key, value in self.params.items():
                 params_file.write(f'{key} : {value}\n')
-        with open(f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}/performance.txt', "w") as text_file:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'performance.txt'), "w") as text_file:
             text_file.write(text)
         self.text = text
         return history
 
     # @logger_decorator(logger)
-    def predict(self, start = 0, end = -1, write=True, batched=False):
+    def predict(self, start = 0, end = -1, write=True, batched=False) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
         ----------
-            start (int): The starting index. Default is 0.
-            end (int): The ending index. Defualt is -1.'''
+            start (int): The starting index. (Default is 0).
+            end (int): The ending index. (Defualt is -1).
+            write (bool): If the predicted and original dataset will be written in a file. (Defualt is True)
+            batched (bool): If the dataset will be modeled in batch. (Defualt is False)'''
         data_to_be_scaled = self.df_data[self.x_cols][start:end]
         data = self.scaler.transform(data_to_be_scaled)
         data = np.array([data[i:i + self.timesteps] for i in np.arange(len(data) - self.timesteps)])
@@ -567,11 +569,11 @@ class RNNPredictor(FFNNPredictor):
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
         if write:
-            path = f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}'
+            path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id)
             if not self.model_id:
                 path = os.path.dirname(self.model_path)
-            File.write_df_on_file(df_ori, f'{path}/frg')
-            File.write_df_on_file(y_pred, f'{path}/bkg')
+            File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
+            File.write_df_on_file(y_pred, os.path.join(path, 'bkg'))
         return df_ori, y_pred
         
 

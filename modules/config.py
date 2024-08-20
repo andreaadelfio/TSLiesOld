@@ -16,13 +16,16 @@ SOLAR_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'solar')
 
 SC_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'spacecraft/LAT/weekly')
 
-# DATA_LATACD_INPUT_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/Dec23-Feb24 input runs')
-DATA_LATACD_INPUT_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/May24-Jun24 input runs')
+# DATA_LATACD_INPUT_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/Dec23-Feb24 input runs')
+DATA_LATACD_INPUT_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/May24-Jun24 input runs')
 
-# DATA_LATACD_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/Dec23-Feb24 output runs')
-DATA_LATACD_FOLDER_PATH = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/May24-Jun24 output runs')
+# DATA_LATACD_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/Dec23-Feb24 output runs')
+DATA_LATACD_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/May24-Jun24 output runs')
 
 BACKGROUND_PREDICTION_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'background_prediction')
+
+TRIGGER_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'anomalies')
+PLOT_TRIGGER_FOLDER_NAME = os.path.join(TRIGGER_FOLDER_NAME, 'plots')
 
 # Folders: parent (data), children (solar, spacecraft, LAT_ACD/output runs)
 SOLAR_FILENAME = 'solar_activity'

@@ -10,11 +10,11 @@ import pandas as pd
 import numpy as np
 try:
     from modules.plotter import Plotter
-    from modules.config import DATA_LATACD_FOLDER_PATH, DATA_LATACD_INPUT_FOLDER_PATH
+    from modules.config import DATA_LATACD_FOLDER_NAME, DATA_LATACD_INPUT_FOLDER_NAME
     from modules.utils import Logger, logger_decorator, File
 except:
     from plotter import Plotter
-    from config import DATA_LATACD_FOLDER_PATH, DATA_LATACD_INPUT_FOLDER_PATH
+    from config import DATA_LATACD_FOLDER_NAME, DATA_LATACD_INPUT_FOLDER_NAME
     from utils import Logger, logger_decorator, File
 
 
@@ -291,8 +291,8 @@ class ACDReconRates:
 
     @logger_decorator(logger)
     def do_work_parallel(self, binning, workers=1):
-        input_runs_folder = DATA_LATACD_INPUT_FOLDER_PATH
-        output_runs_folder = DATA_LATACD_FOLDER_PATH
+        input_runs_folder = DATA_LATACD_INPUT_FOLDER_NAME
+        output_runs_folder = DATA_LATACD_FOLDER_NAME
         input_folder_list = os.listdir(input_runs_folder)
         if not os.path.exists(output_runs_folder):
             os.makedirs(output_runs_folder)
