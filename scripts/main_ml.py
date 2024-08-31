@@ -78,17 +78,17 @@ def run_ffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
     # inputs_outputs['MEDIAN'] = np.median(inputs_outputs[['top', 'Xneg', 'Ypos', 'Yneg']], axis=1)
 
     nn = FFNNPredictor(inputs_outputs, y_cols, x_cols)
-    units_1_values = [100]
-    units_2_values = [100]
-    units_3_values = [70]
-    units_4_values = [70]
-    epochs_values = [10]
+    units_1_values = [90]
+    units_2_values = [90]
+    units_3_values = [90]
+    units_4_values = [30]
+    epochs_values = [30]
     bs_values = [1000]
     do_values = [0.02]
     norm_values = [0]
     drop_values = [0]
     opt_name_values = ['Adam']
-    lr_values = [0.0009]
+    lr_values = [0.00059]
     loss_type_values = ['mae']
 
     Plotter().plot_correlation_matrix(inputs_outputs, show=False, save=True)
@@ -107,7 +107,7 @@ def run_ffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
         nn.set_hyperparams(params)
         nn.create_model()
         history = nn.train()
-        if history.history['loss'][-1] > 0.00415:
+        if history.history['loss'][-1] > 0.0040:
             continue
         Plotter().plot_history(history, 'loss')
         Plotter().plot_history(history, 'accuracy')
@@ -124,7 +124,7 @@ def run_ffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
                 Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred')
             Plotter().plot_pred_true(tiles_df, cols_pred, y_cols_raw)
             Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params, (start, end))
-        if history.history['loss'][-1] < 0.00415:
+        if history.history['loss'][-1] < 0.0040:
             get_feature_importance(nn.model_path, inputs_outputs, y_cols, x_cols, num_sample=10, show=False)
 
 def run_multimean_knn(inputs_outputs, y_cols, x_cols):
@@ -182,12 +182,12 @@ def run_median(inputs_outputs):
 ########### Main ############
 if __name__ == '__main__':
     inputs_outputs_df = File.read_dfs_from_pk_folder()
-    inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
-                                                  start='2023-10-06 05:30:22',
-                                                  stop='2024-03-06 09:15:28')
+    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
+    #                                               start='2023-10-06 05:30:22',
+    #                                               stop='2024-03-06 09:15:28')
 
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
-    Plotter(df = inputs_outputs_df[['top', 'datetime', 'SUN_IS_OCCULTED']], label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
+    # Plotter(df = inputs_outputs_df[['top', 'datetime', 'SUN_IS_OCCULTED']], label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
 
     # run_rnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
     run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)

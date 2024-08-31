@@ -37,10 +37,9 @@ INPUTS_OUTPUTS_FILE_PATH = os.path.join(INPUTS_OUTPUTS_FOLDER, INPUTS_OUTPUTS_FI
 
 LOGGING_FOLDER_NAME = 'logs'
 LOGGING_FILE_NAME = f'acdbkg_{USER}.log'
-LOGGING_FILE_REL_PATH = os.path.join(LOGGING_FOLDER_NAME, LOGGING_FILE_NAME)
-LOGGING_FILE_PATH = os.path.join(os.getcwd(), LOGGING_FILE_REL_PATH)
+LOGGING_FILE_PATH = os.path.join(DIR, LOGGING_FOLDER_NAME, LOGGING_FILE_NAME)
 
-MODEL_NN_SAVED_FILE_NAME = 'saved_model.keras'
+# MODEL_NN_SAVED_FILE_NAME = 'saved_model.keras'
 
 if __name__ == '__main__':
     vars_copy = vars().copy()

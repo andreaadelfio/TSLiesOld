@@ -122,7 +122,7 @@ def get_feature_importance(model_path, inputs_outputs_df, y_cols, x_cols, num_sa
         Plotter.save(os.path.dirname(model_path) if model_path.endswith('.keras') else model_path)
 
 class MLObject:
-    '''The class used to handle the Machine Learning.'''
+    '''The class used to handle Machine Learning.'''
     def __init__(self):
         self.nn_r = None
         self.scaler = None
@@ -276,7 +276,7 @@ class FFNNPredictor(MLObject):
         '''Creates the model.'''
         self.y = self.df_data[self.y_cols].astype('float32')
         self.X = self.df_data[self.x_cols].astype('float32')
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=0, shuffle=True)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=42, shuffle=True)
 
         self.set_scaler(self.X_train)
         self.X_train = self.scaler.transform(self.X_train)
@@ -306,6 +306,11 @@ class FFNNPredictor(MLObject):
             if self.drop:
                 hidden = Dropout(self.do)(hidden)
 
+        hidden = Dense(90, activation='relu')(hidden)
+        hidden = Dense(90, activation='relu')(hidden)
+        hidden = Dense(90, activation='relu')(hidden)
+        hidden = Dense(70, activation='relu')(hidden)
+        hidden = Dense(50, activation='relu')(hidden)
         if self.units_4:
             hidden = Dense(self.units_4, activation='relu')(hidden)
             if self.norm:
@@ -315,7 +320,7 @@ class FFNNPredictor(MLObject):
         outputs = Dense(len(self.y_cols), activation='linear')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
-        plot_model(self.nn_r, to_file=os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'schema.png'),
+        plot_model(self.nn_r, to_file=os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'schema.png'),
                    show_shapes=True, show_layer_names=True, rankdir='LR')
 
         if self.opt_name == 'Adam':
@@ -343,8 +348,8 @@ class FFNNPredictor(MLObject):
     def train(self):
         '''Trains the model.'''
         
-        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, 
-                           patience=10, start_from_epoch=80)
+        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.002, 
+                           patience=10, start_from_epoch=90)
         mc = ModelCheckpoint(self.model_path, 
                              monitor='val_loss', mode='min', verbose=0, save_best_only=True)
 
@@ -381,16 +386,16 @@ class FFNNPredictor(MLObject):
 
         nn_r.save(self.model_path)
         self.nn_r = nn_r
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'params.txt'), "w") as params_file:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'params.txt'), "w") as params_file:
             for key, value in self.params.items():
                 params_file.write(f'{key} : {value}\n')
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'performance.txt'), "w") as text_file:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'performance.txt'), "w") as text_file:
             text_file.write(text)
         self.text = text
         return history
 
     @logger_decorator(logger)
-    def predict(self, start = 0, end = -1, write=True):
+    def predict(self, start = 0, end = -1, write=True) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
@@ -409,7 +414,7 @@ class FFNNPredictor(MLObject):
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
         if write:
-            path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id)
+            path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id))
             if not self.model_id:
                 path = os.path.dirname(self.model_path)
             File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
@@ -529,10 +534,10 @@ class RNNPredictor(FFNNPredictor):
 
         nn_r.save(self.model_path)
         self.nn_r = nn_r
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'params.txt'), "w") as params_file:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'params.txt'), "w") as params_file:
             for key, value in self.params.items():
                 params_file.write(f'{key} : {value}\n')
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id, 'performance.txt'), "w") as text_file:
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'performance.txt'), "w") as text_file:
             text_file.write(text)
         self.text = text
         return history
@@ -569,7 +574,7 @@ class RNNPredictor(FFNNPredictor):
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
         if write:
-            path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.model_id)
+            path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id))
             if not self.model_id:
                 path = os.path.dirname(self.model_path)
             File.write_df_on_file(df_ori, os.path.join(path, 'frg'))

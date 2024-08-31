@@ -22,7 +22,7 @@ x_cols = ['SC_POSITION_0', 'SC_POSITION_1', 'SC_POSITION_2', 'LAT_GEO', 'LON_GEO
     'SC_VELOCITY_0', 'SC_VELOCITY_1', 'SC_VELOCITY_2',
     'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL',
     'SOLAR', 'SUN_IS_OCCULTED', 'TIME_FROM_SAA', 'SAA_EXIT']
-x_cols_excluded = y_cols + y_smooth_cols + ['datetime', 'LIVETIME', 'MET', 'START', 'STOP', 'IN_SAA']
+x_cols_excluded = y_cols + y_smooth_cols + ['datetime', 'LIVETIME', 'MET', 'START', 'STOP', 'IN_SAA', 'SUN_IS_OCCULTED']
 
 # col_selected = inputs_outputs_df.columns
 
