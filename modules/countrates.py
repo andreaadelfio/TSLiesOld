@@ -1,20 +1,6 @@
-# legge lista di file root generati da lanciaReadRecon.py e
-# produce un file root con:
-# istogrammi dei rates per ogni tiles, e mediati sulle 5 facce
-# istogrammi dei rates  normalizzati  per ogni tiles, e mediati sulle 5 facce
-
-# usage:
-# python makeReconRates.py #  --listFile LISTFILE (txt file with list of root files)  --binning BINNING (binning in seconds)  --outfile OUTFILE     (outrootfile, default: out.root) --acdSizesFile ACDSIZESFILE  (files with acd tiles area, default=ACD_tiles_size2.txt),  --t0 T0  (t0, default: 0.0)
-
-# esempio:
-# python ../ACDTransients/makeReconRates.py --listFile fileList --binning 1 --outfile out.root --t0 0 --acdSizesFile ../ACDTransients/ACD_tiles_size2.txt
-
-# NB, la lista deve essere ordinata! (se  no la funzione get_time0_last non funziona... sarebbe da cambiare )
-# es: ls outAcdReconRates_*_?_*.root >fileList
-#     ls outAcdReconRates_*_??_*.root >>fileList
-
-
-# from __future__ import print_function, division
+'''
+This module contains the class to manipulate the runs from Fermi.
+'''
 import os
 import concurrent.futures
 import re
@@ -24,11 +10,11 @@ import pandas as pd
 import numpy as np
 try:
     from modules.plotter import Plotter
-    from modules.config import DATA_LATACD_FOLDER_PATH, DATA_LATACD_INPUT_FOLDER_PATH
+    from modules.config import DATA_LATACD_FOLDER_NAME, DATA_LATACD_INPUT_FOLDER_NAME
     from modules.utils import Logger, logger_decorator, File
 except:
     from plotter import Plotter
-    from config import DATA_LATACD_FOLDER_PATH, DATA_LATACD_INPUT_FOLDER_PATH
+    from config import DATA_LATACD_FOLDER_NAME, DATA_LATACD_INPUT_FOLDER_NAME
     from utils import Logger, logger_decorator, File
 
 
@@ -142,13 +128,13 @@ class ACDReconRates:
 
     @logger_decorator(logger)
     def createTChain(self, rootfiles, treeName, path, end = None):
-        chain = ROOT.TChain(treeName)
-        run = os.path.basename(path).split('_')[-1]
+        chain = ROOT.TChain(treeName) # pylint: disable=maybe-no-member
+        run = re.search(r"\d+", os.path.basename(path)).group(0)
+        print(run)
         for line in rootfiles:
             if not line.endswith('.root'):
                 rootfiles.remove(line)
-        # rootfiles.sort(key=lambda x: int(x.split(run)[-1].split('_')[1].split('.')[0]))
-        rootfiles.sort(key=lambda x: int(os.path.splitext(x)[0].split(run)[-1].strip('_')))
+        rootfiles.sort(key=lambda x: int(re.search(r"\d+", os.path.splitext(x)[0].split(run)[-1]).group(0)))
         for run in rootfiles[:end]:
             chain.Add(os.path.join(path, run))
         return chain
@@ -159,15 +145,15 @@ class ACDReconRates:
         start = time.time()
         list_file = os.listdir(INPUT_ROOTS_FOLDER)
         list_file.sort()
-        output_rootfile = ROOT.TFile(f'{output_filename}.root', 'recreate')
+        output_rootfile = ROOT.TFile(f'{output_filename}.root', 'recreate') # pylint: disable=maybe-no-member
         myTree = self.createTChain(list_file, 'myTree', INPUT_ROOTS_FOLDER)
 
         time0, time_last = self.get_time0_last(myTree)
         n_bins = int((time_last - time0) / binning)
-        identityFunc = ROOT.TF1("identityFunc", "1", time0, time_last)
+        identityFunc = ROOT.TF1("identityFunc", "1", time0, time_last) # pylint: disable=maybe-no-member
 
         # fill hist di tutti i triggers... serve per avere i rates normalizzati (i.e. acd occupancy)
-        hist_triggers = ROOT.TH1F(
+        hist_triggers = ROOT.TH1F( # pylint: disable=maybe-no-member
             "hist_triggers", "hist_triggers", n_bins, time0, time_last)
         myString = 'time >> hist_triggers'
         myTree.Draw(myString, "", "goff")
@@ -180,7 +166,7 @@ class ACDReconRates:
 
         for tileID in range(0, 89):
             hist_name = 'rate_tile'+str(tileID)
-            hist_dict[tileID] = ROOT.TH1F(
+            hist_dict[tileID] = ROOT.TH1F( # pylint: disable=maybe-no-member
                 hist_name, hist_name, n_bins, time0, time_last)
 
             string = 'time >> '+hist_name
@@ -236,17 +222,16 @@ class ACDReconRates:
 
     def create_root_df(self, binning, output_filename, INPUT_ROOTS_FOLDER):
         tiles_faces = {'top': (64, 89), 'Xpos': (48, 64), 'Xneg': (32, 48), 'Ypos': (16, 32), 'Yneg': (0, 16)}
-        list_file = os.listdir(INPUT_ROOTS_FOLDER)[:10]
+        list_file = os.listdir(INPUT_ROOTS_FOLDER)
         myTree = self.createTChain(list_file,'myTree', INPUT_ROOTS_FOLDER)
-        dict_np = ROOT.RDataFrame(myTree).AsNumpy()
+        dict_np = ROOT.RDataFrame(myTree).AsNumpy() # pylint: disable=maybe-no-member
         df = pd.DataFrame(dict_np)
         # df.to_csv('test.csv')
 
         notnull = df['acdE_acdtile'].apply(lambda x: any(x))
         df = df[notnull].reset_index(drop=True)
         if 'gltGemEngine' in df.columns:
-            trigger_type = (df['gltGemEngine'] != 3)
-            df = df[trigger_type].reset_index(drop=True)
+            df = df[df['gltGemEngine'] != 3].reset_index(drop=True)
 
         time0, time_last = df['time'].min(), df['time'].max()
         n_bins = int((time_last - time0) / binning)
@@ -258,11 +243,10 @@ class ACDReconRates:
         # import time
         # start = time.time()
         # acdE_acdtile = df['acdE_acdtile'].apply(lambda x: x[i] for i in range(89)).values.T
-
         acdE_acdtile = np.array([[i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11], i[12], i[13], i[14], i[15], i[16], i[17], i[18], i[19], i[20], i[21], i[22], i[23], i[24], i[25], i[26], i[27], i[28], i[29], i[30], i[31], i[32], i[33], i[34], i[35], i[36], i[37], i[38], i[39], i[40], i[41], i[42], i[43], i[44], i[45], i[46], i[47], i[48], i[49], i[50], i[51], i[52], i[53], i[54], i[55], i[56], i[57], i[58], i[59], i[60], i[61], i[62], i[63], i[64], i[65], i[66], i[67], i[68], i[69], i[70], i[71], i[72], i[73], i[74], i[75], i[76], i[77], i[78], i[79], i[80], i[81], i[82], i[83], i[84], i[85], i[86], i[87], i[88]] for i in df['acdE_acdtile'].values]).T
-        
         # print(time.time() - start)
         # print(acdE_acdtile)
+        
         for face, tiles in tiles_faces.items():
             face_rates = np.zeros(n_bins)
             face_rates_low = np.zeros(n_bins)
@@ -301,14 +285,14 @@ class ACDReconRates:
         #                                                                 smoothing_key='smooth',
         #                                                                 show = True)
         # Plotter.show()
-        # File.write_df_on_file(return_df,
-        #                         filename=output_filename,
-        #                         fmt='both')
+        File.write_df_on_file(return_df,
+                                filename=output_filename,
+                                fmt='both')
 
     @logger_decorator(logger)
     def do_work_parallel(self, binning, workers=1):
-        input_runs_folder = DATA_LATACD_INPUT_FOLDER_PATH
-        output_runs_folder = DATA_LATACD_FOLDER_PATH
+        input_runs_folder = DATA_LATACD_INPUT_FOLDER_NAME
+        output_runs_folder = DATA_LATACD_FOLDER_NAME
         input_folder_list = os.listdir(input_runs_folder)
         if not os.path.exists(output_runs_folder):
             os.makedirs(output_runs_folder)

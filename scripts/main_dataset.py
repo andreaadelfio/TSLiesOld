@@ -1,4 +1,5 @@
-'''Main file to run the project
+'''
+Main file to run the project
 Author: Andrea Adelfio
 Created date: 03/02/2024
 Modified date: 27/06/2024
@@ -12,14 +13,14 @@ import pandas as pd
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-from modules.spacecraftopener import SpacecraftOpener
-from modules.catalogreader import CatalogReader
+from modules.spacecraft import SpacecraftOpener
+from modules.catalog import CatalogReader
 from modules.plotter import Plotter
-from modules.sunmonitor import SunMonitor
+from modules.solar import SunMonitor
 from modules.utils import Data, File, Time, Logger, logger_decorator
 from modules.config import INPUTS_OUTPUTS_FILE_PATH
 
-from config import h_names
+from scripts.main_config import h_names
 
 logger = Logger('Main Dataset').get_logger()
 

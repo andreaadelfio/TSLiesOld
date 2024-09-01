@@ -38,15 +38,15 @@ All modules can be found in the [**/modules**](/modules) folder.
 
 1. [**config.py**](/modules/config.py): This module is used to define the configuration parameters for the project. The configuration parameters are defined as a series of constants.
 
-2. [**makecountrates.py**](/modules/makecountrates.py): This module is used to get the count rates for the ACD data in [`root`](https://root.cern.ch/root/html600/notes/release-notes.html#ttreereader) format.
+2. [**countrates.py**](/modules/countrates.py): This module is used to get the count rates for the ACD data in [`root`](https://root.cern.ch/root/html600/notes/release-notes.html#ttreereader) format.
 
-3. [**catalogreader.py**](/modules/catalogreader.py): This module is used to read the ACD data and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
+3. [**catalog.py**](/modules/catalog.py): This module is used to read the ACD data and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
 
 4. [**spacecraft.py**](/modules/spacecraft.py): This module is used to retrieve the spacecraft data and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
 
-5. [**sunmonitor.py**](/modules/sunmonitor.py): This module is used to retrieve the sun monitor data from GOES and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
+5. [**solar.py**](/modules/solar.py): This module is used to retrieve the sun monitor data from GOES and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
 
-6. [**nn.py**](/modules/nn.py): This modules is used to create, train and validate a Machine Learning model.
+6. [**background.py**](/modules/background.py): This modules is used to create, train and validate a Machine Learning model.
 
 7. [**trigger.py**](/modules/trigger.py): This module is used to find anomalies in the ACD data given the background model, with a triggering algorithm.
 
@@ -90,18 +90,11 @@ Contributions are welcome. Please open an issue to discuss your idea or submit a
 
 ### TO-DO:
 ```
-- use Riccardo's triggering algorithm
+- create unique MLObject class and rewrite the nn
 - train on new periodic trigger signals
 - train on new energy signals
 - train on normalized signals
-- add catalog compilation # ???
-- merge anomalies from different faces
-- improve the trigger plotting
-- check sosc notebooks
-- add logs
-- add triggering folders to the config.py
 - check the articles in lectures
-- check if __init__.py are necessary (https://sentry.io/answers/what-is-init-py-for-in-python/, https://martinxpn.medium.com/what-are-packages-in-python-and-what-is-the-role-of-init-py-files-82-100-days-of-python-325a992b2b13)
 - improve get_feature_importance
 - add feature importance difference before / after an anomaly
 - separate get_feature_importance based on SHAP / lime use

@@ -1,17 +1,56 @@
-''' This module contains the implementation of the FOCuS algorithm for change point detection. '''
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
+'''
+This module contains the implementation of the FOCuS algorithm for change point detection.
+'''
 import os
+import json
+from math import log
+import numpy as np
+import pandas as pd
 try:
     from modules.plotter import Plotter
-    from modules.utils import Data
-    from modules.background_predictor import get_feature_importance
+    from modules.utils import Data, Logger, logger_decorator
+    # from modules.background import get_feature_importance
+    from modules.config import TRIGGER_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 except:
     from plotter import Plotter
-    from utils import Data
-    from modules.background_predictor import get_feature_importance
+    from utils import Data, Logger, logger_decorator
+    # from background import get_feature_importance
+    from config import TRIGGER_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 
+
+
+class Curve:
+    '''
+    From the original python implementation of
+    FOCuS Poisson by Kester Ward (2021). All rights reserved.
+    '''
+
+    def __init__(self, k_T, lambda_1, t=0):
+        self.a = k_T
+        self.b = -lambda_1
+        self.t = t
+
+    def __repr__(self):
+        return "({:d}, {:.2f}, {:d})".format(self.a, self.b, self.t)
+
+    def evaluate(self, mu):
+        return max(self.a * log(mu) + self.b * (mu - 1), 0)
+
+    def update(self, k_T, lambda_1):
+        return Curve(self.a + k_T, -self.b + lambda_1, self.t - 1)
+
+    def ymax(self):
+        return self.evaluate(self.xmax())
+
+    def xmax(self):
+        return -self.a / self.b
+
+    def is_negative(self):
+        # returns true if slope at mu=1 is negative (i.e. no evidence for positive change)
+        return (self.a + self.b) <= 0
+
+    def dominates(self, other_curve):
+        return (self.a + self.b >= other_curve.a + other_curve.b) and (self.a * other_curve.b <= other_curve.a * self.b)
 
 class Quadratic:
     def __init__(self, a, b):
@@ -47,167 +86,159 @@ class Quadratic:
     def dominates(self, other_quadratic):
         return (self.b>other_quadratic.b)and(self.xmax()>other_quadratic.xmax())
 
+class Trigger:
+    logger = Logger('Trigger').get_logger()
 
-def focus_step(quadratic_list, X_T):
-    new_quadratic_list = []
-    global_max = 0
-    time_offset = 0
-    
-    if not quadratic_list: #list is empty
+    @logger_decorator(logger)
+    def focus_step_quad(self, quadratic_list, X_T):
+        new_quadratic_list = []
+        global_max = 0
+        time_offset = 0
         
-        if X_T <= 0:
-            return new_quadratic_list, global_max, time_offset
-        else:
-            updated_q = Quadratic(-1, 2*X_T)
-            new_quadratic_list.append(updated_q)
-            global_max = updated_q.ymax()
-            time_offset = updated_q.a
+        if not quadratic_list: #list is empty
             
-    else: #list not empty: go through and prune
-        
-        updated_q = quadratic_list[0].update(X_T) #check leftmost quadratic separately
-        if updated_q.b < 0: #our leftmost quadratic is negative i.e. we have no quadratics
-            return new_quadratic_list, global_max, time_offset
-        else:
-            new_quadratic_list.append(updated_q)
-            if updated_q.ymax() > global_max:   #we have a new candidate for global maximum
+            if X_T <= 0:
+                return new_quadratic_list, global_max, time_offset
+            else:
+                updated_q = Quadratic(-1, 2*X_T)
+                new_quadratic_list.append(updated_q)
                 global_max = updated_q.ymax()
                 time_offset = updated_q.a
+                
+        else: #list not empty: go through and prune
+            
+            updated_q = quadratic_list[0].update(X_T) #check leftmost quadratic separately
+            if updated_q.b < 0: #our leftmost quadratic is negative i.e. we have no quadratics
+                return new_quadratic_list, global_max, time_offset
+            else:
+                new_quadratic_list.append(updated_q)
+                if updated_q.ymax() > global_max:   #we have a new candidate for global maximum
+                    global_max = updated_q.ymax()
+                    time_offset = updated_q.a
 
-            for q in quadratic_list[1:]+[Quadratic(0, 0)]:#add on new quadratic to end of list
-                updated_q = q.update(X_T)
+                for q in quadratic_list[1:]+[Quadratic(0, 0)]:#add on new quadratic to end of list
+                    updated_q = q.update(X_T)
 
-                if new_quadratic_list[-1].dominates(updated_q):
-                    break #quadratic q and all quadratics to the right of it are pruned out by q's left neighbour
-                else:
-                    new_quadratic_list.append(updated_q)
+                    if new_quadratic_list[-1].dominates(updated_q):
+                        break #quadratic q and all quadratics to the right of it are pruned out by q's left neighbour
+                    else:
+                        new_quadratic_list.append(updated_q)
 
-                    if updated_q.ymax() > global_max:   #we have a new candidate for global maximum
-                        global_max = updated_q.ymax()
-                        time_offset = updated_q.a
-        
-    return new_quadratic_list, global_max, time_offset
+                        if updated_q.ymax() > global_max:   #we have a new candidate for global maximum
+                            global_max = updated_q.ymax()
+                            time_offset = updated_q.a
+            
+        return new_quadratic_list, global_max, time_offset
 
-def plot_quadratics(quadratic_list, threshold, T):
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.set_title("FOCuS step")
-    
-    ax.set_xlabel("$\mu$")
-    ax.set_ylabel("$S_{T}(\mu)$", rotation=0)
-    
-    # ax.set_ylim(-1, threshold+1)
-    # ax.set_xlim(-0.2, 5.2)
-    
-    
-    ax.axhline(threshold, color='C1')
 
-    mu = np.linspace(0, 5, 100) #the x-axis for the plot
-    
-    for q in quadratic_list:
-        ax.plot(mu, q.evaluate(mu), label=f'$\\tau={q.a+T+1}$')
-    
-    ax.axhline(0, color='C0')
+    def focus_step_curve(self, curve_list, k_T, lambda_1):
+        '''
+        From the original python implementation of
+        FOCuS Poisson by Kester Ward (2021). All rights reserved.
+        '''
+        if not curve_list:  # list is empty
+            if k_T <= lambda_1:
+                return [], 0., 0
+            else:
+                updated_c = Curve(k_T, lambda_1, t=-1)
+                return [updated_c], updated_c.ymax(), updated_c.t
 
-    if quadratic_list:
-        ax.legend()
-    return fig
+        else:  # list not empty: go through and prune
 
-def focus(X, threshold, plot=False):
-    quadratic_list = []
-    
-    for T in range(len(X)):
-        quadratic_list, global_max, time_offset = focus_step(quadratic_list, X[T])
-        
-        if plot:
-            plot_quadratics(quadratic_list, threshold, T)
-            plt.show()
-        
-        if global_max > threshold:
-            return global_max, time_offset+T+1, T
-        
-    return 0, len(X)+1, len(X) #no change found by end of signal
+            updated_c = curve_list[0].update(k_T, lambda_1)  # check leftmost quadratic separately
+            if updated_c.is_negative():  # our leftmost quadratic is negative i.e. we have no quadratics
+                return [], 0., 0,
+            else:
+                new_curve_list = [updated_c]
+                global_max = updated_c.ymax()
+                time_offset = updated_c.t
 
-def trigger(tiles_df, y_cols, y_pred_cols, threshold, bsize, model = None):
-    """Run the trigger algorithm on the dataset.
-    """
-    if not os.path.exists('data/anomalies'): # move folders string in config.py
-        os.makedirs('data/anomalies')
-    if not os.path.exists('data/anomalies/plots'):
-        os.makedirs('data/anomalies/plots')
+                for c in curve_list[1:] + [Curve(0, 0)]:  # add on new quadratic to end of list
+                    updated_c = c.update(k_T, lambda_1)
+                    if new_curve_list[-1].dominates(updated_c):
+                        break
+                    else:
+                        new_curve_list.append(updated_c)
+                        ymax = updated_c.ymax()
+                        if ymax > global_max:  # we have a new candidate for global maximum
+                            global_max = ymax
+                            time_offset = updated_c.t
 
-    anomalies_dict = []
-    for key, key_pred in zip(y_cols, y_pred_cols):
-        anomalies = 0
-        print(f'{key}...', end=' ')
-        signal = tiles_df[key] - tiles_df[key_pred]
-        count = 0
-        old_count, old_stopping_time = 0, 0
-        while count+bsize < len(signal):
-            sub_signal = signal[count:count+bsize].reset_index(drop=True)
-            sigma = np.std(sub_signal)
-            significance, changepoint, stopping_time = focus(sub_signal, threshold * sigma)
-            if changepoint is not None and stopping_time < bsize and significance > 0:
-                if count == old_count + old_stopping_time or count + changepoint <= old_count + old_stopping_time + 60:
-                    last_anomaly = anomalies_dict.pop()
-                    new_count = last_anomaly[1]
-                    new_changepoint = last_anomaly[2]
-                    new_stopping_time = last_anomaly[3] + stopping_time
-                    new_anomaly = (key, new_count, new_changepoint, new_stopping_time, str(tiles_df['datetime'][new_count+new_changepoint]), str(tiles_df['datetime'][count+stopping_time]), significance, sigma, threshold)
-                else:
-                    anomalies += 1
-                    new_anomaly = (key, count, changepoint, stopping_time, str(tiles_df['datetime'][count+changepoint]), str(tiles_df['datetime'][count+stopping_time]), significance, sigma, threshold)
-                anomalies_dict.append(new_anomaly)
-                old_count, old_stopping_time = count, stopping_time
-            count += stopping_time if stopping_time > 0 else bsize
-        print(f'{anomalies} anomalies')
+        return new_curve_list, global_max, time_offset
 
-    support_vars = ['SUN_IS_OCCULTED', 'SOLAR']
-    for key, count, changepoint, stopping_time, start_datetime, stop_datetime, significance, sigma, threshold in anomalies_dict:
-        start = count+changepoint-300
-        end = count+stopping_time+300
-        signal = tiles_df[start:end]
-        changepoint = count+changepoint
-        stopping_time = count+stopping_time
-        figs, axs = plt.subplots(6 + len(support_vars), 1, sharex=True, figsize=(13, 9), num=f'burst_{key}')
-        plt.tight_layout()
-        axs[0].set_title(f'Anomaly in {key}, with s = {round(significance / sigma):.2f} $\\sigma$ at $T = ${start_datetime} / {stop_datetime}')
 
-        for i, (face, face_pred) in enumerate(zip(y_cols, y_pred_cols)):
-            face_color = "black" if face != key else None
-            axs[i].plot(signal['datetime'], signal[face], label=face, color=face_color)
-            axs[i].plot(signal['datetime'], signal[face_pred], label=face_pred, color="red")
-            axs[i].axvline(signal['datetime'][stopping_time], color='C1', lw=0.7)
-            axs[i].axvline(signal['datetime'][changepoint], color='red', lw=0.7)
-            axs[i].legend(loc="upper right")
+    @logger_decorator(logger)
+    def trigger(self, tiles_df, y_cols, y_pred_cols, threshold, model = None):
+        '''Run the trigger algorithm on the dataset.
+        '''
+        if not os.path.exists(TRIGGER_FOLDER_NAME):
+            os.makedirs(TRIGGER_FOLDER_NAME)
 
-        axs[1+i].plot(signal['datetime'], signal[key] - signal[f'{key}_pred'], label=f"{key} residual")
-        axs[1+i].axhline(significance, color='C1', label="$\\sigma$")
-        axs[1+i].fill((signal['datetime'][changepoint], signal['datetime'][stopping_time], signal['datetime'][stopping_time], signal['datetime'][changepoint]), (-5, -5, 15, 15), color="red", alpha=0.1, label="anomalous interval") 
-        axs[1+i].axvline(signal['datetime'][stopping_time], color='C1', label="detection time $T$", lw=0.7)
-        axs[1+i].axvline(signal['datetime'][changepoint], color='red', label="start point $\\tau$", lw=0.7)
-        axs[1+i].set_ylim(min(signal[key] - signal[f'{key}_pred']), 1.01 * max(max(signal[key] - signal[f'{key}_pred']), significance))
-        axs[1+i].set_xlim(signal['datetime'][start], signal['datetime'].iloc[-1])
-        axs[1+i].legend(loc="upper right")
+        anomalies_list = []
+        out = {}
+        out_offset = {}
+        sigma = {}
+        diff = tiles_df['MET'].diff()
+        for face, face_pred in zip(y_cols, y_pred_cols):
+            print(f'{face}...', end=' ')
+            signal = (tiles_df[face] - tiles_df[face_pred])
+            out[face] = []
+            out_offset[face] = []
+            sigma[face] = []
+            curve_list = []
+            old_stopping_time = 0
+            sig = np.std(signal)
+            count = 0
+            for T in signal.index:
+                x_t = signal[T]
+                if diff[T] > 10:
+                    curve_list = []
+                curve_list, global_max, offset = self.focus_step_quad(curve_list, x_t)
+                out[face].append(global_max)
+                out_offset[face].append(offset)
+                sigma_val = sig
+                sigma[face].append(sigma_val)
+                if global_max > threshold * sigma_val:
+                    significance, changepoint, stopping_time = global_max, offset+T+1, T
+                    if T == old_stopping_time + 1 or changepoint <= old_stopping_time + 60:
+                        last_anomaly = anomalies_list.pop()
+                        new_changepoint = last_anomaly[1]
+                        new_stopping_time = stopping_time
+                        new_anomaly = (face, new_changepoint, new_changepoint, new_stopping_time, str(tiles_df['datetime'][new_changepoint]), str(tiles_df['datetime'][stopping_time]), significance, sigma_val, threshold)
+                    else:
+                        count += 1
+                        new_anomaly = (face, changepoint, changepoint, stopping_time, str(tiles_df['datetime'][changepoint]), str(tiles_df['datetime'][stopping_time]), significance, sigma_val, threshold)
+                    anomalies_list.append(new_anomaly)
+                    old_stopping_time = stopping_time
+            tiles_df[f'significance_{face}'] = out[face]
+            tiles_df[f'time_offset_{face}'] = out_offset[face]
+            tiles_df[f'sigma_{face}'] = sigma[face]
+            print(f'{count} triggers')
+            # if face == 'Xpos': break
+            
+        def is_mergeable(start, merged_anomalies):
+            for anomaly_start in merged_anomalies:
+                if start - 60 * 5 < anomaly_start < start + 60 * 5:
+                    return start, anomaly_start
+            return False
+        print('Merging triggers...', end=' ')
+        merged_anomalies = {}
+        for face, start, changepoint, stopping_time, start_datetime, stop_datetime, significance, sigma_val, threshold in anomalies_list:
+            if returned := is_mergeable(start, merged_anomalies):
+                start, old_start = returned
+                if start < old_start:
+                    merged_anomalies[start] = merged_anomalies[old_start]
+                    del merged_anomalies[old_start]
+                elif start > old_start:
+                    start = old_start
+                merged_anomalies[start][face] = {'changepoint': changepoint, 'stopping_time': stopping_time, 'start_datetime': start_datetime, 'stop_datetime': stop_datetime, 'significance': significance, 'sigma_val': sigma_val, 'threshold': threshold}
+            else:
+                merged_anomalies[start] = {face: {'changepoint': changepoint, 'stopping_time': stopping_time, 'start_datetime': start_datetime, 'stop_datetime': stop_datetime, 'significance': significance, 'sigma_val': sigma_val, 'threshold': threshold}}
+        print(f'{len(merged_anomalies)} anomalies in total.')
 
-        for j, var in enumerate(support_vars):
-            axs[2+i+j].plot(signal['datetime'], signal[var], color="green", label=var)
-            axs[2+i+j].legend(loc="upper right")
-        
-        axs[-1].set_xlabel("$datetime$")
-        plt.tight_layout()
-        figs.subplots_adjust(hspace=0)
-
-        figs.savefig(f'data/anomalies/plots/{key}_{signal["datetime"][changepoint]}.png', dpi=800)
-        plt.close(figs)
-        if model:
-            x_cols = [col for col in signal.columns if col not in y_cols + y_pred_cols + ['datetime', 'TIME_FROM_SAA', 'SUN_IS_OCCULTED', 'LIVETIME', 'MET', 'START', 'STOP', 'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'SAA_EXIT', 'IN_SAA']]
-            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][changepoint]}_lime.png", inputs_outputs_df = signal[changepoint:stopping_time], y_cols = y_cols, x_cols = x_cols, model = model, show=False, num_sample=10)
-            get_feature_importance(f"data/anomalies/plots/{key}_{signal['datetime'][stopping_time+50]}_lime.png", inputs_outputs_df = signal[changepoint+50:stopping_time+50], y_cols = y_cols, x_cols = x_cols, model = model, show=False, num_sample=10)
-
-    focus_res = pd.DataFrame(anomalies_dict, columns=['face', 'start', 'changepoint', 'stopping_time', 'start_datetime', 'stop_datetime', 'significance', 'sigma', 'threshold'])
-    focus_res.to_csv('data/anomalies/detections.csv', index=False)
-    return anomalies_dict
+        with open(os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'detections.json'), 'w') as f:
+            json.dump(merged_anomalies, f)
+        return merged_anomalies
 
 
 if __name__ == '__main__':
@@ -220,6 +251,6 @@ if __name__ == '__main__':
     nn_pred = nn_pred.assign(**{col: nn_pred[cols_init] for col, cols_init in zip(y_pred_cols, y_cols)}).drop(columns=y_cols)
     tiles_df = Data.merge_dfs(nn_pred, fermi_data)
     Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',',
-                                                        show=True, smoothing_key='pred')
+                                                        show=True, smoothing_face='pred')
 
-    trigger(tiles_df, y_cols, y_pred_cols, 1)
+    Trigger().trigger(tiles_df, y_cols, y_pred_cols, 1, bsize=500)

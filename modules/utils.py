@@ -1,4 +1,6 @@
-'''Utils module for the ACNBkg project.'''
+'''
+Utils module for the ACNBkg project.
+'''
 import sys
 import os
 import pprint
@@ -418,7 +420,7 @@ class File:
                 file.write(f'{key}: {value}\n')
 
 if __name__ == '__main__':
-    from plotter import Plotter
+    from modules.plotter import Plotter
     inputs_outputs_df = File.read_df_from_file(INPUTS_OUTPUTS_FILE_PATH)
     Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime',
                                                                             excluded_cols = [],
