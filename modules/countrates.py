@@ -4,6 +4,7 @@ This module contains the class to manipulate the runs from Fermi.
 import os
 import concurrent.futures
 import re
+import glob
 import ROOT
 from tqdm import tqdm
 import pandas as pd
@@ -17,6 +18,7 @@ except:
     from config import DATA_LATACD_FOLDER_NAME, DATA_LATACD_INPUT_FOLDER_NAME
     from utils import Logger, logger_decorator, File
 
+DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class ACDReconRates:
     logger = Logger('ACDReconRates').get_logger()
@@ -249,25 +251,25 @@ class ACDReconRates:
         
         for face, tiles in tiles_faces.items():
             face_rates = np.zeros(n_bins)
-            face_rates_low = np.zeros(n_bins)
-            face_rates_high = np.zeros(n_bins)
+            # face_rates_low = np.zeros(n_bins)
+            # face_rates_high = np.zeros(n_bins)
             
             for tile in range(tiles[0], tiles[-1]):
                 times_with_energy = df['time'][acdE_acdtile[tile] > 0].values
-                times_with_energy_low = df['time'][(acdE_acdtile[tile] > 0) & (acdE_acdtile[tile] < 5)].values
-                times_with_energy_high = df['time'][acdE_acdtile[tile] > 5].values
+                # times_with_energy_low = df['time'][(acdE_acdtile[tile] > 0) & (acdE_acdtile[tile] < 5)].values
+                # times_with_energy_high = df['time'][acdE_acdtile[tile] > 5].values
                 
                 counts, _ = np.histogram(times_with_energy, bins=bin_edges)
-                counts_low, _ = np.histogram(times_with_energy_low, bins=bin_edges)
-                counts_high, _ = np.histogram(times_with_energy_high, bins=bin_edges)
+                # # counts_low, _ = np.histogram(times_with_energy_low, bins=bin_edges)
+                # # counts_high, _ = np.histogram(times_with_energy_high, bins=bin_edges)
                 norm = 1 / binning / self.dict_tileSize[tile]
                 face_rates += counts * norm
-                face_rates_low += counts_low * norm
-                face_rates_high += counts_high * norm
+                # # face_rates_low += counts_low * norm
+                # # face_rates_high += counts_high * norm
 
             return_df[face] = face_rates / (tiles[-1] - tiles[0])
-            return_df[f"{face}_low"] = face_rates_low / (tiles[-1] - tiles[0])
-            return_df[f"{face}_high"] = face_rates_high / (tiles[-1] - tiles[0])
+            # # return_df[f"{face}_low"] = face_rates_low / (tiles[-1] - tiles[0])
+            # # return_df[f"{face}_high"] = face_rates_high / (tiles[-1] - tiles[0])
         
         # Plotter(df = return_df, label = 'Tiles').df_plot_tiles(x_col = 'MET',
         #                                                                 excluded_cols = [],
@@ -317,10 +319,15 @@ class ACDReconRates:
                 except Exception as exc:
                     print(f'Generated an exception: {exc}')
 
+    def del_txt(self, folder):
+        for file in glob.glob(f'{folder}/*/*.txt'):
+            os.remove(file)
+
 
 if __name__ == '__main__':
-    fileSizes = 'ACD_tiles_size2.txt'
+    fileSizes = os.path.join(DIR, 'ACD_tiles_size2.txt')
     arr = ACDReconRates()
+    arr.del_txt(DATA_LATACD_INPUT_FOLDER_NAME)
     arr.fill_dictSizes(fileSizes)
     arr.do_work_parallel(1, workers=1)
     print("... done, bye bye")

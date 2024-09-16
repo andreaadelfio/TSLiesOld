@@ -17,10 +17,10 @@ SOLAR_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'solar')
 SC_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'spacecraft/LAT/weekly')
 
 # DATA_LATACD_INPUT_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/Dec23-Feb24 input runs')
-DATA_LATACD_INPUT_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/May24-Jun24 input runs')
+DATA_LATACD_INPUT_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/newrunsSept/newRuns_v2')
 
 # DATA_LATACD_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/Dec23-Feb24 output runs')
-DATA_LATACD_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/May24-Jun24 output runs')
+DATA_LATACD_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD/newRuns_v2')
 
 BACKGROUND_PREDICTION_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'background_prediction')
 

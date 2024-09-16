@@ -4,6 +4,8 @@ This module contains the implementation of the FOCuS algorithm for change point 
 import os
 import json
 from math import log
+import multiprocessing
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 try:
@@ -89,7 +91,6 @@ class Quadratic:
 class Trigger:
     logger = Logger('Trigger').get_logger()
 
-    @logger_decorator(logger)
     def focus_step_quad(self, quadratic_list, X_T):
         new_quadratic_list = []
         global_max = 0
@@ -166,55 +167,60 @@ class Trigger:
 
         return new_curve_list, global_max, time_offset
 
+    def trigger_face(self, signal, threshold, face, datetime, diff):
+        '''
+        From the original python implementation of
+        FOCuS Poisson by Kester Ward (2021). All rights reserved.
+        '''
+        anomalies_list = []
+        curve_list = []
+        old_stopping_time = 0
+        sig = np.std(signal)
+        count = 0
+        for T in tqdm(signal.index, desc=face):
+            x_t = signal[T]
+            if diff[T] > 10:
+                curve_list = []
+            curve_list, global_max, offset = self.focus_step_quad(curve_list, x_t)
+            sigma_val = sig
+            if global_max > threshold * sigma_val:
+                significance, changepoint, stopping_time = global_max, offset+T+1, T
+                if T == old_stopping_time + 1 or changepoint <= old_stopping_time + 60:
+                    last_anomaly = anomalies_list.pop()
+                    new_changepoint = last_anomaly[1]
+                    new_stopping_time = stopping_time
+                    new_anomaly = (face, new_changepoint, new_changepoint, new_stopping_time, str(datetime[new_changepoint]), str(datetime[stopping_time]), significance, sigma_val, threshold)
+                else:
+                    count += 1
+                    new_anomaly = (face, changepoint, changepoint, stopping_time, str(datetime[changepoint]), str(datetime[stopping_time]), significance, sigma_val, threshold)
+                anomalies_list.append(new_anomaly)
+                old_stopping_time = stopping_time
+        return anomalies_list
 
     @logger_decorator(logger)
-    def trigger(self, tiles_df, y_cols, y_pred_cols, threshold, model = None):
+    def trigger(self, tiles_df, y_cols, y_pred_cols, threshold):
         '''Run the trigger algorithm on the dataset.
         '''
         if not os.path.exists(TRIGGER_FOLDER_NAME):
             os.makedirs(TRIGGER_FOLDER_NAME)
 
         anomalies_list = []
-        out = {}
-        out_offset = {}
-        sigma = {}
+        # out = {}
+        # out_offset = {}
+        # sigma = {}
+        tiles_df = tiles_df
         diff = tiles_df['MET'].diff()
+
+        pool = multiprocessing.Pool()
+        results = []
         for face, face_pred in zip(y_cols, y_pred_cols):
-            print(f'{face}...', end=' ')
-            signal = (tiles_df[face] - tiles_df[face_pred])
-            out[face] = []
-            out_offset[face] = []
-            sigma[face] = []
-            curve_list = []
-            old_stopping_time = 0
-            sig = np.std(signal)
-            count = 0
-            for T in signal.index:
-                x_t = signal[T]
-                if diff[T] > 10:
-                    curve_list = []
-                curve_list, global_max, offset = self.focus_step_quad(curve_list, x_t)
-                out[face].append(global_max)
-                out_offset[face].append(offset)
-                sigma_val = sig
-                sigma[face].append(sigma_val)
-                if global_max > threshold * sigma_val:
-                    significance, changepoint, stopping_time = global_max, offset+T+1, T
-                    if T == old_stopping_time + 1 or changepoint <= old_stopping_time + 60:
-                        last_anomaly = anomalies_list.pop()
-                        new_changepoint = last_anomaly[1]
-                        new_stopping_time = stopping_time
-                        new_anomaly = (face, new_changepoint, new_changepoint, new_stopping_time, str(tiles_df['datetime'][new_changepoint]), str(tiles_df['datetime'][stopping_time]), significance, sigma_val, threshold)
-                    else:
-                        count += 1
-                        new_anomaly = (face, changepoint, changepoint, stopping_time, str(tiles_df['datetime'][changepoint]), str(tiles_df['datetime'][stopping_time]), significance, sigma_val, threshold)
-                    anomalies_list.append(new_anomaly)
-                    old_stopping_time = stopping_time
-            tiles_df[f'significance_{face}'] = out[face]
-            tiles_df[f'time_offset_{face}'] = out_offset[face]
-            tiles_df[f'sigma_{face}'] = sigma[face]
-            print(f'{count} triggers')
-            # if face == 'Xpos': break
+            result = pool.apply_async(self.trigger_face, (tiles_df[face] - tiles_df[face_pred], threshold, face, tiles_df['datetime'], diff))
+            results.append(result)
+
+        for result in results:
+            anomalies_list += result.get()
+        pool.close()
+        pool.join()
             
         def is_mergeable(start, merged_anomalies):
             for anomaly_start in merged_anomalies:
@@ -253,4 +259,4 @@ if __name__ == '__main__':
     Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',',
                                                         show=True, smoothing_face='pred')
 
-    Trigger().trigger(tiles_df, y_cols, y_pred_cols, 1, bsize=500)
+    Trigger().trigger(tiles_df, y_cols, y_pred_cols, 1)

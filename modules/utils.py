@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 try:
-    from modules.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER
+    from modules.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER, DIR
 except:
-    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER
+    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER, DIR
 
 class Logger():
     '''
@@ -182,7 +182,7 @@ class Data():
 
     @logger_decorator(logger)
     @staticmethod
-    def get_masked_dataframe(start, stop, data, column='datetime'):
+    def get_masked_dataframe(start, stop, data, column='datetime', reset_index=False) -> pd.DataFrame:
         '''
         Returns the masked data within the specified time range.
 
@@ -198,7 +198,7 @@ class Data():
             DataFrame: The masked data within the specified time range.
         '''
         mask = (data[column] >= start) & (data[column] <= stop)
-        masked_data = data[mask]
+        masked_data = data[mask].reset_index(drop=True) if reset_index else data[mask]
         return pd.DataFrame(masked_data)
 
     @staticmethod
@@ -355,8 +355,9 @@ class File:
         -------
             DataFrame: The dataframe read from the file.
         '''
-        if os.path.exists(filename + '.pk'):
-            return pd.read_pickle(filename + '.pk')
+        path = os.path.join(DIR, f'{filename}.pk')
+        if os.path.exists(path):
+            return pd.read_pickle(path)
         return None
 
     @logger_decorator(logger)
@@ -375,6 +376,7 @@ class File:
             DataFrame: The dataframe read from the file.
         '''
         folder_path = os.path.join(folder_path, 'pk')
+        merged_dfs: pd.DataFrame = None
         if os.path.exists(folder_path):
             dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.pk')]
             dir_list = sorted(dir_list, key=custom_sorter)

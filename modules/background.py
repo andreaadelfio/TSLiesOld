@@ -24,12 +24,12 @@ import matplotlib.pyplot as plt
 # ACDAnomalies modules
 try:
     import modules.lime.lime_tabular as lime_tabular
-    from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME
+    from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME, DIR
     from modules.utils import Logger, logger_decorator, File
     from modules.plotter import Plotter
 except:
     import lime.lime_tabular as lime_tabular
-    from config import BACKGROUND_PREDICTION_FOLDER_NAME
+    from config import BACKGROUND_PREDICTION_FOLDER_NAME, DIR
     from utils import Logger, logger_decorator, File
     from plotter import Plotter
 
@@ -138,8 +138,8 @@ class MLObject:
         Returns:
         --------
             Model: The model.'''
-        self.model_path = model_path
-        self.nn_r = load_model(model_path)
+        self.model_path = os.path.join(DIR, model_path)
+        self.nn_r = load_model(self.model_path)
         return self.nn_r
 
     def set_scaler(self, train: pd.DataFrame):
