@@ -135,8 +135,8 @@ class Plotter:
                 else:
                     x = self.df[x_col]
                     axs[i].plot(self.df[column], x, marker = marker, ms = ms, lw = lw, label=column)
-                if smoothing_key != '' and column + f'_{smoothing_key}' in self.df.columns:
-                    axs[i].plot(x, self.df[column + f'_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
+                if smoothing_key != '' and f'{column}_{smoothing_key}' in self.df.columns:
+                    axs[i].plot(x, self.df[f'{column}_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
                 axs[i].legend(loc='upper right')
                 axs[i].set_xlabel(column)
                 axs[i].set_ylabel(x_col)
@@ -179,20 +179,22 @@ class Plotter:
             axs = axs.flatten()
             for i, column in enumerate(df_columns):
                 axs[i].plot(x, self.df[column], marker = marker, lw = lw, label=column)
-                if smoothing_key != '' and column + f'_{smoothing_key}' in self.df.columns:
-                    axs[i].plot(x, self.df[column + f'_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
+                if smoothing_key != '' and f'{column}_{smoothing_key}' in self.df.columns:
+                    axs[i].plot(x, self.df[f'{column}_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
                 axs[i].legend(loc='upper right')
                 axs[i].grid()
-                # axs[i].set_xlim(x[0], x[len(x) - 1])
+                axs[i].set_xlim(x.iloc[0], x.iloc[-1])
                 axs[i].tick_params(axis="x", labelrotation=30)
             for j in range(i + 1, len(axs)):
                 axs[j].axis('off')
         else:
             column = df_columns[0]
             axs.plot(x, self.df[column], marker = marker, lw = lw, label=column)
+            if smoothing_key != '' and f'{column}_{smoothing_key}' in self.df.columns:
+                axs.plot(x, self.df[f'{column}_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
             axs.legend(loc='upper right')
             axs.grid()
-            axs.set_xlim(x[0], x[len(x) - 1])
+            axs.set_xlim(x.iloc[0], x.iloc[-1])
             axs.tick_params(axis="x", labelrotation=45)
         if show:
             plt.show()
@@ -220,8 +222,8 @@ class Plotter:
             axs = axs.flatten()
             for i, column in enumerate(df_columns):
                 axs[i].plot(x, self.df[column], marker = marker, lw = lw, label=column)
-                if smoothing_key != '' and column + f'_{smoothing_key}' in self.df.columns:
-                    axs[i].plot(x, self.df[column + f'_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
+                if smoothing_key != '' and f'{column}_{smoothing_key}' in self.df.columns:
+                    axs[i].plot(x, self.df[f'{column}_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
                 axs[i].legend(loc='upper right')
                 axs[i].grid()
                 # axs[i].set_xlim(x[0], x[len(x) - 1])
@@ -363,6 +365,7 @@ class Plotter:
         if save:
             Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME)
 
+    @logger_decorator(logger)
     def plot_confusion_matrix(self, y_true, y_pred, show = True):
         '''Function to plot the confusion matrix.'''
         cm = confusion_matrix(y_true, y_pred)
@@ -373,6 +376,7 @@ class Plotter:
         if show:
             plt.show()
 
+    @logger_decorator(logger)
     def plot_anomalies(self, support_vars, tiles_df, y_cols, y_pred_cols, save = True, show = False):
         '''Plots the anomalies passed as `df` in Plotter.'''
         if not os.path.exists(PLOT_TRIGGER_FOLDER_NAME):
@@ -437,7 +441,7 @@ class Plotter:
             figs.subplots_adjust(hspace=0)
 
             if save:
-                figs.savefig(os.path.join(PLOT_TRIGGER_FOLDER_NAME, f"{'_'.join(faces)}_{tiles_df['datetime'][changepoint]}.png"), dpi=800)
+                figs.savefig(os.path.join(PLOT_TRIGGER_FOLDER_NAME, f"{'_'.join(faces)}_{tiles_df['datetime'][changepoint]}.png"), dpi=200)
             if show:
                 plt.show()
             plt.close(figs)

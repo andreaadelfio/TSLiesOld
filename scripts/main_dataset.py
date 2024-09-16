@@ -69,11 +69,11 @@ def get_inputs_outputs_df():
     # tile_signal_df = Data.get_masked_dataframe(data=tile_signal_df,
     #                                               start='2024-01-05 04:00:00',
     #                                               stop='2024-01-06 04:00:00')
-    Plotter(df = tile_signal_df[['top', 'MET']], label = 'Inputs').df_plot_tiles(x_col = 'MET',
-                                                                    excluded_cols = ['MET'],
-                                                                    marker = ',',
-                                                                    smoothing_key='smooth',
-                                                                    show = True)
+    # Plotter(df = tile_signal_df, label = 'Inputs').df_plot_tiles(x_col = 'MET',
+    #                                                                 excluded_cols = ['MET'],
+    #                                                                 marker = ',',
+    #                                                                 smoothing_key='smooth',
+    #                                                                 show = True)
     saa_exit_time = 0
     inputs_outputs_list = []
     for week in [week for week in weeks_list if week not in ()]:
@@ -98,12 +98,11 @@ def get_inputs_outputs_df():
 
 # MARK: Main
 if __name__ == '__main__':
-    # inputs_outputs_df = get_inputs_outputs_df()
-    inputs_outputs_df = File.read_dfs_from_pk_folder()
+    inputs_outputs_df = get_inputs_outputs_df()
+    # inputs_outputs_df = File.read_dfs_from_pk_folder()
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
     #                                               start='2023-12-21 21:50:00',
     #                                               stop='2023-12-31 22:08:00')
-    # # File.write_df_on_file(inputs_outputs_df, './inputs_outputs_df')
 
 
 

@@ -182,12 +182,13 @@ def run_median(inputs_outputs):
 ########### Main ############
 if __name__ == '__main__':
     inputs_outputs_df = File.read_dfs_from_pk_folder()
-    # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
-    #                                               start='2023-10-06 05:30:22',
-    #                                               stop='2024-03-06 09:15:28')
+    inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
+                                                  start='2024-02-08 05:30:22',
+                                                  stop='2024-10-06 09:15:28',
+                                                  reset_index=False)
 
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
-    # Plotter(df = inputs_outputs_df[['top', 'datetime', 'SUN_IS_OCCULTED']], label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
+    # Plotter(df = inputs_outputs_df[['top', 'top_smooth', 'datetime']], label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
 
     # run_rnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
     run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)

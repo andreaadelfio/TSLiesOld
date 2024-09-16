@@ -81,7 +81,7 @@ ACDAnomalies
 ```
 
 > [!IMPORTANT]
-> Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path to your ACDAnomalies, e.g. `DIR = /home/ACDAnomalies`).
+> Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path to your ACDAnomalies, e.g. `DIR = /home/andreaadelfio/ACDAnomalies`). If you want your data folder to be in a different path, change the `DIR` variable.
 > 
 
 ## Contributing
