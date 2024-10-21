@@ -4,14 +4,16 @@ Utils module for the ACNBkg project.
 import sys
 import os
 import pprint
+import re
 import logging
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
+from scipy import fftpack
 try:
-    from modules.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER, DIR
+    from modules.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER, DIR, DATA_LATACD_FOLDER_NAME
 except:
-    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER, DIR
+    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER, DIR, DATA_LATACD_FOLDER_NAME
 
 class Logger():
     '''
@@ -110,6 +112,22 @@ class Time:
         return [Time.fermi_ref_time + timedelta(seconds=int(met)) for met in met_list]
 
     @staticmethod
+    def from_datetime_to_met(datetime_list: list) -> list:
+        '''
+        Convert the datetime object to MET.
+
+        Parameters:
+        - datetime_list (list): The datetime list to convert.
+
+        Returns:
+        -------
+        - met_list (list of int): The MET corresponding to the datetime object.
+        '''
+        for dt in datetime_list:
+            print(dt)
+        return [(dt - Time.fermi_ref_time).total_seconds() for dt in datetime_list]
+
+    @staticmethod
     def from_met_to_datetime_str(met_list: list) -> list:
         '''
         Convert the MET to a datetime object and return as string.
@@ -197,7 +215,10 @@ class Data():
         -------
             DataFrame: The masked data within the specified time range.
         '''
-        mask = (data[column] >= start) & (data[column] <= stop)
+        if column == 'index':
+            mask = (data.index >= start) & (data.index <= stop)
+        else:
+            mask = (data[column] >= start) & (data[column] <= stop)
         masked_data = data[mask].reset_index(drop=True) if reset_index else data[mask]
         return pd.DataFrame(masked_data)
 
@@ -359,10 +380,41 @@ class File:
         if os.path.exists(path):
             return pd.read_pickle(path)
         return None
+    
+    @staticmethod
+    def add_smoothing_with_mean(tile_signal, window=30):
+        '''This function adds the smoothed histograms to the signal dataframe.'''
+        window = window if len(tile_signal) > window else len(tile_signal)
+        for h_name in set(tile_signal.keys()) - {'MET', 'datetime'}:
+            histc = tile_signal[h_name].to_list()
+            filtered_sig1 = np.convolve(histc, np.ones(window)/window, mode='same')
+            for i in range(window//2):
+                filtered_sig1[i] = np.mean(histc[:i+window//2])
+            for i in range(len(histc) - window//2, len(histc)):
+                filtered_sig1[i] = np.mean(histc[i-window//2:])
+            tile_signal[f'{h_name}_smooth'] = filtered_sig1
+        return tile_signal
+
+    @staticmethod
+    def add_smoothing_with_fft(tile_signal):
+        '''This function adds the smoothed histograms to the signal dataframe.'''
+        histx = tile_signal['MET']
+        time_step = histx[2] - histx[1]
+        nyquist_freq = 0.5 / time_step
+        for h_name in set(tile_signal.keys()) - {'MET', 'datetime'}:
+            histc = tile_signal[h_name].to_list()
+            freq_cut1 = np.mean(histc) * nyquist_freq / 3
+            sig_fft = fftpack.fft(histc)
+            sample_freq = fftpack.fftfreq(len(histc), d=time_step)
+            low_freq_fft1  = sig_fft.copy()
+            low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
+            filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
+            tile_signal[f'{h_name}_smooth'] = filtered_sig1
+        return tile_signal
 
     @logger_decorator(logger)
     @staticmethod
-    def read_dfs_from_pk_folder(folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0])):
+    def read_dfs_from_runs_pk_folder(folder_path=INPUTS_OUTPUTS_FOLDER, add_smoothing=False, mode='mean', window=30):
         '''
         Read the dataframe from pickle files in a folder.
 
@@ -378,9 +430,41 @@ class File:
         folder_path = os.path.join(folder_path, 'pk')
         merged_dfs: pd.DataFrame = None
         if os.path.exists(folder_path):
-            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.pk')]
-            dir_list = sorted(dir_list, key=custom_sorter)
+            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
+                        if file.endswith('.pk')]
+            dir_list = sorted(dir_list, key=lambda x: int(re.search(r"\d+", os.path.basename(x)).group(0)))
             dfs = [pd.read_pickle(file) for file in dir_list]
+            dfs = [df[(df.loc[:, df.columns.difference(['MET'])] != 0).any(axis=1)] for df in dfs]
+            if add_smoothing:
+                if mode == 'mean':
+                    dfs = [File.add_smoothing_with_mean(df, window=window) for df in dfs]
+                elif mode == 'fft':
+                    dfs = [File.add_smoothing_with_fft(df) for df in dfs]
+            merged_dfs = pd.concat(dfs, ignore_index=True).drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug
+        return merged_dfs
+
+    @logger_decorator(logger)
+    @staticmethod
+    def read_dfs_from_weekly_pk_folder(folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
+        '''
+        Read the dataframe from pickle files in a folder.
+
+        Parameters:
+        ----------
+            folder_path (str, optional): The name of the folder to read the dataframe from.
+                                      Defaults to INPUTS_OUTPUTS_FOLDER.
+
+        Returns:
+        -------
+            DataFrame: The dataframe read from the file.
+        '''
+        folder_path = os.path.join(folder_path, 'pk')
+        merged_dfs: pd.DataFrame = None
+        if os.path.exists(folder_path):
+            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
+                        if file.endswith('.pk') and start <= int(file.split('_w')[-1].split('.')[0]) <= stop]
+            dir_list = sorted(dir_list, key=custom_sorter)
+            dfs = [pd.read_pickle(file)[cols_list] if cols_list else pd.read_pickle(file) for file in dir_list]
             merged_dfs = pd.concat(dfs, ignore_index=True).drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug
         return merged_dfs
 
@@ -421,11 +505,30 @@ class File:
             for key, value in data.items():
                 file.write(f'{key}: {value}\n')
 
+    @logger_decorator(logger)
+    @staticmethod
+    def check_integrity_runs_pk_folder(folder_path=INPUTS_OUTPUTS_FOLDER):
+        '''
+        Checks the integrity of the dataframe from pickle files in a folder.
+
+        Parameters:
+        ----------
+            folder_path (str, optional): The name of the folder to read the dataframe from.
+                                      Defaults to INPUTS_OUTPUTS_FOLDER.
+        '''
+        print('Checking integrity...')
+        folder_path = os.path.join(folder_path, 'pk')
+        if os.path.exists(folder_path):
+            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
+                        if file.endswith('.pk')]
+            dir_list = sorted(dir_list, key=lambda x: int(re.search(r"\d+", os.path.basename(x)).group(0)))
+            for file in dir_list:
+                df = pd.read_pickle(file)
+                initial_len = len(df)
+                df = df[(df.loc[:, df.columns.difference(['MET', 'datetime'])] != 0).any(axis=1)]
+                if len(df) != initial_len:
+                    print(initial_len, len(df), os.path.basename(file))
+                    # os.remove(file)
+
 if __name__ == '__main__':
-    from modules.plotter import Plotter
-    inputs_outputs_df = File.read_df_from_file(INPUTS_OUTPUTS_FILE_PATH)
-    Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime',
-                                                                            excluded_cols = [],
-                                                                            marker = ',',
-                                                                            show = True,
-                                                                            smoothing_key='smooth')
+    File.check_integrity_runs_pk_folder(DATA_LATACD_FOLDER_NAME)

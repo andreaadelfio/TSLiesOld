@@ -65,16 +65,16 @@ class SunMonitor:
             df_goes.index.name = 'datetime'
             df_goes.reset_index(inplace=True)
             df_goes = df_goes[(df_goes['xrsa_quality'] == 0) & (df_goes['xrsb_quality'] == 0)]
-            df_goes = df_goes[['datetime', 'xrsb']]
+            df_goes = df_goes[['datetime', 'xrsb', 'xrsa']]
             df_goes['datetime'] = Time.remove_milliseconds_from_datetime(df_goes['datetime'])
             dfs.append(df_goes)
-        df_mean = pd.concat(dfs).groupby('datetime')['xrsb'].mean().reset_index()
-        df_mean.columns = ['datetime', 'SOLAR']
+        df_mean = pd.concat(dfs).groupby('datetime')[['xrsa', 'xrsb']].mean().reset_index()
+        df_mean.columns = ['datetime', 'SOLAR_a', 'SOLAR_b']
         return df_mean
 
 
 if __name__ == '__main__':
-    sm = SunMonitor(tstart = '2024-02-01 00:00:00', tend = '2024-02-08 00:00:00')
+    sm = SunMonitor(tstart = '2024-02-01 00:00:00', tend = '2024-02-03 00:00:00')
     file_goes = sm.fetch_goes_data()
     df = sm.merge_goes_data(file_goes)
     Plotter(df = df, label = 'solar activity').df_plot_tiles(x_col = 'datetime',

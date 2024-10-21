@@ -170,6 +170,7 @@ class SpacecraftOpener:
         if prev_lon_lat != 0:
             prev_dist = np.sqrt((sc_df.loc[0, 'LON_GEO'] - prev_lon_lat[0])**2 + (sc_df.loc[0, 'LAT_GEO'] - prev_lon_lat[1])**2)
             sc_df.loc[0, 'SAA_EXIT'] = is_contained[0] and prev_dist > 1 and prev_dist < 300
+        sc_df['SAA_EXIT'] = sc_df['SAA_EXIT'].astype(int)
         time_from_saa = sc_df['SAA_EXIT'].to_numpy()
         was_in_saa = np.roll(time_from_saa, shift=1)
         time_from_saa = (time_from_saa & ~was_in_saa).astype(float)
@@ -201,7 +202,7 @@ class SpacecraftOpener:
         cos_theta = np.clip(cos_theta, -1.0, 1.0)
         theta_rad = np.arccos(cos_theta)
         theta_deg = np.rad2deg(theta_rad)
-        sc_df['SUN_IS_OCCULTED'] = (theta_deg > 110).astype(float)
+        sc_df['SUN_IS_EARTH_OCCULTED'] = (theta_deg > 110).astype(float)
         return sc_df
 
     @logger_decorator(logger)

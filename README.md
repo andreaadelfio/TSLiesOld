@@ -90,11 +90,9 @@ Contributions are welcome. Please open an issue to discuss your idea or submit a
 
 ### TO-DO:
 ```
-- create unique MLObject class and rewrite the nn
-- train on new periodic trigger signals
-- train on new energy signals
+- create unique MLObject class
+- improve lambda_callback
 - train on normalized signals
-- check the articles in lectures
 - improve get_feature_importance
 - add feature importance difference before / after an anomaly
 - separate get_feature_importance based on SHAP / lime use
