@@ -129,16 +129,23 @@ class ACDReconRates:
 
 
     @logger_decorator(logger)
-    def createTChain(self, rootfiles, treeName, path, end = None):
-        chain = ROOT.TChain(treeName) # pylint: disable=maybe-no-member
-        run = re.search(r"\d+", os.path.basename(path)).group(0)
-        print(run)
+    def createTChain(self, rootfiles, treeName, run_path, end = None):
+        run = re.search(r"\d+", os.path.basename(run_path)).group(0)
+        try:
+            chain = ROOT.TChain(treeName) # pylint: disable=maybe-no-member
+        except Exception as e:
+            with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
+                error_file.write(f"Error {e} in {run}\n")
         for line in rootfiles:
             if not line.endswith('.root'):
                 rootfiles.remove(line)
         rootfiles.sort(key=lambda x: int(re.search(r"\d+", os.path.splitext(x)[0].split(run)[-1]).group(0)))
         for run in rootfiles[:end]:
-            chain.Add(os.path.join(path, run))
+            try:
+                chain.Add(os.path.join(run_path, run))
+            except Exception as e:
+                with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
+                    error_file.write(f"Error {e} in {run}\n")
         return chain
 
     @logger_decorator(logger)
@@ -222,74 +229,83 @@ class ACDReconRates:
         output_rootfile.Close()
         print(time.time() - start)
 
-    def create_root_df(self, binning, output_filename, INPUT_ROOTS_FOLDER):
+    def create_df(self, binning, output_filename, INPUT_ROOTS_FOLDER):
         tiles_faces = {'top': (64, 89), 'Xpos': (48, 64), 'Xneg': (32, 48), 'Ypos': (16, 32), 'Yneg': (0, 16)}
         list_file = os.listdir(INPUT_ROOTS_FOLDER)
         myTree = self.createTChain(list_file,'myTree', INPUT_ROOTS_FOLDER)
-        dict_np = ROOT.RDataFrame(myTree).AsNumpy() # pylint: disable=maybe-no-member
-        df = pd.DataFrame(dict_np)
-        # df.to_csv('test.csv')
+        try:
+            dict_np = ROOT.RDataFrame(myTree).AsNumpy() # pylint: disable=maybe-no-member
+            df = pd.DataFrame(dict_np)
+            # df.to_csv('test.csv')
 
-        notnull = df['acdE_acdtile'].apply(lambda x: any(x))
-        df = df[notnull].reset_index(drop=True)
-        if 'gltGemEngine' in df.columns:
-            df = df[df['gltGemEngine'] != 3].reset_index(drop=True)
+            notnull = df['acdE_acdtile'].apply(lambda x: any(x))
+            df = df[notnull].reset_index(drop=True)
+            if 'gltGemEngine' in df.columns:
+                df = df[df['gltGemEngine'] != 3].reset_index(drop=True)
 
-        time0, time_last = df['time'].min(), df['time'].max()
-        n_bins = int((time_last - time0) / binning)
-        bin_edges = np.linspace(time0, time_last, n_bins+1)
-        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-        return_df = pd.DataFrame(bin_centers, columns=['MET'])
+            time0, time_last = df['time'].min(), df['time'].max()
+            n_bins = int((time_last - time0) / binning)
+            bin_edges = np.linspace(time0, time_last, n_bins+1)
+            bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+            return_df = pd.DataFrame(bin_centers, columns=['MET'])
 
-        # print('start')
-        # import time
-        # start = time.time()
-        # acdE_acdtile = df['acdE_acdtile'].apply(lambda x: x[i] for i in range(89)).values.T
-        acdE_acdtile = np.array([[i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11], i[12], i[13], i[14], i[15], i[16], i[17], i[18], i[19], i[20], i[21], i[22], i[23], i[24], i[25], i[26], i[27], i[28], i[29], i[30], i[31], i[32], i[33], i[34], i[35], i[36], i[37], i[38], i[39], i[40], i[41], i[42], i[43], i[44], i[45], i[46], i[47], i[48], i[49], i[50], i[51], i[52], i[53], i[54], i[55], i[56], i[57], i[58], i[59], i[60], i[61], i[62], i[63], i[64], i[65], i[66], i[67], i[68], i[69], i[70], i[71], i[72], i[73], i[74], i[75], i[76], i[77], i[78], i[79], i[80], i[81], i[82], i[83], i[84], i[85], i[86], i[87], i[88]] for i in df['acdE_acdtile'].values]).T
-        # print(time.time() - start)
-        # print(acdE_acdtile)
-        
-        for face, tiles in tiles_faces.items():
-            face_rates = np.zeros(n_bins)
-            # face_rates_low = np.zeros(n_bins)
-            # face_rates_high = np.zeros(n_bins)
+            # print('start')
+            # import time
+            # start = time.time()
+            # acdE_acdtile = df['acdE_acdtile'].apply(lambda x: x[i] for i in range(89)).values.T
+            acdE_acdtile = np.array([[i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11], i[12], i[13], i[14], i[15], i[16], i[17], i[18], i[19], i[20], i[21], i[22], i[23], i[24], i[25], i[26], i[27], i[28], i[29], i[30], i[31], i[32], i[33], i[34], i[35], i[36], i[37], i[38], i[39], i[40], i[41], i[42], i[43], i[44], i[45], i[46], i[47], i[48], i[49], i[50], i[51], i[52], i[53], i[54], i[55], i[56], i[57], i[58], i[59], i[60], i[61], i[62], i[63], i[64], i[65], i[66], i[67], i[68], i[69], i[70], i[71], i[72], i[73], i[74], i[75], i[76], i[77], i[78], i[79], i[80], i[81], i[82], i[83], i[84], i[85], i[86], i[87], i[88]] for i in df['acdE_acdtile'].values]).T
+            # print(time.time() - start)
+            # print(acdE_acdtile)
             
-            for tile in range(tiles[0], tiles[-1]):
-                times_with_energy = df['time'][acdE_acdtile[tile] > 0].values
-                # times_with_energy_low = df['time'][(acdE_acdtile[tile] > 0) & (acdE_acdtile[tile] < 5)].values
-                # times_with_energy_high = df['time'][acdE_acdtile[tile] > 5].values
+            for face, tiles in tiles_faces.items():
+                face_rates = np.zeros(n_bins)
+                # face_rates_low = np.zeros(n_bins)
+                # face_rates_high = np.zeros(n_bins)
                 
-                counts, _ = np.histogram(times_with_energy, bins=bin_edges)
-                # # counts_low, _ = np.histogram(times_with_energy_low, bins=bin_edges)
-                # # counts_high, _ = np.histogram(times_with_energy_high, bins=bin_edges)
-                norm = 1 / binning / self.dict_tileSize[tile]
-                face_rates += counts * norm
-                # # face_rates_low += counts_low * norm
-                # # face_rates_high += counts_high * norm
+                for tile in range(tiles[0], tiles[-1]):
+                    times_with_energy = df['time'][acdE_acdtile[tile] > 0].values
+                    # times_with_energy_low = df['time'][(acdE_acdtile[tile] > 0) & (acdE_acdtile[tile] < 5)].values
+                    # times_with_energy_high = df['time'][acdE_acdtile[tile] > 5].values
+                    
+                    counts, _ = np.histogram(times_with_energy, bins=bin_edges)
+                    # # counts_low, _ = np.histogram(times_with_energy_low, bins=bin_edges)
+                    # # counts_high, _ = np.histogram(times_with_energy_high, bins=bin_edges)
+                    norm = 1 / binning / self.dict_tileSize[tile]
+                    face_rates += counts * norm
+                    # # face_rates_low += counts_low * norm
+                    # # face_rates_high += counts_high * norm
 
-            return_df[face] = face_rates / (tiles[-1] - tiles[0])
-            # # return_df[f"{face}_low"] = face_rates_low / (tiles[-1] - tiles[0])
-            # # return_df[f"{face}_high"] = face_rates_high / (tiles[-1] - tiles[0])
-        
-        # Plotter(df = return_df, label = 'Tiles').df_plot_tiles(x_col = 'MET',
-        #                                                                 excluded_cols = [],
-        #                                                                 marker = ',',
-        #                                                                 smoothing_key='smooth',
-        #                                                                 show = True)
-        # Plotter(df = return_df_low, label = 'Tiles low').df_plot_tiles(x_col = 'MET',
-        #                                                                 excluded_cols = [],
-        #                                                                 marker = ',',
-        #                                                                 smoothing_key='smooth',
-        #                                                                 show = True)
-        # Plotter(df = return_df_high, label = 'Tiles high').df_plot_tiles(x_col = 'MET',
-        #                                                                 excluded_cols = [],
-        #                                                                 marker = ',',
-        #                                                                 smoothing_key='smooth',
-        #                                                                 show = True)
-        # Plotter.show()
-        File.write_df_on_file(return_df,
-                                filename=output_filename,
-                                fmt='both')
+                return_df[face] = face_rates / (tiles[-1] - tiles[0])
+                # # return_df[f"{face}_low"] = face_rates_low / (tiles[-1] - tiles[0])
+                # # return_df[f"{face}_high"] = face_rates_high / (tiles[-1] - tiles[0])
+            
+            mask = return_df.loc[:, return_df.columns != 'MET'].any(axis=1)
+
+            if len(return_df[mask]) != len(return_df):
+                with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'dimensions_checks.txt'), 'a') as file:
+                    file.write(f"{len(return_df[mask])} {len(return_df)} {INPUT_ROOTS_FOLDER}\n")
+            # Plotter(df = return_df, label = 'Tiles').df_plot_tiles(x_col = 'MET',
+            #                                                                 excluded_cols = [],
+            #                                                                 marker = ',',
+            #                                                                 smoothing_key='smooth',
+            #                                                                 show = True)
+            # Plotter(df = return_df_low, label = 'Tiles low').df_plot_tiles(x_col = 'MET',
+            #                                                                 excluded_cols = [],
+            #                                                                 marker = ',',
+            #                                                                 smoothing_key='smooth',
+            #                                                                 show = True)
+            # Plotter(df = return_df_high, label = 'Tiles high').df_plot_tiles(x_col = 'MET',
+            #                                                                 excluded_cols = [],
+            #                                                                 marker = ',',
+            #                                                                 smoothing_key='smooth',
+            #                                                                 show = True)
+            # Plotter.show()
+            File.write_df_on_file(return_df,
+                                    filename=output_filename,
+                                    fmt='both')
+        except Exception as e:
+            with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
+                error_file.write(f"Error {e} in {INPUT_ROOTS_FOLDER}\n")
 
     @logger_decorator(logger)
     def do_work_parallel(self, binning, workers=1):
@@ -309,15 +325,15 @@ class ACDReconRates:
                 run_folder = f'{prefix}{numeric}'
                 if run_folder in input_folder_list or len(os.listdir(os.path.join(input_runs_folder, run_folder))) == 0:
                     input_folder_list.remove(run_folder)
-
         input_folder_list.sort(key=lambda x: int(re.search(r'\d+', x).group(0)))
         with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
-            futures = [executor.submit(self.create_root_df, binning, os.path.join(output_runs_folder, re.search(r'\d+', run).group(0)), os.path.join(input_runs_folder, run)) for run in input_folder_list[:]]
+            futures = [executor.submit(self.create_df, binning, os.path.join(output_runs_folder, re.search(r'\d+', run).group(0)), os.path.join(input_runs_folder, run)) for run in input_folder_list[:]]
             for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing runs"):
                 try:
                     future.result()
                 except Exception as exc:
-                    print(f'Generated an exception: {exc}')
+                    with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
+                        error_file.write(f"Error {exc}\n")
 
     def del_txt(self, folder):
         for file in glob.glob(f'{folder}/*/*.txt'):

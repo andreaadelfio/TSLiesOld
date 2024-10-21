@@ -5,14 +5,16 @@ import os
 import ROOT
 import numpy as np
 import pandas as pd
-import re
-from scipy import fftpack
+# import re
+# from scipy import fftpack
 try:
     from modules.config import DATA_LATACD_FOLDER_NAME
     from modules.utils import Time, Logger, logger_decorator, File
+    from modules.plotter import Plotter
 except:
     from config import DATA_LATACD_FOLDER_NAME
     from utils import Time, Logger, logger_decorator, File
+    from plotter import Plotter
 
 
 class CatalogReader():
@@ -94,7 +96,7 @@ class CatalogReader():
         return self.runs_dict
 
     @logger_decorator(logger)
-    def get_runs_dict(self, binning = None) -> pd.DataFrame:
+    def get_signal_df_from_catalog(self) -> pd.DataFrame:
         '''
         Get the pandas.Dataframe containing the signals for each run.
 
@@ -104,67 +106,17 @@ class CatalogReader():
         Returns:
         - runs_dict (pandas.Dataframe): The dataframe containing the signals for each run.
         '''
-        catalog_df = File.read_dfs_from_pk_folder(folder_path=self.data_dir, custom_sorter=lambda x: int(re.search(r"\d+", os.path.basename(x)).group(0)))
+        catalog_df = File.read_dfs_from_runs_pk_folder(folder_path=self.data_dir, add_smoothing=True, mode='mean', window=35)
         catalog_df['datetime'] = np.array(Time.from_met_to_datetime(catalog_df['MET'] - 1))
         self.runs_times['catalog'] = (catalog_df['datetime'][0], catalog_df['datetime'].iloc[-1])
         return catalog_df
 
-    @logger_decorator(logger)
-    def add_smoothing(self, tile_signal):
-        '''This function adds the smoothed histograms to the signal dataframe.'''
-        histx = tile_signal['MET']
-        time_step = histx[2] - histx[1]
-        nyquist_freq = 0.5 / time_step
-        freq_cut1 = 0.01 * nyquist_freq
-        for h_name in set(tile_signal.keys()) - {'MET', 'datetime'}:
-            histc = tile_signal[h_name].to_list()
-            sig_fft = fftpack.fft(histc)
-            sample_freq = fftpack.fftfreq(len(histc), d=time_step)
-            low_freq_fft1  = sig_fft.copy()
-            low_freq_fft1[np.abs(sample_freq) > freq_cut1] = 0
-            filtered_sig1  = np.array(fftpack.ifft(low_freq_fft1)).real
-            tile_signal[f'{h_name}_smooth'] = filtered_sig1
-        return tile_signal
-
-    @logger_decorator(logger)
-    def get_signal_df_from_catalog_root(self, runs_dict = None, binning = None):
-        '''
-        Get the signal dataframe from the catalog.
-
-        Parameters:
-        - runs_dict (dict): The dictionary of runs and their properties.
-
-        Returns:
-        - signal_dataframe (pd.DataFrame): The signal dataframe.
-        '''
-        if runs_dict is None:
-            runs_dict = self.get_runs_dict_root(binning=binning)
-        if len(runs_dict) > 1:
-            catalog_df = pd.concat([pd.DataFrame(hist_dict) for hist_dict in runs_dict.values()], ignore_index=True)
-        else:
-            catalog_df = pd.DataFrame(list(runs_dict.values())[0])
-        
-        catalog_df = catalog_df[catalog_df['Xpos'] != 0]
-        return catalog_df
-
-    @logger_decorator(logger)
-    def get_signal_df_from_catalog(self, runs_dict = None, binning = None):
-        '''
-        Get the signal dataframe from the catalog.
-
-        Parameters:
-        - runs_dict (dict): The dictionary of runs and their properties.
-
-        Returns:
-        - signal_dataframe (pd.DataFrame): The signal dataframe.
-        '''
-        if runs_dict is None:
-            catalog_df = self.get_runs_dict(binning=binning)
-        
-        catalog_df = catalog_df[catalog_df['Xpos'] != 0]
-        return catalog_df
-
 if __name__ == '__main__':
-    cr = CatalogReader(h_names=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg'], data_dir='data/LAT_ACD/output runs dfs', start=0, end=-1)
+    cr = CatalogReader(h_names=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg'], start=0, end=-1)
     tile_signal_df = cr.get_signal_df_from_catalog()
-    print(len(tile_signal_df))
+
+    Plotter(df = tile_signal_df[['top', 'top_smooth', 'datetime']], label = 'Inputs').df_plot_tiles(x_col = 'datetime',
+                                                                    excluded_cols = ['MET'],
+                                                                    marker = ',',
+                                                                    smoothing_key='smooth',
+                                                                    show = True)

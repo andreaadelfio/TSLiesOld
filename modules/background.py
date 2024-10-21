@@ -15,7 +15,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from keras.optimizers import Adam, Nadam, RMSprop, SGD # pylint: disable=E0401
 from keras import Input, Model
 from keras.layers import Dense, Dropout, BatchNormalization, LSTM # pylint: disable=E0401
-from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler # pylint: disable=E0401
+from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler, LambdaCallback # pylint: disable=E0401
 from keras.models import load_model # pylint: disable=E0401
 from keras.utils import plot_model # pylint: disable=E0401
 # Explainability
@@ -25,12 +25,12 @@ import matplotlib.pyplot as plt
 try:
     import modules.lime.lime_tabular as lime_tabular
     from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME, DIR
-    from modules.utils import Logger, logger_decorator, File
+    from modules.utils import Logger, logger_decorator, File, Data
     from modules.plotter import Plotter
 except:
     import lime.lime_tabular as lime_tabular
     from config import BACKGROUND_PREDICTION_FOLDER_NAME, DIR
-    from utils import Logger, logger_decorator, File
+    from utils import Logger, logger_decorator, File, Data
     from plotter import Plotter
 
 
@@ -123,44 +123,13 @@ def get_feature_importance(model_path, inputs_outputs_df, y_cols, x_cols, num_sa
 
 class MLObject:
     '''The class used to handle Machine Learning.'''
-    def __init__(self):
-        self.nn_r = None
-        self.scaler = None
-        self.model_path = None
-
-    def set_model(self, model_path: str):
-        '''Sets the model from the model path.
-        
-        Parameters:
-        ----------
-            model_path (str): The path to the model.
-            
-        Returns:
-        --------
-            Model: The model.'''
-        self.model_path = os.path.join(DIR, model_path)
-        self.nn_r = load_model(self.model_path)
-        return self.nn_r
-
-    def set_scaler(self, train: pd.DataFrame):
-        '''Sets the scaler for the model.
-        
-        Parameters:
-        ----------
-            train (pd.DataFrame): The training data.'''
-        scaler = StandardScaler()
-        scaler.fit(train)
-        self.scaler = scaler
-
-
-class FFNNPredictor(MLObject):
-    '''The class for the Neural Network model.'''
-    logger = Logger('NN').get_logger()
-
-    @logger_decorator(logger)
-    def __init__(self, df_data, y_cols, x_cols):
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols):
         self.y_cols = y_cols
         self.x_cols = x_cols
+        self.y_cols_raw = y_cols_raw
+        self.y_pred_cols = y_pred_cols
+        print(f'x_cols: {x_cols}')
+        print(f'y_cols: {y_cols}')
         self.df_data: pd.DataFrame = df_data
 
         if not os.path.exists(f'{BACKGROUND_PREDICTION_FOLDER_NAME}'):
@@ -176,10 +145,7 @@ class FFNNPredictor(MLObject):
         self.params = None
         self.norm = None
         self.drop = None
-        self.units_1 = None
-        self.units_2 = None
-        self.units_3 = None
-        self.units_4 = None
+        self.units_for_layers = None
         self.bs = None
         self.do = None
         self.opt_name = None
@@ -187,6 +153,40 @@ class FFNNPredictor(MLObject):
         self.loss_type = None
         self.epochs = None
         self.mae_tr_list = None
+
+    def set_model(self, model_path: str):
+        '''Sets the model from the model path.
+        
+        Parameters:
+        ----------
+            model_path (str): The path to the model.
+            
+        Returns:
+        --------
+            Model: The model.'''
+        self.model_path = os.path.join(DIR, model_path)
+        self.nn_r = load_model(self.model_path)
+        return self.nn_r
+
+    def set_scaler(self, train: pd.DataFrame = None):
+        '''Sets the scaler for the model.
+        
+        Parameters:
+        ----------
+            train (pd.DataFrame): The training data.'''
+        self.scaler = StandardScaler()
+        if train is None:
+            train = self.df_data[self.x_cols]
+        self.scaler.fit(train)
+
+
+class FFNNPredictor(MLObject):
+    '''The class for the Neural Network model.'''
+    logger = Logger('FFNN').get_logger()
+
+    @logger_decorator(logger)
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols):
+        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols)
 
     @logger_decorator(logger)
     def trim_hyperparams_combinations(self, hyperparams_combinations):
@@ -198,14 +198,14 @@ class FFNNPredictor(MLObject):
             os.remove(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv'))
         with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv'), 'a') as f:
             f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'units_4', 'norm', 'drop', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
-        for units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
-            sorted_tuple = tuple([value for value in [units_1, units_2, units_3, units_4] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
+        for units_for_layers, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
+            sorted_tuple = tuple([value for value in units_for_layers if value and value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
             if len(sorted_tuple) == 8 or sorted_tuple in uniques:
                 continue
             else:
                 print(sorted_tuple)
                 uniques.add(sorted_tuple)
-                hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
+                hyperparams_combinations_tmp.append((model_id, units_for_layers, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
                 model_id += 1
 
         return hyperparams_combinations_tmp
@@ -226,14 +226,14 @@ class FFNNPredictor(MLObject):
         model_id = 0
         if os.path.exists(BACKGROUND_PREDICTION_FOLDER_NAME):
             first = sorted(os.listdir(BACKGROUND_PREDICTION_FOLDER_NAME), key=(lambda x: int(x) if len(x) < 4 else 0))[-1]
-        for units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
-            sorted_tuple = tuple([value for value in [units_1, units_2, units_3, units_4] if value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
+        for units_for_layers, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
+            sorted_tuple = tuple([value for value in [units_for_layers] if value and value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
             if len(sorted_tuple) == 8 or sorted_tuple in uniques:
                 continue
             else:
                 print(sorted_tuple)
                 uniques.add(sorted_tuple)
-                hyperparams_combinations_tmp.append((model_id, units_1, units_2, units_3, units_4, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
+                hyperparams_combinations_tmp.append((model_id, units_for_layers, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
                 model_id += 1
         
         return hyperparams_combinations_tmp[int(first):]
@@ -253,14 +253,13 @@ class FFNNPredictor(MLObject):
                       'opt_name': 'Adam', 'lr': 0.001, 'loss_type': 'mean_squared_error'}
             nn.set_hyperparams(params)'''
         self.params = params
+        self.params['x_cols'] = self.x_cols
+        self.params['y_cols'] = self.y_cols
         self.model_id = params['model_id']
         if not os.path.exists(f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}'):
             os.makedirs(f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}')
         self.model_path = f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}/model.keras'
-        self.units_1 = params['units_1']
-        self.units_2 = params['units_2']
-        self.units_3 = params['units_3']
-        self.units_4 = params['units_4']
+        self.units_for_layers = params['units_for_layers']
         self.bs = params['bs']
         self.do = params['do']
         self.opt_name = params['opt_name']
@@ -283,36 +282,8 @@ class FFNNPredictor(MLObject):
         self.X_test = self.scaler.transform(self.X_test)
 
         inputs = Input(shape=(self.X_train.shape[1],))
-        if self.units_1:
-            hidden = Dense(self.units_1, activation='relu')(inputs)
-            if self.norm:
-                hidden = BatchNormalization()(hidden)
-            if self.drop:
-                hidden = Dropout(self.do)(hidden)
-        else:
-            hidden = inputs
-
-        if self.units_2:
-            hidden = Dense(self.units_2, activation='relu')(hidden)
-            if self.norm:
-                hidden = BatchNormalization()(hidden)
-            if self.drop:
-                hidden = Dropout(self.do)(hidden)
-
-        if self.units_3:
-            hidden = Dense(self.units_3, activation='relu')(hidden)
-            if self.norm:
-                hidden = BatchNormalization()(hidden)
-            if self.drop:
-                hidden = Dropout(self.do)(hidden)
-
-        hidden = Dense(90, activation='relu')(hidden)
-        hidden = Dense(90, activation='relu')(hidden)
-        hidden = Dense(90, activation='relu')(hidden)
-        hidden = Dense(70, activation='relu')(hidden)
-        hidden = Dense(50, activation='relu')(hidden)
-        if self.units_4:
-            hidden = Dense(self.units_4, activation='relu')(hidden)
+        for count, units in enumerate(list(self.units_for_layers)):
+            hidden = Dense(units, activation='relu')(inputs if count == 0 else hidden)
             if self.norm:
                 hidden = BatchNormalization()(hidden)
             if self.drop:
@@ -321,7 +292,7 @@ class FFNNPredictor(MLObject):
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
         plot_model(self.nn_r, to_file=os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'schema.png'),
-                   show_shapes=True, show_layer_names=True, rankdir='LR')
+                   show_shapes=True, show_layer_names=True, rankdir='TB')
 
         if self.opt_name == 'Adam':
             opt = Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
@@ -341,17 +312,19 @@ class FFNNPredictor(MLObject):
             return self.lr*12.5
         if 0.06 * self.epochs <= epoch < 0.20 * self.epochs:
             return self.lr*2
-        if 0.20 * self.epochs <= epoch:
-            return self.lr/2
+        if 0.20 * self.epochs:
+            return self.lr/3
 
     @logger_decorator(logger)
     def train(self):
         '''Trains the model.'''
         
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.002, 
-                           patience=10, start_from_epoch=90)
+                           patience=10, start_from_epoch=190)
         mc = ModelCheckpoint(self.model_path, 
                              monitor='val_loss', mode='min', verbose=0, save_best_only=True)
+        # batch_print_callback = LambdaCallback(on_epoch_end=lambda epoch,logs: self.predict(start='2024-05-08 20:30:00', end='2024-05-08 23:40:00', write_bkg=False, save_plot=True))
+
 
         if not self.lr:
             callbacks = [es, mc]
@@ -395,30 +368,50 @@ class FFNNPredictor(MLObject):
         return history
 
     @logger_decorator(logger)
-    def predict(self, start = 0, end = -1, write=True) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def predict(self, start = 0, end = -1, write_bkg=True, write_frg=False, batch_size=1, save_plot=True) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
         ----------
             start (int): The starting index. Default is 0.
             end (int): The ending index. Defualt is -1.'''
-        df_data = self.df_data[start:end]
-        pred_x_tot = self.nn_r.predict(self.scaler.transform(df_data[self.x_cols]))
-        gc.collect()
-
-        df_ori = df_data[self.y_cols].reset_index(drop=True)
+        if isinstance(start, int) and isinstance(end, int):
+            df_data = self.df_data[start:end]
+        elif isinstance(start, str) and isinstance(end, str):
+            df_data = Data.get_masked_dataframe(data=self.df_data, start=start, stop=end, reset_index=False)
+        scaled_data = self.scaler.transform(df_data[self.x_cols])
+        if batch_size > 1:
+            pred_x_tot = np.array([])
+            for i in range(0, len(scaled_data), batch_size):
+                pred_x_tot = np.append(pred_x_tot, self.nn_r.predict(scaled_data[i:i + batch_size]))
+        else:
+            pred_x_tot = self.nn_r.predict(scaled_data)
         y_pred = pd.DataFrame(pred_x_tot, columns=self.y_cols)
-        df_ori['datetime'] = df_data['datetime'].values
         y_pred['datetime'] = df_data['datetime'].values
-
-        df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
-        if write:
+        df_ori = df_data[self.y_cols].reset_index(drop=True)
+        df_ori['datetime'] = df_data['datetime'].values
+        df_ori.reset_index(drop=True, inplace=True)
+        if write_bkg:
             path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id))
             if not self.model_id:
                 path = os.path.dirname(self.model_path)
-            File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
             File.write_df_on_file(y_pred, os.path.join(path, 'bkg'))
+            gc.collect()
+
+            if write_frg:
+                path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id))
+                if not self.model_id:
+                    path = os.path.dirname(self.model_path)
+                File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
+        if save_plot:
+            y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(self.y_pred_cols, self.y_cols)}).drop(columns=self.y_cols)
+            tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime', 'SOLAR']], y_pred)
+            for col in self.y_cols_raw:
+                Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred')
+            Plotter().plot_pred_true(tiles_df, self.y_pred_cols, self.y_cols_raw)
+            Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, self.params, (start, end))
+
         return df_ori, y_pred
 
     @logger_decorator(logger)
@@ -430,11 +423,13 @@ class FFNNPredictor(MLObject):
 
 
 class RNNPredictor(FFNNPredictor):
-    def __init__(self, df_data, y_cols, x_cols, timestep):
-        super().__init__(df_data, y_cols, x_cols)
+    logger = Logger('RNN').get_logger()
+
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, timestep):
+        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols)
         self.timesteps = timestep
 
-    # @logger_decorator(logger)
+    @logger_decorator(logger)
     def create_model(self):
         '''Creates the model.'''
         self.y = self.df_data[self.y_cols].astype('float32')
@@ -450,36 +445,19 @@ class RNNPredictor(FFNNPredictor):
         X_test = np.array([self.X_test[i:i + self.timesteps] for i in np.arange(len(self.X_test) - self.timesteps)])
         self.X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_test.shape[2]))
         
-        inputs = Input(shape=(None, len(self.x_cols)))  # None indica un numero variabile di timestep
-
-        if self.units_1:
-            hidden = LSTM(self.units_1, return_sequences=True)(inputs)  # return_sequences=True se vuoi collegare più layer LSTM
+        inputs = Input(shape=(None, len(self.x_cols)))
+        hidden = LSTM(90)(inputs)
+        for count, units in enumerate(list(self.units_for_layers)):
+            hidden = Dense(units, activation='relu')(hidden)
             if self.norm:
                 hidden = BatchNormalization()(hidden)
             if self.drop:
                 hidden = Dropout(self.do)(hidden)
-        else:
-            hidden = inputs
-
-        if self.units_2:
-            hidden = LSTM(self.units_2, return_sequences=True)(hidden)  # Assicurati che return_sequences sia True se aggiungi altri layer LSTM dopo questo
-            if self.norm:
-                hidden = BatchNormalization()(hidden)
-            if self.drop:
-                hidden = Dropout(self.do)(hidden)
-
-        if self.units_3:
-            hidden = LSTM(self.units_3)(hidden)  # return_sequences=False (default) se questo è l'ultimo layer LSTM
-            if self.norm:
-                hidden = BatchNormalization()(hidden)
-            if self.drop:
-                Dropout(self.do)(hidden)
-
         outputs = Dense(len(self.y_cols), activation='linear')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
-        plot_model(self.nn_r, to_file=f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}/schema.png',
-                   show_shapes=True, show_layer_names=True, rankdir='LR')
+        plot_model(self.nn_r, to_file=os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'schema.png'),
+                   show_shapes=True, show_layer_names=True, rankdir='TB')
 
         if self.opt_name == 'Adam':
             opt = Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
@@ -492,11 +470,11 @@ class RNNPredictor(FFNNPredictor):
 
         self.nn_r.compile(loss=self.loss_type, optimizer=opt, metrics=['accuracy'])
 
-    # @logger_decorator(logger)
+    @logger_decorator(logger)
     def train(self):
         '''Trains the model.'''
         
-        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01, 
+        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01,
                            patience=10, start_from_epoch=80)
         mc = ModelCheckpoint(self.model_path, 
                              monitor='val_loss', mode='min', verbose=0, save_best_only=True)

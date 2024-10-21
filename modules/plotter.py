@@ -5,15 +5,16 @@ import os
 import operator
 from datetime import timedelta
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 try:
-    from modules.utils import Logger, logger_decorator
+    from modules.utils import Logger, logger_decorator, Time
     from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 except:
-    from utils import Logger, logger_decorator
+    from utils import Logger, logger_decorator, Time
     from config import BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 
 
@@ -154,9 +155,9 @@ class Plotter:
             axs.tick_params(axis="x", labelrotation=45)
         if show:
             plt.show()
-    
+
     @logger_decorator(logger)
-    def df_plot_tiles(self, x_col, excluded_cols = None, marker = '-', lw = 0.1, smoothing_key = 'smooth', show = True):
+    def df_plot_tiles(self, x_col, top_x_col = None, excluded_cols = None, marker = '-', lw = 0.1, smoothing_key = 'smooth', show = True):
         '''
         Plot multiple curves as tiles.
 
@@ -165,38 +166,69 @@ class Plotter:
             lw (float): Line width of the curves (default: 0.1).
             with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         '''
+
         if not excluded_cols:
             excluded_cols = []
         df_columns = [column for column in self.df.columns if f'_{smoothing_key}' not in column and column not in excluded_cols and column != x_col]
         n_plots = len(df_columns)
         n_cols = int(np.ceil(np.sqrt(n_plots)))
         n_rows = int(np.ceil(n_plots / n_cols))
-        fig, axs = plt.subplots(n_rows, n_cols, sharex=True, squeeze=True, figsize=(17, 10), num=self.label)
-        plt.tight_layout(pad = 0.4)
-        fig.subplots_adjust(bottom = 0.06, hspace = 0)
+        fig = plt.figure(figsize=(16, 10), num=self.label)
+        fig.subplots_adjust(bottom=0.076, hspace=0, left=0.052, right=0.98, top=0.9, wspace=0.076)
         x = self.df[x_col]
+        axs = []
+
         if n_plots > 1:
-            axs = axs.flatten()
+            for i in range(n_plots):
+                if i == 0:
+                    ax = fig.add_subplot(n_rows, n_cols, i + 1)
+                else:
+                    ax = fig.add_subplot(n_rows, n_cols, i + 1, sharex=axs[0])
+                axs.append(ax)
+
             for i, column in enumerate(df_columns):
-                axs[i].plot(x, self.df[column], marker = marker, lw = lw, label=column)
-                if smoothing_key != '' and f'{column}_{smoothing_key}' in self.df.columns:
-                    axs[i].plot(x, self.df[f'{column}_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
+                axs[i].plot(x.values, self.df[column], marker=marker, lw=lw, label=column)
+                if smoothing_key and f'{column}_{smoothing_key}' in self.df.columns:
+                    axs[i].plot(x.values, self.df[f'{column}_{smoothing_key}'], marker='.', ms=0.2, lw=0.1, label=f'{column} {smoothing_key}')
+                
+                if i >= n_cols * (n_rows - 1) - (n_cols * n_rows - n_plots):
+                    axs[i].tick_params(axis="x", labelrotation=30)
+                    plt.setp(axs[i].get_xticklabels(), visible=True)
+                    offset_text = axs[i].get_xaxis().get_offset_text().get_text()
+                    xlabel = f'{x_col} ({offset_text})' if offset_text else f'{x_col} ({x.iloc[0]})'
+                    axs[i].set_xlabel(xlabel)
+                    axs[i].get_xaxis().get_offset_text().set_visible(False)
+                else:
+                    plt.setp(axs[i].get_xticklabels(), visible=False)
+                
                 axs[i].legend(loc='upper right')
                 axs[i].grid()
                 axs[i].set_xlim(x.iloc[0], x.iloc[-1])
-                axs[i].tick_params(axis="x", labelrotation=30)
+                axs[i].tick_params(axis="y", labelrotation=30)
+                
+                if top_x_col and top_x_col in self.df.columns and i < n_cols:
+                    secax = axs[i].secondary_xaxis('top', functions=(Time.from_met_to_datetime, lambda x: x))
+                    secax.set_xlabel(f'{top_x_col} ({self.df[top_x_col].iloc[0]})')
+                    secax.tick_params(axis="x", labelrotation=30)
+                # if i % n_cols == 0:
+                #     axs[i].set_ylabel('Count Rate')
+
             for j in range(i + 1, len(axs)):
                 axs[j].axis('off')
         else:
             column = df_columns[0]
-            axs.plot(x, self.df[column], marker = marker, lw = lw, label=column)
+            ax = fig.add_subplot(1, 1, 1)
+            ax.plot(x, self.df[column], marker = marker, lw = lw, label=column)
             if smoothing_key != '' and f'{column}_{smoothing_key}' in self.df.columns:
-                axs.plot(x, self.df[f'{column}_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
-            axs.legend(loc='upper right')
-            axs.grid()
-            axs.set_xlim(x.iloc[0], x.iloc[-1])
-            axs.tick_params(axis="x", labelrotation=45)
+                ax.plot(x, self.df[f'{column}_{smoothing_key}'], marker = '.', ms = 0.2, lw = '0.1', label=f'{column} {smoothing_key}')
+            ax.legend(loc='upper right')
+            ax.grid()
+            ax.set_xlim(x.iloc[0], x.iloc[-1])
+            ax.tick_params(axis="x", labelrotation=45)
+            ax.set_xlabel(f'{x_col} {x.iloc[0]}')
+
         if show:
+            plt.tight_layout(pad=0.4)
             plt.show()
 
     @logger_decorator(logger)
@@ -265,19 +297,20 @@ class Plotter:
 
 
     @logger_decorator(logger)
-    def plot_tile(self, tiles_df, face='top', smoothing_key = 'smooth'):
+    def plot_tile(self, tiles_df, face='top', col='datetime', smoothing_key = 'smooth'):
         with sns.plotting_context("talk"):
             fig, axs = plt.subplots(2, 1, sharex=True, figsize=(20, 12), num=face, tight_layout=True)
             fig.subplots_adjust(hspace=0)
 
-            axs[0].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[face], 'k-.')
-            axs[0].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[f'{face}_{smoothing_key}'], 'r-')
-            axs[0].set_title('foreground and background')
-            axs[0].set_ylabel('Count Rate')
+            axs[0].plot(pd.to_datetime(tiles_df[col]), tiles_df[face], 'k-.')
+            axs[0].plot(pd.to_datetime(tiles_df[col]), tiles_df[f'{face}_{smoothing_key}'], 'r-')
+            axs[0].set_ylabel(f'{face} count rate')
 
-            axs[1].plot(pd.to_datetime(tiles_df['datetime']), tiles_df[face] - tiles_df[f'{face}_{smoothing_key}'], 'k-.')
-            axs[1].plot(pd.to_datetime(tiles_df['datetime']).ffill(), [0 for _ in tiles_df['datetime'].ffill()], 'k-')
-            axs[1].set_xlabel('time (YYYY-MM-DD hh:mm:ss)')
+            axs[1].plot(pd.to_datetime(tiles_df[col]), tiles_df[face] - tiles_df[f'{face}_{smoothing_key}'], 'k-.')
+            axs[1].axhline(0, color='red')
+            # axs[1].plot(pd.to_datetime(tiles_df[col]).ffill(), [0 for _ in tiles_df[col].ffill()], 'k-')
+            axs[1].set_xlabel(f"{col} ({tiles_df[col].iloc[0]})")
+            axs[1].set_xlim(tiles_df[col].iloc[0], tiles_df[col].iloc[-1])
             plt.xticks(rotation=0)
             axs[1].set_ylabel('Residuals')
 
@@ -310,7 +343,7 @@ class Plotter:
             plt.plot([min_y, max_y], [min_y, max_y], '-')
             plt.xlabel('True signal')
             plt.ylabel('Predicted signal')
-        plt.legend(y_cols_raw)  
+        plt.legend(y_cols_raw)
 
     @logger_decorator(logger)
     def plot_history(self, history, feature):
@@ -382,7 +415,7 @@ class Plotter:
         if not os.path.exists(PLOT_TRIGGER_FOLDER_NAME):
             os.makedirs(PLOT_TRIGGER_FOLDER_NAME)
 
-        for anomaly_start, anomalies in self.df.items():
+        for anomaly_start, anomalies in tqdm(self.df.items(), desc='Plotting anomalies'):
             faces = list(anomalies.keys())
             figs, axs = plt.subplots(6 + len(support_vars), 1, sharex=True, figsize=(13, 12), num=f"burst_{'_'.join(faces)}")
 
@@ -400,18 +433,23 @@ class Plotter:
                     face_color = None
                     changepoint = anomalies[face]['changepoint']
                     stopping_time = anomalies[face]['stopping_time']
+                    max_significance = anomalies[face]['max_significance']
+                    max_point = anomalies[face]['max_point']
+                    sigma_val = anomalies[face]['sigma_val']
                     axs[i].axvline(tiles_df['datetime'][changepoint], color='red', lw=0.8)
                     axs[i].axvline(tiles_df['datetime'][stopping_time], color='red', lw=0.8)
-                    # axs[i].fill((tiles_df['datetime'][start], tiles_df['datetime'][end], tiles_df['datetime'][end], tiles_df['datetime'][start]), (-5, -5, 15, 15), color="yellow", alpha=0.1) 
+                    # axs[i].text(tiles_df['datetime'][max_point], 1.01 * tiles_df[face_pred][max_point], f'{r"$s_{MAX}="}{round(max_significance//sigma_val)}\sigma$', color='black', fontsize=11)
+                    # axs[i].fill((tiles_df['datetime'][start], tiles_df['datetime'][end], tiles_df['datetime'][end], tiles_df['datetime'][start]), (-5, -5, 15, 15), color="yellow", alpha=0.1)
                 axs[i].plot(tiles_df[start:end]['datetime'], tiles_df[start:end][face], label=face, color=face_color)
                 axs[i].plot(tiles_df[start:end]['datetime'], tiles_df[start:end][face_pred], label='background', color="red")
-                axs[i].legend(loc="upper right")
+                axs[i].legend(loc="upper left")
                 axs[i].set_ylim(min(tiles_df[start:end][face]), 1.01 * max(tiles_df[start:end][face]))
 
             max_val = -1
             min_val = 100
             colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
             count = 0
+            axs[1+i].axhline(0, color='grey', lw=0.8)
             for face in faces:
                 significance = anomalies[face]['significance']
                 axs[1+i].axhline(significance, color=colors[count], label=f"{face} $\\sigma$")
@@ -420,15 +458,15 @@ class Plotter:
                 min_val = min(min(diff), min_val)
                 max_val = max(max(max(diff), significance), max_val)
                 count+=1
-            axs[1+i].fill((tiles_df['datetime'][int(anomaly_start)], tiles_df['datetime'][anomaly_end], tiles_df['datetime'][anomaly_end], tiles_df['datetime'][int(anomaly_start)]), (-5, -5, 15, 15), color="red", alpha=0.1) 
+            axs[1+i].fill((tiles_df['datetime'][int(anomaly_start)], tiles_df['datetime'][anomaly_end], tiles_df['datetime'][anomaly_end], tiles_df['datetime'][int(anomaly_start)]), (-5, -5, 15, 15), color="red", alpha=0.1)
             axs[1+i].axvline(tiles_df['datetime'][anomaly_end], color='red', lw=0.7)
             axs[1+i].axvline(tiles_df['datetime'][int(anomaly_start)], color='red', lw=0.7)
             axs[1+i].set_ylim(min_val, 1.01 * max_val)
-            axs[1+i].legend(loc="upper right")
+            axs[1+i].legend(loc="upper left")
 
             for j, var in enumerate(support_vars):
                 axs[2+i+j].plot(tiles_df[start:end]['datetime'], tiles_df[start:end][var], color="green", label=var)
-                axs[2+i+j].legend(loc="upper right")
+                axs[2+i+j].legend(loc="upper left")
 
             start_xlim = tiles_df['datetime'][int(anomaly_start)] - timedelta(seconds=anomaly_delta)
             end_xlim = tiles_df['datetime'][anomaly_end] + timedelta(seconds=anomaly_delta)
@@ -469,94 +507,94 @@ class Plotter:
         plt.close('all')
 
 if __name__ == '__main__':
-    Plotter().show_models_params('data/model_nn_1', title = 'layers', features_dict={'1 layer': {'units_1': {'value': 0, 'op': operator.eq}, 
+    Plotter().show_models_params('data/model_nn_1', title = 'layers', features_dict={'1 layer': {'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.eq},
-                                                                                                 'units_3': {'value': 0, 'op': operator.gt}}, 
-                                                                                     '2 layers': {'units_1': {'value': 0, 'op': operator.eq}, 
-                                                                                                 'units_2': {'value': 0, 'op': operator.gt}, 
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                     '3 layers': {'units_1': {'value': 0, 'op': operator.gt}, 
-                                                                                                 'units_2': {'value': 0, 'op': operator.gt}, 
+                                                                                     '2 layers': {'units_1': {'value': 0, 'op': operator.eq},
+                                                                                                 'units_2': {'value': 0, 'op': operator.gt},
+                                                                                                 'units_3': {'value': 0, 'op': operator.gt}},
+                                                                                     '3 layers': {'units_1': {'value': 0, 'op': operator.gt},
+                                                                                                 'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}}}, show = False)
     Plotter().show_models_params('data/model_nn_1', title = '1 layer', features_dict={
-                                                                                            'norm+dropout': 
+                                                                                            'norm+dropout':
                                                                                                 {'drop': {'value': 1, 'op': operator.eq},
                                                                                                  'norm': {'value': 1, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.eq}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.eq},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'norm': 
+                                                                                            'norm':
                                                                                                 {'drop': {'value': 0, 'op': operator.eq},
                                                                                                  'norm': {'value': 1, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.eq}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.eq},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'dropout': 
+                                                                                            'dropout':
                                                                                                 {'drop': {'value': 1, 'op': operator.eq},
                                                                                                  'norm': {'value': 0, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.eq}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.eq},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'no norm no drop': 
+                                                                                            'no norm no drop':
                                                                                                 {'drop': {'value': 0, 'op': operator.eq},
                                                                                                  'norm': {'value': 0, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.eq}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.eq},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}}
                                                                                                                 }, show = False)
     Plotter().show_models_params('data/model_nn_1', title = '2 layer', features_dict={
-                                                                                            'norm+dropout': 
+                                                                                            'norm+dropout':
                                                                                                 {'drop': {'value': 1, 'op': operator.eq},
                                                                                                  'norm': {'value': 1, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.eq}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'norm': 
+                                                                                            'norm':
                                                                                                 {'drop': {'value': 0, 'op': operator.eq},
                                                                                                  'norm': {'value': 1, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.eq}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'dropout': 
+                                                                                            'dropout':
                                                                                                 {'drop': {'value': 1, 'op': operator.eq},
                                                                                                  'norm': {'value': 0, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.eq}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'no norm no drop': 
+                                                                                            'no norm no drop':
                                                                                                 {'drop': {'value': 0, 'op': operator.eq},
                                                                                                  'norm': {'value': 0, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.eq}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.eq},
                                                                                                  'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}}
                                                                                                                 }, show = False)
     Plotter().show_models_params('data/model_nn_1', title = '3 layer', features_dict={
-                                                                                            'norm+dropout': 
+                                                                                            'norm+dropout':
                                                                                                 {'drop': {'value': 1, 'op': operator.eq},
                                                                                                  'norm': {'value': 1, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.gt}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.gt},
                                                                                                  'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'norm': 
+                                                                                            'norm':
                                                                                                 {'drop': {'value': 0, 'op': operator.eq},
                                                                                                  'norm': {'value': 1, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.gt}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.gt},
                                                                                                  'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'dropout': 
+                                                                                            'dropout':
                                                                                                 {'drop': {'value': 1, 'op': operator.eq},
                                                                                                  'norm': {'value': 0, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.gt}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.gt},
                                                                                                  'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}},
-                                                                                            'no norm no drop': 
+                                                                                            'no norm no drop':
                                                                                                 {'drop': {'value': 0, 'op': operator.eq},
                                                                                                  'norm': {'value': 0, 'op': operator.eq},
-                                                                                                 'units_1': {'value': 0, 'op': operator.gt}, 
+                                                                                                 'units_1': {'value': 0, 'op': operator.gt},
                                                                                                  'units_2': {'value': 0, 'op': operator.gt},
                                                                                                  'units_3': {'value': 0, 'op': operator.gt}}
                                                                                                                 }, show = False)
-                                                                                                                
+
 
     # # Plotter.save('data/model_nn_1')
     Plotter().show()
