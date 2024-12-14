@@ -1,10 +1,12 @@
 '''
 This module contains the classes for the Neural Network and K-Nearest Neighbors models.
 '''
+import itertools
 import os
 import gc
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 # sklearn
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error as MAE, median_absolute_error as MeAE
@@ -18,130 +20,56 @@ from keras.layers import Dense, Dropout, BatchNormalization, LSTM # pylint: disa
 from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler, LambdaCallback # pylint: disable=E0401
 from keras.models import load_model # pylint: disable=E0401
 from keras.utils import plot_model # pylint: disable=E0401
-# Explainability
-import matplotlib.pyplot as plt
-# import shap
+# TensorFlow for Bayesian Neural Network
+import tf_keras
+import tensorflow_probability as tfp
+tfpl = tfp.layers
+tfd = tfp.distributions
+import tensorflow as tf
 # ACDAnomalies modules
 try:
-    import modules.lime.lime_tabular as lime_tabular
     from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME, DIR
     from modules.utils import Logger, logger_decorator, File, Data
     from modules.plotter import Plotter
 except:
-    import lime.lime_tabular as lime_tabular
     from config import BACKGROUND_PREDICTION_FOLDER_NAME, DIR
     from utils import Logger, logger_decorator, File, Data
     from plotter import Plotter
 
 
-def get_feature_importance(model_path, inputs_outputs_df, y_cols, x_cols, num_sample = 100, model = None, show=True, save=True):
-    '''Get the feature importance using LIME and SHAP and plots it with matplotlib barh.
-    
-    Parameters:
-    ----------
-        model_path (str): The path to the model.
-        inputs_outputs_df (pd.DataFrame): The input and output data.
-        y_cols (list): The columns of the output data.
-        x_cols (list): The columns of the input data.
-        show (bool): Whether to show the plot.'''
-    X_test = inputs_outputs_df[x_cols]
-    if model is None:
-        model = load_model(model_path)
-        scaler = StandardScaler()
-        scaler.fit(X_test)
-    else:
-        scaler = model.scaler
-        model = model.nn_r
-    X_test =  pd.DataFrame(scaler.transform(X_test), columns=x_cols)
-
-    y_test = inputs_outputs_df[y_cols]
-    X_back = X_test.sample(num_sample)
-    importance_dict = {face: {col: 0 for col in X_back.columns} for face in y_cols}
-    explainer = lime_tabular.LimeTabularExplainer(
-        training_data=np.array(X_back),
-        feature_names=X_back.columns,
-        class_names=list(y_test.columns),
-        mode='regression'
-    )
-
-    for i in range(num_sample):
-        for mylabel, face in enumerate(y_cols):
-            exp = explainer.explain_instance(
-                data_row=X_back.iloc[i],
-                mylabel=mylabel,
-                predict_fn=model.predict,
-                num_features=len(X_back.columns)
-            )
-            for feature, weight in exp.as_list(label=mylabel):
-                for col in set(x_cols):
-                    if col in feature:
-                        importance_dict[face][col] += np.abs(weight) / num_sample
-                        break
-
-    summed_importance_dict = {col: 0 for col in importance_dict[y_cols[0]].keys()}
-    for face in y_cols:
-        for col, value in importance_dict[face].items():
-            summed_importance_dict[col] += value
-
-    summed_sorted_importance_dict = dict(sorted(summed_importance_dict.items(), key=lambda item: item[1]))
-
-    sorted_importance_dict = {face: dict(sorted(value.items(), key=lambda item: item[1])) for face, value in importance_dict.items()}
-    
-    file_name = 'Feature Importance with Lime' if model_path.endswith('.keras') else model_path
-    plt.figure(num=file_name, figsize=(10, 8))
-    left = {col: 0 for col in importance_dict[y_cols[0]]}
-    for i, key in enumerate(importance_dict.keys()):
-        sorted_importance_dict[key] = {k: sorted_importance_dict[key][k] for k in summed_sorted_importance_dict}
-        left_arr = [left[key] for key in sorted_importance_dict[key]]
-        bars = plt.barh(list(sorted_importance_dict[key].keys()), list(sorted_importance_dict[key].values()), left=left_arr, label=key)
-        for col in sorted_importance_dict[key]:
-            left[col] += sorted_importance_dict[key][col]
-    for bar, sum in zip(bars, summed_sorted_importance_dict.values()):
-        plt.text(sum * 1.002, bar.get_y() + bar.get_height() / 2, f'{sum:.4f}', va='center', color='grey')
-    plt.legend(loc='lower right')
-    plt.tight_layout()
-
-    # e = shap.KernelExplainer(model, X_back)
-    # shap_values_orig = e(X_back)
-    # shap_values_sum = np.mean(shap_values_orig.values, axis=2)
-    # shap_values_sum = shap.Explanation(values=shap_values_sum,
-    #                                 base_values=shap_values_orig.base_values[0],
-    #                                 data=shap_values_orig.data,
-    #                                 feature_names=shap_values_orig.feature_names)
-    # plt.figure(num='Feature Importance with SHAP')
-    # shap.plots.bar(shap_values_sum, max_display=len(X_back.columns), show=False)
-
-    # idx = 0
-    # plt.figure(num='Waterfall plot with SHAP')
-    # shap.plots._waterfall.waterfall_legacy(e.expected_value[idx], shap_values_orig[0].T[idx],
-    #                                        feature_names=x_cols, max_display=len(x_cols))
-
-    if show:
-        plt.show()
-    if save:
-        Plotter.save(os.path.dirname(model_path) if model_path.endswith('.keras') else model_path)
-
 class MLObject:
     '''The class used to handle Machine Learning.'''
-    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols):
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator=False):
+        self.model_name = self.__class__.__name__
+        self.training_date = pd.Timestamp.date(pd.Timestamp.now()).strftime('%Y-%m-%d')
+        print(f'{self.model_name} - {self.training_date}')
+        self.with_generator = with_generator
         self.y_cols = y_cols
         self.x_cols = x_cols
-        self.y_cols_raw = y_cols_raw
-        self.y_pred_cols = y_pred_cols
         print(f'x_cols: {x_cols}')
         print(f'y_cols: {y_cols}')
-        self.df_data: pd.DataFrame = df_data
+        self.y_cols_raw = y_cols_raw
+        self.y_pred_cols = y_pred_cols
 
-        if not os.path.exists(f'{BACKGROUND_PREDICTION_FOLDER_NAME}'):
-            os.makedirs(f'{BACKGROUND_PREDICTION_FOLDER_NAME}')
-        self.y = None
-        self.X = None
-        self.X_train = self.X_test = self.y_train = self.y_test = None
-        self.scaler = None
+        if with_generator: # if the data is too large, use tensorflow DataGenerator
+            # to be implemented
+            pass
+        else:
+            self.df_data: pd.DataFrame = df_data
+        self.y = self.df_data[self.y_cols].astype('float32')
+        self.X = self.df_data[self.x_cols].astype('float32')
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=42, shuffle=True)
+        
+        self.set_scaler(self.X)
+        self.X_train = self.scaler.transform(self.X_train)
+        self.X_test = self.scaler.transform(self.X_test)
+
+        self.model_path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.training_date, self.model_name)
+        if not os.path.exists(self.model_path):
+            os.makedirs(self.model_path)
         self.nn_r = None
         self.text = None
         self.model_id = None
-        self.model_path = None
         self.params = None
         self.norm = None
         self.drop = None
@@ -153,6 +81,81 @@ class MLObject:
         self.loss_type = None
         self.epochs = None
         self.mae_tr_list = None
+
+    def get_hyperparams_combinations(self, hyperparams_combinations:dict, use_previous:bool=False) -> list:
+        '''Trims the hyperparameters combinations to avoid training duplicate models.
+        
+            Parameters:
+            ----------
+                hyperparams_combinations (dict): The hyperparameters combinations.
+                use_previous (bool): Whether to use the previous hyperparameters combinations found in `BACKGROUND_PREDICTION_FOLDER_NAME`.
+                
+            Returns:
+            --------
+                list: The hyperparameters combinations.'''
+        hyperparams_combinations_tmp = []
+        uniques = set()
+        model_id = 0
+        first = 0
+        if not use_previous:
+            model_params_path = os.path.join(self.model_path, 'models_params.csv')
+            if os.path.exists(model_params_path):
+                os.remove(model_params_path)
+            with open(model_params_path, 'w') as f:
+                f.write('\t'.join(['model_id'] + list(hyperparams_combinations.keys()) + ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
+        else:
+            first = int(sorted(os.listdir(self.model_path), key=(lambda x: int(x) if len(x) < 4 else 0))[-1])
+
+        units_for_layers = list(itertools.product(*hyperparams_combinations['units_for_layers']))
+        other_params = [hyperparams_combinations[key] for key in hyperparams_combinations if key != 'units_for_layers']
+        all_combinations = list(itertools.product(units_for_layers, *other_params))
+
+        for combination in all_combinations:
+            sorted_tuple = tuple([value for value in combination[0] if value and value > 0] + list(combination[1:]))
+            if len(sorted_tuple) == 8 or sorted_tuple in uniques:
+                continue
+            else:
+                uniques.add(sorted_tuple)
+                hyperparams_dict = {key: value for key, value in zip(hyperparams_combinations.keys(), combination)}
+                hyperparams_dict['model_id'] = model_id
+                hyperparams_combinations_tmp.append(hyperparams_dict)
+                model_id += 1
+
+        return hyperparams_combinations_tmp[int(first):]
+
+    def set_hyperparams(self, params):
+        '''Sets the hyperparameters for the model.
+        
+        Parameters:
+        ----------
+            params (dict): The hyperparameters.
+            
+        Example::
+
+            params = {'model_id': 0, 'units_1': 128, 'units_2': 128, 'units_3': 128,
+                      'norm': True, 'drop': True, 'epochs': 100, 'bs': 32, 'do': 0.5,
+                      'opt_name': 'Adam', 'lr': 0.001, 'loss_type': 'mean_squared_error'}
+            nn.set_hyperparams(params)'''
+        self.params = params
+        self.params['model_name'] = self.model_name
+        self.params['training_date'] = self.training_date
+        self.params['x_cols'] = self.x_cols
+        self.params['y_cols'] = self.y_cols
+        self.model_id = params['model_id']
+        self.model_path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.training_date, self.model_name, str(self.model_id))
+        if not os.path.exists(self.model_path):
+            os.makedirs(self.model_path)
+        self.params['model_path'] = self.model_path = os.path.join(self.model_path, 'model.keras')
+        self.units_for_layers = params['units_for_layers']
+        self.bs = params['bs']
+        self.do = params['do']
+        self.opt_name = params['opt_name']
+        self.lr = params['lr']
+        self.loss_type = params['loss_type']
+        self.epochs = params['epochs']
+        self.norm = params['norm']
+        self.drop = params['drop']
+        self.mae_tr_list = []
 
     def set_model(self, model_path: str):
         '''Sets the model from the model path.
@@ -174,113 +177,96 @@ class MLObject:
         Parameters:
         ----------
             train (pd.DataFrame): The training data.'''
-        self.scaler = StandardScaler()
         if train is None:
             train = self.df_data[self.x_cols]
+        self.scaler = StandardScaler()
         self.scaler.fit(train)
 
+    def scheduler(self, epoch, lr_actual):
+        '''The learning rate scheduler.'''
+        # if epoch < 0.06 * self.epochs:
+        #     return self.lr*12.5
+        # if 0.06 * self.epochs <= epoch < 0.20 * self.epochs:
+        #     return self.lr*2
+        # if 0.20 * self.epochs:
+        #     return self.lr/3
+        return lr_actual
+        
+    def update_summary(self):
+        '''Updates the summary file with the model parameters'''
+        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.training_date, self.model_name, 'models_params.csv'), 'a') as f:
+            list_tmp = list(self.params.values()) + self.mae_tr_list
+            f.write('\t'.join([str(value) for value in list_tmp] + ['\n']))
+
+    def negative_log_likelihood(self, y_true, y_pred):
+        '''The negative log likelihood loss function computed using the mean and variance.'''
+        num_outputs = y_true.shape[1]
+        mean = y_pred[:, :num_outputs]
+        log_var = y_pred[:, num_outputs:]
+        precision = tf.exp(-log_var)
+        nll = 0.5 * tf.reduce_mean(log_var + precision * (y_true - mean) ** 2, axis=0)  # Per output
+        return tf.reduce_sum(nll)  # Sum over all outputs
+
+    def mae(self, y_true, y_pred):
+        '''The mean absolute error metric computed using the mean of the output.'''
+        num_outputs = y_true.shape[1]
+        mean = y_pred[:, :num_outputs]
+        return tf.reduce_mean(tf.abs(y_true - mean))
+
+    def NLL(self, y_true, y_pred):
+        '''The negative log likelihood loss function computed using the mean and variance.'''
+        return -tf.reduce_mean(y_pred.log_prob(y_true))
+
+    def MSE(self, y_true, y_pred):
+        '''The mean squared error loss function computed using the mean of the output.'''
+        return tf.reduce_mean(tf.square(y_true - y_pred.mean()))
+
+    def MAE(self, y_true, y_pred):
+        '''The mean absolute error loss function computed using the mean of the output.'''
+        return tf.reduce_mean(tf.abs(y_true - y_pred.mean()))
+
+    def KL_divergence(self, posterior, prior):
+        '''The Kullback-Leibler divergence loss function.'''
+        return tfp.distributions.kl_divergence(posterior, prior)
+
+    def combined_loss(self, y_true, y_pred):
+        '''A combined loss function.'''
+        nll_loss = self.NLL(y_true, y_pred)
+        mae_loss = self.MAE(y_true, y_pred)
+        return nll_loss
+
+    class custom_callback(tf_keras.callbacks.Callback):
+        '''Custom callback class to end the model training and plot the predictions.'''
+        def __init__(self, predictor):
+            super().__init__()
+            self.predictor = predictor
+
+        def on_epoch_end(self, epoch, logs={}):
+            if (epoch + 1) % 5 == 0:
+                self.predictor.predict(start=0, end=1000, mask_column='index', write_bkg=False, save_predictions_plot=True)
+            if( logs['mae'] <= 0.003 and logs['accuracy'] > 0.65 ):
+                self.model.stop_training = True
+
+    def save_predictions_plots(self, tiles_df, start, end, params):
+        '''Saves the prediction plots.'''
+        Plotter(df=tiles_df, label='tiles').df_plot_tiles(self.y_cols, x_col='datetime', init_marker=',',
+                                                        show=False, smoothing_key='pred')
+        for col in self.y_cols_raw:
+            Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred')
+        Plotter().plot_pred_true(tiles_df, self.y_pred_cols, self.y_cols_raw)
+        Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params, (start, end))
 
 class FFNNPredictor(MLObject):
-    '''The class for the Neural Network model.'''
-    logger = Logger('FFNN').get_logger()
+    '''The class for the Feed Forward Neural Network model.'''
+    logger = Logger('FFNNPredictor').get_logger()
 
     @logger_decorator(logger)
-    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols):
-        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols)
-
-    @logger_decorator(logger)
-    def trim_hyperparams_combinations(self, hyperparams_combinations):
-        '''Trims the hyperparameters combinations to avoid duplicates.'''
-        hyperparams_combinations_tmp = []
-        uniques = set()
-        model_id = 0
-        if os.path.exists(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv')):
-            os.remove(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv'))
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv'), 'a') as f:
-            f.write('\t'.join(['model_id', 'units_1', 'units_2', 'units_3', 'units_4', 'norm', 'drop', 'epochs', 'bs', 'do', 'opt_name', 'lr', 'loss_type', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']) + '\n')
-        for units_for_layers, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
-            sorted_tuple = tuple([value for value in units_for_layers if value and value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
-            if len(sorted_tuple) == 8 or sorted_tuple in uniques:
-                continue
-            else:
-                print(sorted_tuple)
-                uniques.add(sorted_tuple)
-                hyperparams_combinations_tmp.append((model_id, units_for_layers, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
-                model_id += 1
-
-        return hyperparams_combinations_tmp
-
-    @logger_decorator(logger)
-    def use_previous_hyperparams_combinations(self, hyperparams_combinations) -> list:
-        '''Uses the previous hyperparameters combinations.
-        
-        Parameters:
-        ----------
-            hyperparams_combinations (list): The hyperparameters combinations.
-            
-        Returns:
-        --------
-            list: The hyperparameters combinations.'''
-        hyperparams_combinations_tmp = []
-        uniques = set()
-        model_id = 0
-        if os.path.exists(BACKGROUND_PREDICTION_FOLDER_NAME):
-            first = sorted(os.listdir(BACKGROUND_PREDICTION_FOLDER_NAME), key=(lambda x: int(x) if len(x) < 4 else 0))[-1]
-        for units_for_layers, norm, drop, epochs, bs, do, opt_name, lr, loss_type in hyperparams_combinations:
-            sorted_tuple = tuple([value for value in [units_for_layers] if value and value > 0] + [norm, drop, epochs, bs, do, opt_name, lr, loss_type])
-            if len(sorted_tuple) == 8 or sorted_tuple in uniques:
-                continue
-            else:
-                print(sorted_tuple)
-                uniques.add(sorted_tuple)
-                hyperparams_combinations_tmp.append((model_id, units_for_layers, norm, drop, epochs, bs, do, opt_name, lr, loss_type))
-                model_id += 1
-        
-        return hyperparams_combinations_tmp[int(first):]
-
-    @logger_decorator(logger)
-    def set_hyperparams(self, params):
-        '''Sets the hyperparameters for the model.
-        
-        Parameters:
-        ----------
-            params (dict): The hyperparameters.
-            
-        Example::
-
-            params = {'model_id': 0, 'units_1': 128, 'units_2': 128, 'units_3': 128,
-                      'norm': True, 'drop': True, 'epochs': 100, 'bs': 32, 'do': 0.5,
-                      'opt_name': 'Adam', 'lr': 0.001, 'loss_type': 'mean_squared_error'}
-            nn.set_hyperparams(params)'''
-        self.params = params
-        self.params['x_cols'] = self.x_cols
-        self.params['y_cols'] = self.y_cols
-        self.model_id = params['model_id']
-        if not os.path.exists(f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}'):
-            os.makedirs(f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}')
-        self.model_path = f'{BACKGROUND_PREDICTION_FOLDER_NAME}/{self.model_id}/model.keras'
-        self.units_for_layers = params['units_for_layers']
-        self.bs = params['bs']
-        self.do = params['do']
-        self.opt_name = params['opt_name']
-        self.lr = params['lr']
-        self.loss_type = params['loss_type']
-        self.epochs = params['epochs']
-        self.norm = params['norm']
-        self.drop = params['drop']
-        self.mae_tr_list = []
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator=False):
+        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator)
 
     @logger_decorator(logger)
     def create_model(self):
         '''Creates the model.'''
-        self.y = self.df_data[self.y_cols].astype('float32')
-        self.X = self.df_data[self.x_cols].astype('float32')
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=42, shuffle=True)
-
-        self.set_scaler(self.X_train)
-        self.X_train = self.scaler.transform(self.X_train)
-        self.X_test = self.scaler.transform(self.X_test)
-
         inputs = Input(shape=(self.X_train.shape[1],))
         for count, units in enumerate(list(self.units_for_layers)):
             hidden = Dense(units, activation='relu')(inputs if count == 0 else hidden)
@@ -291,9 +277,10 @@ class FFNNPredictor(MLObject):
         outputs = Dense(len(self.y_cols), activation='linear')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
-        plot_model(self.nn_r, to_file=os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'schema.png'),
+        plot_model(self.nn_r, to_file=os.path.join(os.path.dirname(self.model_path), 'schema.png'),
                    show_shapes=True, show_layer_names=True, rankdir='TB')
 
+        opt = None
         if self.opt_name == 'Adam':
             opt = Adam(beta_1=0.9, beta_2=0.99, epsilon=1e-07)
         elif self.opt_name == 'Nadam':
@@ -306,16 +293,6 @@ class FFNNPredictor(MLObject):
         self.nn_r.compile(loss=self.loss_type, optimizer=opt, metrics=['accuracy'])
 
     @logger_decorator(logger)
-    def scheduler(self, epoch, lr_actual):
-        '''The learning rate scheduler.'''
-        if epoch < 0.06 * self.epochs:
-            return self.lr*12.5
-        if 0.06 * self.epochs <= epoch < 0.20 * self.epochs:
-            return self.lr*2
-        if 0.20 * self.epochs:
-            return self.lr/3
-
-    @logger_decorator(logger)
     def train(self):
         '''Trains the model.'''
         
@@ -323,7 +300,7 @@ class FFNNPredictor(MLObject):
                            patience=10, start_from_epoch=190)
         mc = ModelCheckpoint(self.model_path, 
                              monitor='val_loss', mode='min', verbose=0, save_best_only=True)
-        # batch_print_callback = LambdaCallback(on_epoch_end=lambda epoch,logs: self.predict(start='2024-05-08 20:30:00', end='2024-05-08 23:40:00', write_bkg=False, save_plot=True))
+        # batch_print_callback = LambdaCallback(on_epoch_end=lambda epoch,logs: self.predict(start='2024-05-08 20:30:00', end='2024-05-08 23:40:00', write_bkg=False, save_predictions_plot=True))
 
 
         if not self.lr:
@@ -331,8 +308,12 @@ class FFNNPredictor(MLObject):
         else:
             call_lr = LearningRateScheduler(self.scheduler)
             callbacks = [es, mc, call_lr]
-        history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
-                        validation_split=0.3, callbacks=callbacks)
+
+        if self.with_generator:
+            history = self.nn_r.fit(self.df_data, epochs=self.epochs, batch_size=32, validation_split=0.3, callbacks=callbacks)
+        else:
+            history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs,
+                            validation_split=0.3, callbacks=callbacks)
         
         nn_r = load_model(self.model_path)
 
@@ -359,26 +340,32 @@ class FFNNPredictor(MLObject):
 
         nn_r.save(self.model_path)
         self.nn_r = nn_r
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'params.txt'), "w") as params_file:
+        with open(os.path.join(os.path.dirname(self.model_path), 'params.txt'), "w") as params_file:
             for key, value in self.params.items():
                 params_file.write(f'{key} : {value}\n')
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'performance.txt'), "w") as text_file:
+        with open(os.path.join(os.path.dirname(self.model_path), 'performance.txt'), "w") as text_file:
             text_file.write(text)
         self.text = text
         return history
 
     @logger_decorator(logger)
-    def predict(self, start = 0, end = -1, write_bkg=True, write_frg=False, batch_size=1, save_plot=True) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def predict(self, start:str|int = 0, end:str|int = -1, mask_column='index', write_bkg=True, write_frg=False, batch_size=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
         ----------
-            start (int): The starting index. Default is 0.
-            end (int): The ending index. Defualt is -1.'''
-        if isinstance(start, int) and isinstance(end, int):
-            df_data = self.df_data[start:end]
-        elif isinstance(start, str) and isinstance(end, str):
-            df_data = Data.get_masked_dataframe(data=self.df_data, start=start, stop=end, reset_index=False)
+            start (str|int): The starting index. Default is 0.
+            end (str|int): The ending index. Defualt is -1.
+            mask_column (str): The column to mask the data.
+            write_bkg (bool): Whether to write the background data. Default is `True`.
+            write_frg (bool): Whether to write the foreground data. Default is `False`.
+            batch_size (int): The batch size for the prediction. Default is 1.
+            save_predictions_plot (bool): Whether to save the predictions plot. Default is `False`.
+            support_variables (list): The support variables to plot.
+        '''
+        df_data = Data.get_masked_dataframe(data=self.df_data, start=start, stop=end, column=mask_column, reset_index=False)
+        if df_data.empty:
+            return pd.DataFrame(), pd.DataFrame()
         scaled_data = self.scaler.transform(df_data[self.x_cols])
         if batch_size > 1:
             pred_x_tot = np.array([])
@@ -393,57 +380,327 @@ class FFNNPredictor(MLObject):
         df_ori['datetime'] = df_data['datetime'].values
         df_ori.reset_index(drop=True, inplace=True)
         if write_bkg:
-            path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id))
+            path = os.path.join(os.path.dirname(self.model_path))
             if not self.model_id:
                 path = os.path.dirname(self.model_path)
             File.write_df_on_file(y_pred, os.path.join(path, 'bkg'))
             gc.collect()
 
             if write_frg:
-                path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id))
+                path = os.path.join(os.path.dirname(self.model_path))
                 if not self.model_id:
                     path = os.path.dirname(self.model_path)
                 File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
-        if save_plot:
+        if save_predictions_plot:
             y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(self.y_pred_cols, self.y_cols)}).drop(columns=self.y_cols)
-            tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime', 'SOLAR']], y_pred)
-            for col in self.y_cols_raw:
-                Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred')
-            Plotter().plot_pred_true(tiles_df, self.y_pred_cols, self.y_cols_raw)
-            Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, self.params, (start, end))
-
+            tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime'] + support_variables], y_pred)
+            self.save_predictions_plots(tiles_df, start, end, self.params)
         return df_ori, y_pred
 
-    @logger_decorator(logger)
-    def update_summary(self):
-        '''Updates the summary file with the model parameters'''
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, 'models_params.csv'), 'a') as f:
-            list_tmp = list(self.params.values()) + self.mae_tr_list
-            f.write('\t'.join([str(value) for value in list_tmp] + ['\n']))
+class PBNNPredictor(MLObject):
+    '''The class for the Probabilistic Bayesian Neural Network model.'''
+    logger = Logger('PBNNPredictor').get_logger()
 
+    @logger_decorator(logger)
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator=False):
+        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator)
+    
+    def prior_trainable(self, kernel_size, bias_size=0, dtype=None):
+        n = kernel_size + bias_size
+        return tf_keras.Sequential([
+            tfp.layers.VariableLayer(n, dtype=dtype),
+            tfp.layers.DistributionLambda(lambda t: tfd.Independent(
+                tfd.Normal(loc=t, scale=1),
+                reinterpreted_batch_ndims=1)),
+        ])
+
+    def random_gaussian_initializer(self, shape, dtype):
+        n = int(shape / 2)
+        loc_norm = tf.random_normal_initializer(mean=0., stddev=0.1)
+        loc = tf.Variable(
+            initial_value=loc_norm(shape=(n,), dtype=dtype)
+        )
+        scale_norm = tf.random_normal_initializer(mean=-3., stddev=0.1)
+        scale = tf.Variable(
+            initial_value=scale_norm(shape=(n,), dtype=dtype)
+        )
+        return tf.concat([loc, scale], 0)
+    
+    # The posterior is modeled as n_weights independent Normal distribution with learnable parameters
+    def posterior_mean_field(self, kernel_size, bias_size=0, dtype=None):
+        n = kernel_size + bias_size
+        c = np.log(np.expm1(1.))
+        return tf_keras.Sequential([
+            tfp.layers.VariableLayer(2 * n, dtype=dtype, initializer=self.random_gaussian_initializer, trainable=True),
+            tfp.layers.DistributionLambda(lambda t: tfd.Independent(
+                tfd.Normal(loc=t[..., :n],
+                            scale=1e-5 + 0.001*tf.nn.softplus(c + t[..., n:])),
+                reinterpreted_batch_ndims=1)),
+        ])
+    
+    def normal_sp(self, params):
+        return tfd.Normal(loc=params[:,:len(self.y_cols)],\
+                      scale=1e-5 + 0.00001*tf_keras.backend.exp(params[:,len(self.y_cols):]))# both parameters are learnable
+
+    @logger_decorator(logger)
+    def create_model(self):
+        '''Builds the Bayesian Neural Network model.'''
+
+        self.nn_r = tf_keras.Sequential([
+            tf_keras.Input(shape=(len(self.x_cols), )),
+        ])
+
+        for units in list(self.units_for_layers):
+            self.nn_r.add(tfpl.DenseVariational(units, self.posterior_mean_field, self.prior_trainable, kl_weight=1/self.X_train.shape[0]))
+        self.nn_r.add(tfpl.DenseVariational(2*len(self.y_cols), self.posterior_mean_field, self.prior_trainable, kl_weight=1/self.X_train.shape[0]))
+        self.nn_r.add(tfpl.DistributionLambda(self.normal_sp))
+
+        if self.lr:
+            opt = tf_keras.optimizers.Adam(learning_rate=self.lr)
+        else:
+            opt = tf_keras.optimizers.Adam()
+
+        self.nn_r.compile(optimizer=opt,
+                      loss=self.combined_loss,
+                      metrics=['mae', 'accuracy'])
+    
+    @logger_decorator(logger)
+    def train(self):
+        '''Trains the model.'''
+        es = tf_keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', min_delta=0.002,
+                           patience=10, start_from_epoch=190)
+        mc = tf_keras.callbacks.ModelCheckpoint(self.model_path,
+                             monitor='val_loss', mode='min', verbose=0, save_best_only=True)
+        
+        call_lr = tf_keras.callbacks.LearningRateScheduler(self.scheduler)
+        
+        callbacks = [self.custom_callback(self), call_lr]
+
+        if self.with_generator:
+            history = self.nn_r.fit(self.df_data, epochs=self.epochs, batch_size=32, validation_split=0.3)
+        else:
+            history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs, validation_split=0.3,
+                      callbacks=callbacks)
+        
+
+        # pred_train = nn_r.predict(self.X_train)
+        # pred_test = nn_r.predict(self.X_test)
+        # idx = 0
+        # text = ''
+        # for col in self.y_cols:
+        #     mae_tr = MAE(self.y_train.iloc[:, idx], pred_train[:, idx])
+        #     self.mae_tr_list.append(mae_tr)
+        #     mae_te = MAE(self.y_test.iloc[:, idx], pred_test[:, idx])
+        #     diff_i = (self.y_test.iloc[:, idx] - pred_test[:, idx])
+        #     mean_diff_i = (diff_i).mean()
+        #     meae_tr = MeAE(self.y_train.iloc[:, idx], pred_train[:, idx])
+        #     meae_te = MeAE(self.y_test.iloc[:, idx], pred_test[:, idx])
+        #     median_diff_i = (diff_i).median()
+        #     text += f"MAE_train_{col} : {mae_tr:0.5f}\t" + \
+        #             f"MAE_test_{col} : {mae_te:0.5f}\t" + \
+        #             f"mean_diff_test_pred_{col} : {mean_diff_i:0.5f}\t" + \
+        #             f"MeAE_train_{col} {meae_tr:0.5f}\t" + \
+        #             f"MeAE_test_{col} {meae_te:0.5f}\t" + \
+        #             f"median_diff_test_pred_{col} {median_diff_i:0.5f}\n"
+        #     idx = idx + 1
+
+        # nn_r.save(self.model_path)
+        with open(os.path.join(os.path.dirname(self.model_path), 'params.txt'), "w") as params_file:
+            for key, value in self.params.items():
+                params_file.write(f'{key} : {value}\n')
+        # with open(os.path.join(os.path.dirname(self.model_path), 'performance.txt'), "w") as text_file:
+        #     text_file.write(text)
+        # self.text = text
+        return history
+    
+    @logger_decorator(logger)
+    def predict(self, start = 0, end = -1, runs=250, mask_column='index', write_bkg=True, write_frg=False, batch_size=1, save_predictions_plot=True, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
+        '''Predicts the output data.
+        
+        Parameters:
+        ----------
+            start (int): The starting index. Default is 0.
+            end (int): The ending index. Defualt is -1.'''
+        df_data = Data.get_masked_dataframe(data=self.df_data, start=start, stop=end, column=mask_column, reset_index=False)
+        if df_data.empty:
+            return pd.DataFrame(), pd.DataFrame()
+        scaled_data = self.scaler.transform(df_data[self.x_cols])
+        if batch_size > 1:
+            preds = np.array([])
+            for i in range(0, len(scaled_data), batch_size):
+                preds = np.append(preds, self.nn_r.predict(scaled_data[i:i + batch_size]))
+        else:
+            preds = tf.zeros([runs, len(scaled_data), len(self.y_cols)]).numpy()
+            for i in tqdm(range(0, runs)):
+                preds[i,:] = self.nn_r.predict(scaled_data, verbose=0)
+                
+        preds_std = tf.experimental.numpy.std( preds, axis=0, keepdims=None ).numpy()
+        preds_mean = tf.experimental.numpy.mean( preds, axis=0, dtype=None, out=None, keepdims=None ).numpy()
+        y_pred = pd.DataFrame(preds_mean, columns=self.y_cols)
+        y_std = pd.DataFrame(preds_std, columns=[f'{col}_std' for col in self.y_cols])
+        y_pred = pd.concat([y_pred, y_std], axis=1)
+        y_pred['datetime'] = df_data['datetime'].values
+        y_pred.reset_index(drop=True, inplace=True)
+        df_ori = df_data[self.y_cols].reset_index(drop=True)
+        df_ori['datetime'] = df_data['datetime'].values
+        df_ori.reset_index(drop=True, inplace=True)
+        if write_bkg:
+            path = os.path.join(os.path.dirname(self.model_path))
+            if not self.model_id:
+                path = os.path.dirname(self.model_path)
+            File.write_df_on_file(y_pred, os.path.join(path, 'bkg'))
+            gc.collect()
+
+            if write_frg:
+                path = os.path.join(os.path.dirname(self.model_path))
+                if not self.model_id:
+                    path = os.path.dirname(self.model_path)
+                File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
+        if save_predictions_plot:
+            y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(self.y_pred_cols, self.y_cols)}).drop(columns=self.y_cols)
+            tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime'] + support_variables], y_pred)
+            self.save_predictions_plots(tiles_df, start, end, self.params)
+        return df_ori, y_pred
+
+class BNNPredictor(MLObject):
+    '''The class for the Bayesian Neural Network model.'''
+    logger = Logger('BNNPredictor').get_logger()
+
+    @logger_decorator(logger)
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator=False):
+        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator)
+    
+    @logger_decorator(logger)
+    def create_model(self):
+        '''Builds the Bayesian Neural Network model.'''
+
+        self.nn_r = tf_keras.Sequential([
+            tf_keras.Input(shape=(len(self.x_cols), )),
+        ])
+
+        for units in list(self.units_for_layers):
+            self.nn_r.add(tf_keras.layers.Dense(units, activation='relu'))
+        self.nn_r.add(tf_keras.layers.Dense(2*len(self.y_cols), activation='linear'))
+
+        self.nn_r.compile(optimizer=tf_keras.optimizers.Adam(),
+                      loss=self.negative_log_likelihood,
+                      metrics=[self.mae, 'accuracy'])
+    
+    @logger_decorator(logger)
+    def train(self):
+        '''Trains the model.'''
+        es = tf_keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', min_delta=0.002,
+                           patience=10, start_from_epoch=190)
+        mc = tf_keras.callbacks.ModelCheckpoint(self.model_path,
+                             monitor='val_loss', mode='min', verbose=0, save_best_only=True)
+        
+        if not self.lr:
+            callbacks = [self.custom_callback(self)]
+        else:
+            call_lr = tf_keras.callbacks.LearningRateScheduler(self.scheduler)
+            callbacks = [self.custom_callback(self)]
+
+        if self.with_generator:
+            history = self.nn_r.fit(self.df_data, epochs=self.epochs, batch_size=32, validation_split=0.3)
+        else:
+            history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs, validation_split=0.3,
+                      callbacks=callbacks)
+        
+
+        # pred_train = nn_r.predict(self.X_train)
+        # pred_test = nn_r.predict(self.X_test)
+        # idx = 0
+        # text = ''
+        # for col in self.y_cols:
+        #     mae_tr = MAE(self.y_train.iloc[:, idx], pred_train[:, idx])
+        #     self.mae_tr_list.append(mae_tr)
+        #     mae_te = MAE(self.y_test.iloc[:, idx], pred_test[:, idx])
+        #     diff_i = (self.y_test.iloc[:, idx] - pred_test[:, idx])
+        #     mean_diff_i = (diff_i).mean()
+        #     meae_tr = MeAE(self.y_train.iloc[:, idx], pred_train[:, idx])
+        #     meae_te = MeAE(self.y_test.iloc[:, idx], pred_test[:, idx])
+        #     median_diff_i = (diff_i).median()
+        #     text += f"MAE_train_{col} : {mae_tr:0.5f}\t" + \
+        #             f"MAE_test_{col} : {mae_te:0.5f}\t" + \
+        #             f"mean_diff_test_pred_{col} : {mean_diff_i:0.5f}\t" + \
+        #             f"MeAE_train_{col} {meae_tr:0.5f}\t" + \
+        #             f"MeAE_test_{col} {meae_te:0.5f}\t" + \
+        #             f"median_diff_test_pred_{col} {median_diff_i:0.5f}\n"
+        #     idx = idx + 1
+
+        # nn_r.save(self.model_path)
+        with open(os.path.join(os.path.dirname(self.model_path), 'params.txt'), "w") as params_file:
+            for key, value in self.params.items():
+                params_file.write(f'{key} : {value}\n')
+        # with open(os.path.join(os.path.dirname(self.model_path), 'performance.txt'), "w") as text_file:
+        #     text_file.write(text)
+        # self.text = text
+        return history
+    
+    @logger_decorator(logger)
+    def predict(self, start = 0, end = -1, mask_column='index', write_bkg=True, write_frg=False, batch_size=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
+        '''Predicts the output data.
+        
+        Parameters:
+        ----------
+            start (int): The starting index. Default is 0.
+            end (int): The ending index. Defualt is -1.'''
+        df_data = Data.get_masked_dataframe(data=self.df_data, start=start, stop=end, column=mask_column, reset_index=False)
+        if df_data.empty:
+            return pd.DataFrame(), pd.DataFrame()
+        scaled_data = self.scaler.transform(df_data[self.x_cols])
+        if batch_size > 1:
+            y_pred = np.array([])
+            for i in range(0, len(scaled_data), batch_size):
+                y_pred = np.append(y_pred, self.nn_r.predict(scaled_data[i:i + batch_size]))
+        else:
+            y_pred = self.nn_r.predict(scaled_data)
+        mean_pred = y_pred[:, :len(self.y_cols)]
+        log_var_pred = y_pred[:, len(self.y_cols):]
+        std_pred = np.sqrt(np.exp(log_var_pred))
+        y_pred = pd.DataFrame(mean_pred, columns=self.y_cols)
+        y_std = pd.DataFrame(std_pred, columns=[f'{col}_std' for col in self.y_cols])
+        y_pred = pd.concat([y_pred, y_std], axis=1)
+        y_pred['datetime'] = df_data['datetime'].values
+        y_pred.reset_index(drop=True, inplace=True)
+        df_ori = df_data[self.y_cols].reset_index(drop=True)
+        df_ori['datetime'] = df_data['datetime'].values
+        df_ori.reset_index(drop=True, inplace=True)
+        if write_bkg:
+            path = os.path.join(os.path.dirname(self.model_path))
+            if not self.model_id:
+                path = os.path.dirname(self.model_path)
+            File.write_df_on_file(y_pred, os.path.join(path, 'bkg'))
+            gc.collect()
+
+            if write_frg:
+                path = os.path.join(os.path.dirname(self.model_path))
+                if not self.model_id:
+                    path = os.path.dirname(self.model_path)
+                File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
+        if save_predictions_plot:
+            y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(self.y_pred_cols, self.y_cols)}).drop(columns=self.y_cols)
+            tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime'] + support_variables], y_pred)
+            self.save_predictions_plots(tiles_df, start, end, self.params)
+        return df_ori, y_pred
 
 class RNNPredictor(FFNNPredictor):
     logger = Logger('RNN').get_logger()
 
-    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, timestep):
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols):
         super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols)
-        self.timesteps = timestep
+
+    @logger_decorator(logger)
+    def reshape_data(self, x, y):
+        '''Reshapes the data for the RNN model.'''
+        y = y[self.params['timesteps']:]
+        x = np.array([x[i:i + self.params['timesteps']] for i in np.arange(len(x) - self.params['timesteps'])])
+        x = np.reshape(x, (x.shape[0], x.shape[1], x.shape[2]))
+        return x, y
 
     @logger_decorator(logger)
     def create_model(self):
         '''Creates the model.'''
-        self.y = self.df_data[self.y_cols].astype('float32')
-        self.X = self.df_data[self.x_cols].astype('float32')
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X.values, self.y.values, test_size=0.25, random_state=0, shuffle=True)
-
-        self.set_scaler(self.X_train)
-        self.X_train = self.scaler.transform(self.X_train)
-        self.X_test = self.scaler.transform(self.X_test)
-        self.y_train, self.y_test = self.y_train[self.timesteps:], self.y_test[self.timesteps:]
-        X_train = np.array([self.X_train[i:i + self.timesteps] for i in np.arange(len(self.X_train) - self.timesteps)])
-        self.X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], X_train.shape[2]))
-        X_test = np.array([self.X_test[i:i + self.timesteps] for i in np.arange(len(self.X_test) - self.timesteps)])
-        self.X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], X_test.shape[2]))
         
         inputs = Input(shape=(None, len(self.x_cols)))
         hidden = LSTM(90)(inputs)
@@ -456,7 +713,7 @@ class RNNPredictor(FFNNPredictor):
         outputs = Dense(len(self.y_cols), activation='linear')(hidden)
 
         self.nn_r = Model(inputs=[inputs], outputs=outputs)
-        plot_model(self.nn_r, to_file=os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'schema.png'),
+        plot_model(self.nn_r, to_file=os.path.join(os.path.dirname(self.model_path), 'schema.png'),
                    show_shapes=True, show_layer_names=True, rankdir='TB')
 
         if self.opt_name == 'Adam':
@@ -473,6 +730,8 @@ class RNNPredictor(FFNNPredictor):
     @logger_decorator(logger)
     def train(self):
         '''Trains the model.'''
+        self.X_train, self.y_train = self.reshape_data(self.X_train, self.y_train)
+        self.X_test, self.y_test = self.reshape_data(self.X_test, self.y_test)
         
         es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.01,
                            patience=10, start_from_epoch=80)
@@ -512,16 +771,16 @@ class RNNPredictor(FFNNPredictor):
 
         nn_r.save(self.model_path)
         self.nn_r = nn_r
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'params.txt'), "w") as params_file:
+        with open(os.path.join(os.path.dirname(self.model_path), 'params.txt'), "w") as params_file:
             for key, value in self.params.items():
                 params_file.write(f'{key} : {value}\n')
-        with open(os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id), 'performance.txt'), "w") as text_file:
+        with open(os.path.join(os.path.dirname(self.model_path), 'performance.txt'), "w") as text_file:
             text_file.write(text)
         self.text = text
         return history
 
-    # @logger_decorator(logger)
-    def predict(self, start = 0, end = -1, write=True, batched=False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    @logger_decorator(logger)
+    def predict(self, start = 0, end = -1, write_bkg=True, write_frg=False, batch_size=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
@@ -530,13 +789,15 @@ class RNNPredictor(FFNNPredictor):
             end (int): The ending index. (Defualt is -1).
             write (bool): If the predicted and original dataset will be written in a file. (Defualt is True)
             batched (bool): If the dataset will be modeled in batch. (Defualt is False)'''
-        data_to_be_scaled = self.df_data[self.x_cols][start:end]
-        data = self.scaler.transform(data_to_be_scaled)
-        data = np.array([data[i:i + self.timesteps] for i in np.arange(len(data) - self.timesteps)])
+        df_data = Data.get_masked_dataframe(data=self.df_data, start=start, stop=end, reset_index=False)
+        if df_data.empty:
+            return pd.DataFrame(), pd.DataFrame()
+        data = self.scaler.transform(df_data)
+        data = np.array([data[i:i + self.params['timesteps']] for i in np.arange(len(data) - self.params['timesteps'])])
         data = np.reshape(data, (data.shape[0], data.shape[1], data.shape[2]))
-        if batched:
+        if batch_size > 1:
             pred_x_tot = np.array([])
-            batch_size = len(data)//self.timesteps
+            batch_size = len(data)//self.params['timesteps']
             for i in range(0, len(data), batch_size):
                 pred_x_tot = np.append(pred_x_tot, self.nn_r.predict(data[i:i + batch_size]))
             pred_x_tot = np.reshape(pred_x_tot, (len(data), len(self.y_cols)))
@@ -551,12 +812,22 @@ class RNNPredictor(FFNNPredictor):
 
         df_ori.reset_index(drop=True, inplace=True)
         y_pred.reset_index(drop=True, inplace=True)
-        if write:
-            path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, str(self.model_id))
+        if write_bkg:
+            path = os.path.join(os.path.dirname(self.model_path))
             if not self.model_id:
                 path = os.path.dirname(self.model_path)
-            File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
             File.write_df_on_file(y_pred, os.path.join(path, 'bkg'))
+            gc.collect()
+
+            if write_frg:
+                path = os.path.join(os.path.dirname(self.model_path))
+                if not self.model_id:
+                    path = os.path.dirname(self.model_path)
+                File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
+        if save_predictions_plot:
+            y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(self.y_pred_cols, self.y_cols)}).drop(columns=self.y_cols)
+            tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime'] + support_variables], y_pred)
+            self.save_predictions_plots(tiles_df, start, end, self.params)
         return df_ori, y_pred
         
 
@@ -669,4 +940,3 @@ if __name__ == '__main__':
     y_smooth_cols = ['top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth']
     x_cols = [col for col in inputs_outputs_df.columns if col not in y_cols + y_smooth_cols + ['datetime']]
     MODEL_PATH = './data/model_nn/0/model.keras'
-    get_feature_importance(MODEL_PATH, inputs_outputs_df, y_cols, x_cols, num_sample=10, show=True)

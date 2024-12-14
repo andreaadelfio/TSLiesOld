@@ -21,7 +21,7 @@ from modules.solar import SunMonitor
 from modules.utils import Data, File, Time, Logger, logger_decorator
 from modules.config import INPUTS_OUTPUTS_FILE_PATH
 
-from scripts.main_config import h_names
+from scripts.main_config import h_names, y_cols, y_cols_raw, units, x_cols
 
 logger = Logger('Main Dataset').get_logger()
 
@@ -32,6 +32,34 @@ def get_tiles_signal_df():
     print('Catalog...', end='')
     cr = CatalogReader(h_names=h_names, start=0, end=-1)
     tile_signal_df = cr.get_signal_df_from_catalog()
+    # Plotter(df = tile_signal_df, label = 'Inputs').df_plot_tiles(x_col = 'datetime',
+    #                                                                 excluded_cols = ['MET'],
+    #                                                                 marker = ',',
+    #                                                                 smoothing_key='smooth',
+    #                                                                 show = True)
+    # print(tile_signal_df.head())
+    # print(tile_signal_df.tail())
+    # cr = CatalogReader(h_names=h_names, data_dir='data/LAT_ACD/Feb24-Jul24 output runs', start=0, end=-1)
+    # tile_signal_df1 = cr.get_signal_df_from_catalog()
+    # tile_signal_df1 = Data.get_masked_dataframe(data=tile_signal_df1, 
+    #                                             start=tile_signal_df['datetime'].iloc[0],
+    #                                             stop=tile_signal_df['datetime'].iloc[-1],
+    #                                             reset_index=True)
+    # tile_signal_df = tile_signal_df.merge(tile_signal_df1, on='datetime', suffixes=('', '_df1')).reset_index(drop=True)
+    # print(tile_signal_df.head())
+    # print(tile_signal_df.tail())
+    # for col in y_cols_raw:
+    #     tile_signal_df[col] = tile_signal_df[col] - tile_signal_df[f'{col}_df1']
+    # Plotter(df = tile_signal_df, label = 'Inputs').df_plot_tiles(x_col = 'datetime',
+    #                                                                 excluded_cols = ['MET'],
+    #                                                                 marker = ',',
+    #                                                                 smoothing_key='smooth',
+    #                                                                 show = True)
+    # for col in y_cols_raw:
+    #     tile_signal_df[col] = tile_signal_df[col] - tile_signal_df1[col]
+    # print(tile_signal_df.head())
+    # print(tile_signal_df.tail())
+
     runs_times = cr.get_runs_times()
     weeks_list = Time.get_week_from_datetime(runs_times)
     print(' done')
@@ -77,8 +105,8 @@ def get_inputs_outputs_df():
         inputs_outputs = Data.merge_dfs(tile_signal_df, sc_params_df)
         solar_signal_df = get_solar_signal_df(week)
         inputs_outputs = Data.merge_dfs(inputs_outputs, solar_signal_df)
-        inputs_outputs['SOLAR_a_EARTH_OCCULTED'] = (1 - inputs_outputs['SUN_IS_EARTH_OCCULTED']) * inputs_outputs['SOLAR_a']
-        inputs_outputs['SOLAR_b_EARTH_OCCULTED'] = (1 - inputs_outputs['SUN_IS_EARTH_OCCULTED']) * inputs_outputs['SOLAR_b']
+        inputs_outputs['GOES_XRSA_HARD_EARTH_OCCULTED'] = (1 - inputs_outputs['SUN_IS_EARTH_OCCULTED']) * inputs_outputs['GOES_XRSA_HARD']
+        inputs_outputs['GOES_XRSB_SOFT_EARTH_OCCULTED'] = (1 - inputs_outputs['SUN_IS_EARTH_OCCULTED']) * inputs_outputs['GOES_XRSB_SOFT']
 
         # Plotter(df = inputs_outputs, label = 'Inputs').df_plot_tiles(x_col = 'datetime',
         #                                                                 excluded_cols = [col for col in inputs_outputs.columns if col not in ['Xpos', 'SOLAR', 'SUN_IS_OCCULTED']],
@@ -95,15 +123,18 @@ def get_inputs_outputs_df():
 # MARK: Main
 if __name__ == '__main__':
     # inputs_outputs_df = get_inputs_outputs_df()
-    inputs_outputs_df = File.read_dfs_from_weekly_pk_folder(start=822, stop=823)
+    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=1000)
     inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
-                                                  start='2024-03-10 12:00:00',
-                                                  stop='2024-03-10 12:40:00')
+                                                  start='2024-06-20 22:35:00',
+                                                  stop='2024-06-20 23:40:00')
 
-
-
-    Plotter(df = inputs_outputs_df[[ 'SUN_IS_EARTH_OCCULTED', 'top', 'Xpos', 'Xneg', 'Ypos', 'Yneg', 'top_smooth', 'Xpos_smooth', 'Xneg_smooth', 'Ypos_smooth', 'Yneg_smooth', 'SOLAR_a', 'SOLAR_b', 'datetime', 'MET']], label = 'Outputs').df_plot_tiles(x_col ='MET', top_x_col='datetime',  
-                                                                     excluded_cols = ['MET', 'datetime', 'SOLAR_a_EARTH_OCCULTED', 'SOLAR_b_EARTH_OCCULTED', 'TIME_FROM_SAA'],
-                                                                     marker = ',', smoothing_key='smooth',
-                                                                     show = False)
+    Plotter(df = inputs_outputs_df[['GOES_XRSA_HARD', 'GOES_XRSB_SOFT', 'MET', 'datetime']], label = 'Outputs').df_plot_tiles(
+                                                    y_cols=y_cols,
+                                                    x_col ='MET',
+                                                    top_x_col='datetime',
+                                                    excluded_cols = y_cols_raw + ['SUN_IS_EARTH_OCCULTED', 'MET', 'datetime', 'TIME_FROM_SAA', 'SAA_EXIT', 'GOES_XRSA_HARD_EARTH_OCCULTED', 'GOES_XRSB_SOFT_EARTH_OCCULTED'],
+                                                    init_marker=',',
+                                                    smoothing_key='smooth',
+                                                    save = True,
+                                                    units=units)
     Plotter.show()

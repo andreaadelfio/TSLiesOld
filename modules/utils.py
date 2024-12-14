@@ -11,9 +11,21 @@ import pandas as pd
 import numpy as np
 from scipy import fftpack
 try:
-    from modules.config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER, DIR, DATA_LATACD_FOLDER_NAME
+    from modules.config import INPUTS_OUTPUTS_FILE_PATH,\
+                                LOGGING_FOLDER_PATH,\
+                                LOGGING_FILE_NAME,\
+                                INPUTS_OUTPUTS_FOLDER,\
+                                DIR,\
+                                DATA_LATACD_FOLDER_NAME,\
+                                DATA_FOLDER_NAME
 except:
-    from config import INPUTS_OUTPUTS_FILE_PATH, LOGGING_FILE_PATH, INPUTS_OUTPUTS_FOLDER, DIR, DATA_LATACD_FOLDER_NAME
+    from config import INPUTS_OUTPUTS_FILE_PATH,\
+                                LOGGING_FOLDER_PATH,\
+                                LOGGING_FILE_NAME,\
+                                INPUTS_OUTPUTS_FOLDER,\
+                                DIR,\
+                                DATA_LATACD_FOLDER_NAME,\
+                                DATA_FOLDER_NAME
 
 class Logger():
     '''
@@ -21,7 +33,9 @@ class Logger():
 
     '''
     def __init__(self, logger_name: str,
-                 log_file_name: str = LOGGING_FILE_PATH,
+                 log_file_prefix: str = '',
+                 log_file_name: str = LOGGING_FILE_NAME,
+                 log_folder_path: str = LOGGING_FOLDER_PATH,
                  log_level: int = logging.DEBUG):
         '''
         Initializes a Logger object.
@@ -30,16 +44,22 @@ class Logger():
         ----------
             logger_name (str): The name of the logger.
             log_file_name (str): The name of the log file. 
-                                 Default is LOGGING_FILE_PATH from config.py.
+                                 Default is LOGGING_FILE_NAME from config.py.
+            log_folder_path (str): The path of the log folder.
+                                   Default is LOGGING_FOLDER_PATH from config.py.
             log_level (int): The log level. Default is logging.DEBUG.
 
         Returns:
         -------
             None
         '''
-        if not os.path.exists(log_file_name):
-            os.makedirs(os.path.dirname(log_file_name), exist_ok=True)
-        self.log_file_name = log_file_name
+        if log_folder_path != LOGGING_FOLDER_PATH:
+            log_folder_path = os.path.join(DIR, log_folder_path)
+        if not os.path.exists(log_folder_path):
+            os.makedirs(log_folder_path, exist_ok=True)
+        if log_file_prefix:
+            log_file_prefix = f'{log_file_prefix}_'
+        self.log_file_name = os.path.join(log_folder_path, f'{log_file_prefix}{log_file_name}')
         self.log_level = log_level
         self.logger_name = logger_name
         self.logger = logging.getLogger(self.logger_name)
@@ -200,7 +220,7 @@ class Data():
 
     @logger_decorator(logger)
     @staticmethod
-    def get_masked_dataframe(start, stop, data, column='datetime', reset_index=False) -> pd.DataFrame:
+    def get_masked_dataframe(data, start, stop, column='datetime', reset_index=False) -> pd.DataFrame:
         '''
         Returns the masked data within the specified time range.
 
@@ -215,9 +235,10 @@ class Data():
         -------
             DataFrame: The masked data within the specified time range.
         '''
-        if column == 'index':
+        mask = None
+        if isinstance(start, int) and isinstance(stop, int) and column == 'index':
             mask = (data.index >= start) & (data.index <= stop)
-        else:
+        elif isinstance(start, str) and isinstance(stop, str):
             mask = (data[column] >= start) & (data[column] <= stop)
         masked_data = data[mask].reset_index(drop=True) if reset_index else data[mask]
         return pd.DataFrame(masked_data)
@@ -444,8 +465,7 @@ class File:
         return merged_dfs
 
     @logger_decorator(logger)
-    @staticmethod
-    def read_dfs_from_weekly_pk_folder(folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
+    def read_dfs_from_weekly_pk_folder(self, folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
         '''
         Read the dataframe from pickle files in a folder.
 
@@ -458,7 +478,10 @@ class File:
         -------
             DataFrame: The dataframe read from the file.
         '''
+        if folder_path != INPUTS_OUTPUTS_FOLDER:
+            folder_path = os.path.join(DATA_FOLDER_NAME, folder_path)
         folder_path = os.path.join(folder_path, 'pk')
+        self.logger.info('Reading from: %s.', folder_path)
         merged_dfs: pd.DataFrame = None
         if os.path.exists(folder_path):
             dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
@@ -467,6 +490,67 @@ class File:
             dfs = [pd.read_pickle(file)[cols_list] if cols_list else pd.read_pickle(file) for file in dir_list]
             merged_dfs = pd.concat(dfs, ignore_index=True).drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug
         return merged_dfs
+
+    # # @staticmethod
+    # @logger_decorator(logger)
+    # def read_dfs_from_weekly_csv_folder_dask(self, folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
+    #     '''
+    #     Read the dataframe from csv files in a folder.
+
+    #     Parameters:
+    #     ----------
+    #         folder_path (str, optional): The name of the folder to read the dataframe from.
+    #                                   Defaults to INPUTS_OUTPUTS_FOLDER.
+
+    #     Returns:
+    #     -------
+    #         DataFrame: The dataframe read from the file.
+    #     '''
+    #     if folder_path != INPUTS_OUTPUTS_FOLDER:
+    #         folder_path = os.path.join(DATA_FOLDER_NAME, folder_path)
+
+    #     folder_path = os.path.join(folder_path, 'csv')
+    #     self.logger.info('Reading from: %s.', folder_path)
+    #     if not os.path.exists(folder_path):
+    #         return None
+    #     dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
+    #         if file.endswith('.csv') and start <= int(file.split('_w')[-1].split('.')[0]) <= stop]
+    #     dir_list = sorted(dir_list, key=custom_sorter)
+    #     dfs = dask.dataframe.read_csv(dir_list, assume_missing=True)[cols_list] if cols_list else dask.dataframe.read_csv(dir_list, assume_missing=True)
+    #     dfs = dfs.drop_duplicates('MET') # patch, trovare sorgente del bug: perché ci sono duplicati?
+    #     dfs = dfs.repartition(npartitions=1000)
+    #     return dfs # patch, trovare sorgente del bug: perché ci sono duplicati?
+
+    # # @staticmethod
+    # @logger_decorator(logger)
+    # def read_dfs_from_weekly_pk_folder_dask(self, folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
+    #     '''
+    #     Read the dataframe from pickle files in a folder.
+
+    #     Parameters:
+    #     ----------
+    #         folder_path (str, optional): The name of the folder to read the dataframe from.
+    #                                   Defaults to INPUTS_OUTPUTS_FOLDER.
+
+    #     Returns:
+    #     -------
+    #         DataFrame: The dataframe read from the file.
+    #     '''
+    #     if folder_path != INPUTS_OUTPUTS_FOLDER:
+    #         folder_path = os.path.join(DATA_FOLDER_NAME, folder_path)
+
+    #     folder_path = os.path.join(folder_path, 'pk')
+    #     merged_dfs: dask.dataframe.DataFrame = None
+    #     self.logger.info('Reading from: %s.', folder_path)
+    #     if os.path.exists(folder_path):
+    #         dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
+    #             if file.endswith('.pk') and start <= int(file.split('_w')[-1].split('.')[0]) <= stop]
+    #         dir_list = sorted(dir_list, key=custom_sorter)
+    #         dfs = [dask.dataframe.from_pandas(pd.read_pickle(file)[cols_list], npartitions=100) if cols_list else dask.dataframe.from_pandas(pd.read_pickle(file), npartitions=100) for file in dir_list]
+    #         merged_dfs = dask.dataframe.concat(dfs)
+    #         print('after concat')
+    #         merged_dfs = merged_dfs.drop_duplicates('MET')  # patch, trovare sorgente del bug
+    #     return merged_dfs
 
     @logger_decorator(logger)
     @staticmethod
@@ -483,6 +567,8 @@ class File:
         -------
             DataFrame: The dataframe read from the file.
         '''
+        if folder_path != INPUTS_OUTPUTS_FOLDER:
+            folder_path = os.path.join(DATA_FOLDER_NAME, folder_path)
         folder_path = os.path.join(folder_path, 'csv')
         if os.path.exists(folder_path):
             dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.csv')]

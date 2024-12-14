@@ -34,6 +34,7 @@ class SunMonitor:
         files_to_fetch = {}
         files_list = []
         for i, url in enumerate(list(result_goes[0]['url'])):
+            print(url)
             filename = url.split('/')[-1]
             path = os.path.join(SOLAR_FOLDER_NAME, filename)
             if os.path.exists(path):
@@ -69,7 +70,7 @@ class SunMonitor:
             df_goes['datetime'] = Time.remove_milliseconds_from_datetime(df_goes['datetime'])
             dfs.append(df_goes)
         df_mean = pd.concat(dfs).groupby('datetime')[['xrsa', 'xrsb']].mean().reset_index()
-        df_mean.columns = ['datetime', 'SOLAR_a', 'SOLAR_b']
+        df_mean.columns = ['datetime', 'GOES_XRSA_HARD', 'GOES_XRSB_SOFT']
         return df_mean
 
 
