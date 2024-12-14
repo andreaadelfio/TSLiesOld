@@ -237,25 +237,17 @@ class ACDReconRates:
             dict_np = ROOT.RDataFrame(myTree).AsNumpy() # pylint: disable=maybe-no-member
             df = pd.DataFrame(dict_np)
             # df.to_csv('test.csv')
-
             notnull = df['acdE_acdtile'].apply(lambda x: any(x))
-            df = df[notnull].reset_index(drop=True)
+            df = df[notnull]#.reset_index(drop=True)
             if 'gltGemEngine' in df.columns:
-                df = df[df['gltGemEngine'] != 3].reset_index(drop=True)
+                df = df[df['gltGemEngine'] != 3]#.reset_index(drop=True)
 
+            df.drop(columns=['gltGemSummary', 'gltGemEngine'], inplace=True)
             time0, time_last = df['time'].min(), df['time'].max()
             n_bins = int((time_last - time0) / binning)
             bin_edges = np.linspace(time0, time_last, n_bins+1)
             bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
             return_df = pd.DataFrame(bin_centers, columns=['MET'])
-
-            # print('start')
-            # import time
-            # start = time.time()
-            # acdE_acdtile = df['acdE_acdtile'].apply(lambda x: x[i] for i in range(89)).values.T
-            acdE_acdtile = np.array([[i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], i[11], i[12], i[13], i[14], i[15], i[16], i[17], i[18], i[19], i[20], i[21], i[22], i[23], i[24], i[25], i[26], i[27], i[28], i[29], i[30], i[31], i[32], i[33], i[34], i[35], i[36], i[37], i[38], i[39], i[40], i[41], i[42], i[43], i[44], i[45], i[46], i[47], i[48], i[49], i[50], i[51], i[52], i[53], i[54], i[55], i[56], i[57], i[58], i[59], i[60], i[61], i[62], i[63], i[64], i[65], i[66], i[67], i[68], i[69], i[70], i[71], i[72], i[73], i[74], i[75], i[76], i[77], i[78], i[79], i[80], i[81], i[82], i[83], i[84], i[85], i[86], i[87], i[88]] for i in df['acdE_acdtile'].values]).T
-            # print(time.time() - start)
-            # print(acdE_acdtile)
             
             for face, tiles in tiles_faces.items():
                 face_rates = np.zeros(n_bins)
@@ -263,7 +255,8 @@ class ACDReconRates:
                 # face_rates_high = np.zeros(n_bins)
                 
                 for tile in range(tiles[0], tiles[-1]):
-                    times_with_energy = df['time'][acdE_acdtile[tile] > 0].values
+                    acdE_acdtile = np.array([i[tile] for i in df['acdE_acdtile'].values]).T
+                    times_with_energy = df['time'][acdE_acdtile > 0].values
                     # times_with_energy_low = df['time'][(acdE_acdtile[tile] > 0) & (acdE_acdtile[tile] < 5)].values
                     # times_with_energy_high = df['time'][acdE_acdtile[tile] > 5].values
                     
@@ -345,5 +338,5 @@ if __name__ == '__main__':
     arr = ACDReconRates()
     arr.del_txt(DATA_LATACD_INPUT_FOLDER_NAME)
     arr.fill_dictSizes(fileSizes)
-    arr.do_work_parallel(1, workers=1)
+    arr.do_work_parallel(1, workers=4)
     print("... done, bye bye")

@@ -18,7 +18,7 @@ from modules.utils import Data, File
 from modules.plotter import Plotter
 from modules.trigger import Trigger
 
-from scripts.main_config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded
+from scripts.main_config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded, units
 
 
 def run_trigger_rnn(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):
@@ -44,16 +44,21 @@ def run_trigger_ffnn(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):
         nn.set_model(model_path='data/background_prediction/0/model.keras')
         start, end = 0, -1
         _, y_pred = nn.predict(start, end, write_bkg=True, batch_size=1, save_plot=False)
+    
     y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(y_cols_pred, y_cols)}).drop(columns=y_cols)
     tiles_df = Data.merge_dfs(inputs_outputs, y_pred)
-    # tiles_df = Data.get_masked_dataframe(data=tiles_df,
-    #                                               start='2024-03-21 23:45:22',
-    #                                               stop='2024-05-21 23:59:28').reset_index(drop=True)
-    # Plotter(df = tiles_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in inputs_outputs_df.columns if col not in y_cols_pred + y_cols + ['Xpos', 'SOLAR', 'SUN_IS_OCCULTED']], marker = ',', show = True, smoothing_key='pred')
-    merged_anomalies_list = Trigger().trigger(tiles_df, y_cols_raw, y_cols_pred, threshold=3)
-    # merged_anomalies_list = {"2701": {"top": {"changepoint": 2701, "stopping_time": 3164, "start_datetime": "2024-02-09 13:46:03", "stop_datetime": "2024-02-09 13:46:03", "significance": 0.008554283939547276, "max_significance": 0.010720111565244583, "sigma_val": 0.002848191337849441, "threshold": 3, "max_point": 2924}}, "38514": {"top": {"changepoint": 38514, "stopping_time": 39901, "start_datetime": "2024-02-10 03:59:00", "stop_datetime": "2024-02-10 03:59:00", "significance": 0.01022438562041527, "max_significance": 0.013547062336562913, "sigma_val": 0.002848191337849441, "threshold": 3, "max_point": 39392}}}
-    support_vars = ['SOLAR_a_EARTH_OCCULTED']
-    Plotter(df = merged_anomalies_list).plot_anomalies(support_vars, tiles_df, y_cols_raw, y_cols_pred)
+    tiles_df = Data.get_masked_dataframe(data=tiles_df,
+                                                  start='2024-06-20 22:35:00',
+                                                  stop='2024-06-20 23:40:00', column='datetime').reset_index(drop=True)
+    for col in y_cols_raw:
+        Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred', units=units)
+    Plotter(df = tiles_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in inputs_outputs_df.columns if col not in y_cols_pred + y_cols_raw + ['GOES_XRSA_HARD_EARTH_OCCULTED']], marker = ',', show = True, smoothing_key='pred')
+    thresholds = {'top': 6, 'Xpos': 10, 'Ypos': 7, 'Xneg': 7, 'Yneg': 7}
+    merged_anomalies_list, triggs_df = Trigger().trigger(tiles_df, y_cols_raw, y_cols_pred, thresholds)
+    # merged_anomalies_list = {"0": {"top": {"changepoint": 0, "stopping_time": 1449902, "start_datetime": "2024-06-19 20:54:00", "stop_datetime": "2024-06-19 20:54:00", "significance": 0.013827112738508777, "max_significance": 0.013827112738508777, "sigma_val": 0.002631981979971562, "threshold": 5, "max_point": 134}}}
+    support_vars = ['GOES_XRSA_HARD_EARTH_OCCULTED']
+    tiles_df = Data.merge_dfs(tiles_df, triggs_df, on_column='datetime')
+    Plotter(df = merged_anomalies_list).plot_anomalies(support_vars, thresholds, tiles_df, y_cols_raw, y_cols_pred, show=False, units=units)
 
 def run_trigger_with_median(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):
     '''Runs the model'''
@@ -85,7 +90,7 @@ def run_trigger_with_median(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_c
 
 if __name__ == '__main__':
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
-    inputs_outputs_df = File.read_dfs_from_weekly_pk_folder(start=819, stop=825)
+    inputs_outputs_df = File.read_dfs_from_weekly_pk_folder(start=0, stop=1000)
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
     #                                               start='2024-02-08 05:30:22',
     #                                               stop='2024-09-11 09:15:28')

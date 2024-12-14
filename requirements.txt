@@ -3,8 +3,10 @@ matplotlib>=3.8
 pandas>=1.0
 scipy>=1.12
 scikit-learn>=1.4.1
-tensorflow==2.15
+tensorflow>=2.18
 astropy>=5.9
 wget>=3.2
 pydot>=2.0.0
 tqdm>=4.50
+tensorflow_probability
+tf_keras
