@@ -6,7 +6,8 @@ import os
 import pprint
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import matplotlib.dates as mdates
 import pandas as pd
 import numpy as np
 from scipy import fftpack
@@ -16,7 +17,7 @@ try:
                                 LOGGING_FILE_NAME,\
                                 INPUTS_OUTPUTS_FOLDER,\
                                 DIR,\
-                                DATA_LATACD_FOLDER_NAME,\
+                                DATA_LATACD_PROCESSED_FOLDER_NAME,\
                                 DATA_FOLDER_NAME
 except:
     from config import INPUTS_OUTPUTS_FILE_PATH,\
@@ -24,7 +25,7 @@ except:
                                 LOGGING_FILE_NAME,\
                                 INPUTS_OUTPUTS_FOLDER,\
                                 DIR,\
-                                DATA_LATACD_FOLDER_NAME,\
+                                DATA_LATACD_PROCESSED_FOLDER_NAME,\
                                 DATA_FOLDER_NAME
 
 class Logger():
@@ -114,7 +115,7 @@ class Time:
     '''
     logger = Logger('Time').get_logger()
 
-    fermi_ref_time = datetime(2001, 1, 1, 0, 0, 0)
+    fermi_ref_time = datetime(2001, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     fermi_launch_time = datetime(2008, 8, 7, 3, 35, 44)
 
     @staticmethod
@@ -146,6 +147,23 @@ class Time:
         for dt in datetime_list:
             print(dt)
         return [(dt - Time.fermi_ref_time).total_seconds() for dt in datetime_list]
+
+    @staticmethod
+    def date2yday(x):
+        """Convert matplotlib datenum to days since 2018-01-01."""
+        y = []
+        for dt in x:
+            y.append((mdates.num2date(dt) - Time.fermi_ref_time).total_seconds())
+        return y
+
+    @staticmethod
+    def yday2date(x):
+        """Return a matplotlib datenum for *x* days after 2018-01-01."""
+        y = []
+        for dt in x:
+            print(dt)
+            y.append((mdates.num2date(dt) + Time.fermi_ref_time).total_seconds())
+        return y
 
     @staticmethod
     def from_met_to_datetime_str(met_list: list) -> list:
@@ -237,6 +255,7 @@ class Data():
         '''
         mask = None
         if isinstance(start, int) and isinstance(stop, int) and column == 'index':
+            if stop == -1: stop = len(data)
             mask = (data.index >= start) & (data.index <= stop)
         elif isinstance(start, str) and isinstance(stop, str):
             mask = (data[column] >= start) & (data[column] <= stop)
@@ -617,4 +636,4 @@ class File:
                     # os.remove(file)
 
 if __name__ == '__main__':
-    File.check_integrity_runs_pk_folder(DATA_LATACD_FOLDER_NAME)
+    File.check_integrity_runs_pk_folder(DATA_LATACD_PROCESSED_FOLDER_NAME)

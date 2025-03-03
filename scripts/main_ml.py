@@ -95,7 +95,7 @@ def run_pbnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
     nn = PBNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, False)
     hyperparams_combinations = {
         'units_for_layers' : ([90, 100], [90], [70], [50]),
-        'epochs' : [5],
+        'epochs' : [30],
         'bs' : [1000],
         'do' : [0.02],
         'norm' : [0],
@@ -133,8 +133,8 @@ def run_bnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
     '''Runs the neural network model'''
     nn = BNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, False)
     hyperparams_combinations = {
-        'units_for_layers' : ([90, 100], [90], [70], [50]),
-        'epochs' : [5],
+        'units_for_layers' : ([90], [90], [70], [50]),
+        'epochs' : [50],
         'bs' : [1000],
         'do' : [0.02],
         'norm' : [0],
@@ -151,17 +151,17 @@ def run_bnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
         Plotter().plot_history(history)
         nn.update_summary()
         Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
-        for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
-                           ('2024-03-28 20:50:00', '2024-03-28 21:10:00'),
-                           ('2024-05-08 20:30:00', '2024-05-08 23:40:00'),
-                           ('2024-05-11 01:00:00', '2024-05-11 03:00:00'),
-                           ('2024-05-15 14:15:00', '2024-05-15 15:40:00'),
-                           ('2024-05-08 01:00:00', '2024-05-08 05:00:00'), 
-                           ('2024-06-20 22:35:00', '2024-06-20 23:40:00'), 
-                           ('2024-06-23 05:35:00', '2024-06-23 14:40:00'), 
-                           (str(inputs_outputs['datetime'].iloc[0]), str(inputs_outputs['datetime'].iloc[35000])),
-                           (str(inputs_outputs['datetime'].iloc[35000]), str(inputs_outputs['datetime'].iloc[43000]))]:
-            nn.predict(start=start, end=end, mask_column='datetime', write_bkg=False, save_predictions_plot=True, support_variables=['SOLAR_a'])
+        # for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
+        #                    ('2024-03-28 20:50:00', '2024-03-28 21:10:00'),
+        #                    ('2024-05-08 20:30:00', '2024-05-08 23:40:00'),
+        #                    ('2024-05-11 01:00:00', '2024-05-11 03:00:00'),
+        #                    ('2024-05-15 14:15:00', '2024-05-15 15:40:00'),
+        #                    ('2024-05-08 01:00:00', '2024-05-08 05:00:00'), 
+        #                    ('2024-06-20 22:35:00', '2024-06-20 23:40:00'), 
+        #                    ('2024-06-23 05:35:00', '2024-06-23 14:40:00'), 
+        #                    (str(inputs_outputs['datetime'].iloc[0]), str(inputs_outputs['datetime'].iloc[35000])),
+        #                    (str(inputs_outputs['datetime'].iloc[35000]), str(inputs_outputs['datetime'].iloc[43000]))]:
+        #     nn.predict(start=start, end=end, mask_column='datetime', write_bkg=False, save_predictions_plot=True, support_variables=['SOLAR_a'])
         # nn.predict(start=0, end=-1)
         # if history.history['loss'][-1] < 0.0040:
         #     get_feature_importance(nn.model_path, inputs_outputs, y_cols, x_cols, num_sample=10, show=False)
@@ -221,8 +221,8 @@ def run_median(inputs_outputs):
 ########### Main ############
 if __name__ == '__main__':
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
-    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder('inputs_outputs_old', start=819, stop=820)
-    Plotter(df=inputs_outputs_df).plot_correlation_matrix(show=False, save=True)
+    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder('inputs_outputs', start=0, stop=1000)
+    # Plotter(df=inputs_outputs_df).plot_correlation_matrix(show=False, save=True)
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
     #                                               start=0,
     #                                               stop=20,
@@ -233,9 +233,9 @@ if __name__ == '__main__':
 
 
     # run_pbnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
-    # run_bnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
+    run_bnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
     # run_rnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
-    run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
+    # run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
     # run_multimean_knn(inputs_outputs_df, y_cols, x_cols)
     # run_multimedian_knn(inputs_outputs_df, y_cols, x_cols)
     # run_median(inputs_outputs_df, y_cols)

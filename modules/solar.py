@@ -34,7 +34,6 @@ class SunMonitor:
         files_to_fetch = {}
         files_list = []
         for i, url in enumerate(list(result_goes[0]['url'])):
-            print(url)
             filename = url.split('/')[-1]
             path = os.path.join(SOLAR_FOLDER_NAME, filename)
             if os.path.exists(path):

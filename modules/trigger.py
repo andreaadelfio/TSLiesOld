@@ -165,22 +165,26 @@ class Trigger:
 
         return new_curve_list, global_max, time_offset
 
+    def trigger_face_z_score(self, signal, face, diff):
+        '''
+        Calculates the z-score of the signal and the offset of the change point.
+        '''
+        result = {f'{face}_significance': signal}
+        return result
+
+
     def trigger_face(self, signal, face, diff):
         '''
         From the original python implementation of
         FOCuS Poisson by Kester Ward (2021). All rights reserved.
         '''
-        result = {f'{face}_std': [], f'{face}_offset': [], f'{face}_significance': []}
+        result = {f'{face}_offset': [], f'{face}_significance': []}
         curve_list = []
-        std = np.std(signal)
         for T in tqdm(signal.index, desc=face):
-            # start_window, end_window = max(0, T-120), min(len(signal), T+120)
-            # std = np.std(signal[start_window:end_window])
             x_t = signal[T]
             if diff[T] > 60:
                 curve_list = []
             curve_list, global_max, offset = self.focus_step_quad(curve_list, x_t)
-            result[f'{face}_std'].append(std)
             result[f'{face}_offset'].append(offset)
             result[f'{face}_significance'].append(np.sqrt(2 * global_max))
         return result
@@ -207,12 +211,14 @@ class Trigger:
         diff = tiles_df['MET'].diff()
         pool = multiprocessing.Pool()
         results = []
-        for face, face_pred in zip(y_cols, y_pred_cols):
-            result = pool.apply_async(self.trigger_face, (tiles_df[face] - tiles_df[face_pred], face, diff))
+        for face in y_cols:
+            result = pool.apply_async(self.trigger_face_z_score, (tiles_df[f'{face}_norm'], face, diff))
+            # result = self.trigger_face(tiles_df[f'{face}_norm'], face, diff)
             results.append(result)
 
         for result in results:
             triggs_dict.update(result.get())
+            # triggs_dict.update(result)
         pool.close()
         pool.join()
 
@@ -222,8 +228,10 @@ class Trigger:
         # triggs_df.to_csv(os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'triggers.csv'), index=False)
         mask = False
         for face in y_cols:
-            mask |= triggs_df[f'{face}_significance'] > thresholds[face] * triggs_df[f'{face}_std']
+            mask |= triggs_df[f'{face}_significance'] > thresholds[face]
+
         triggs_df = triggs_df[mask]
+        # Plotter(df = triggs_df, label = 'Inputs and outputs').df_plot_tiles(y_cols=y_cols, x_col = 'datetime', init_marker = ',', show = True, smoothing_key='pred')
 
         count = 0
         anomalies_faces = {face: [] for face in y_cols}
@@ -231,13 +239,13 @@ class Trigger:
 
         for index, row in tqdm(triggs_df.iterrows(), total=len(triggs_df), desc='Identifying triggers'):
             for face in y_cols:
-                if row[f'{face}_significance'] > thresholds[face] * row[f'{face}_std']:
-                    changepoint, stopping_time = row[f'{face}_offset']+index+1, index
+                if row[f'{face}_significance'] > thresholds[face]:
+                    changepoint, stopping_time = index+1, index
                     significance = row[f'{face}_significance']
-                    sigma_val = row[f'{face}_std']
+                    sigma_val = thresholds[face]
                     datetime = str(row['datetime'])
 
-                    if index == old_stopping_time[face] + 1 or changepoint <= old_stopping_time[face] + 60 and anomalies_faces[face]:
+                    if index == old_stopping_time[face] + 1 or changepoint <= old_stopping_time[face] + 120 and anomalies_faces[face]:
                         last_anomaly = anomalies_faces[face].pop()
                         new_changepoint = last_anomaly[1]
                         new_significance = last_anomaly[7]
