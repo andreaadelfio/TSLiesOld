@@ -6,6 +6,7 @@
 /m_check
 /modules/lime
 /modules/__pycache__
+/utils
 
 # Extensions
 *.pyc
