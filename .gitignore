@@ -1,10 +1,12 @@
 # Folders
 /data
+/results
 /logs
 /lectures
 /m_check
 /modules/lime
 /modules/__pycache__
+/utils
 
 # Extensions
 *.pyc
@@ -12,8 +14,9 @@
 
 # Files
 sc_meta.txt
+sc_columns.txt
 ACD_tiles_size2.txt
 list_file.txt
 ls.txt
-sc_columns.txt
 errors.txt
+failed_runs.txt

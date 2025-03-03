@@ -43,7 +43,7 @@ def run_trigger_ffnn(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):
         nn.set_scaler()
         nn.set_model(model_path='data/background_prediction/0/model.keras')
         start, end = 0, -1
-        _, y_pred = nn.predict(start, end, write_bkg=True, batch_size=1, save_plot=False)
+        _, y_pred = nn.predict(start, end, write_bkg=True, save_predictions_plot=False)
     
     y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(y_cols_pred, y_cols)}).drop(columns=y_cols)
     tiles_df = Data.merge_dfs(inputs_outputs, y_pred)
@@ -52,7 +52,7 @@ def run_trigger_ffnn(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_cols):
                                                   stop='2024-06-20 23:40:00', column='datetime').reset_index(drop=True)
     for col in y_cols_raw:
         Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred', units=units)
-    Plotter(df = tiles_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in inputs_outputs_df.columns if col not in y_cols_pred + y_cols_raw + ['GOES_XRSA_HARD_EARTH_OCCULTED']], marker = ',', show = True, smoothing_key='pred')
+    Plotter(df = tiles_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', y_cols=y_cols, excluded_cols = [col for col in inputs_outputs_df.columns if col not in y_cols_pred + y_cols_raw + ['GOES_XRSA_HARD_EARTH_OCCULTED']], show = True, smoothing_key='pred')
     thresholds = {'top': 6, 'Xpos': 10, 'Ypos': 7, 'Xneg': 7, 'Yneg': 7}
     merged_anomalies_list, triggs_df = Trigger().trigger(tiles_df, y_cols_raw, y_cols_pred, thresholds)
     # merged_anomalies_list = {"0": {"top": {"changepoint": 0, "stopping_time": 1449902, "start_datetime": "2024-06-19 20:54:00", "stop_datetime": "2024-06-19 20:54:00", "significance": 0.013827112738508777, "max_significance": 0.013827112738508777, "sigma_val": 0.002631981979971562, "threshold": 5, "max_point": 134}}}
@@ -90,7 +90,7 @@ def run_trigger_with_median(inputs_outputs, y_cols, y_cols_raw, y_cols_pred, x_c
 
 if __name__ == '__main__':
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
-    inputs_outputs_df = File.read_dfs_from_weekly_pk_folder(start=0, stop=1000)
+    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=1000)
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
     #                                               start='2024-02-08 05:30:22',
     #                                               stop='2024-09-11 09:15:28')

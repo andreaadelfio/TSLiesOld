@@ -15,7 +15,7 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.neighbors import KNeighborsRegressor
 # Keras
 from keras.optimizers import Adam, Nadam, RMSprop, SGD # pylint: disable=E0401
-from keras import Input, Model
+from keras import Input, Model, Sequential
 from keras.layers import Dense, Dropout, BatchNormalization, LSTM # pylint: disable=E0401
 from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler, LambdaCallback # pylint: disable=E0401
 from keras.models import load_model # pylint: disable=E0401
@@ -36,12 +36,100 @@ except:
     from utils import Logger, logger_decorator, File, Data
     from plotter import Plotter
 
+@tf.keras.utils.register_keras_serializable()
+class CustomLosses:
+    def __init__(self, normalizations_dict):
+        '''The class for custom loss functions.'''
+        self.normalizations_dict = normalizations_dict
+
+    def get_config(self):
+        '''Returns the configuration of the custom loss functions.'''
+        return {'normalizations_dict': self.normalizations_dict}
+    
+    @tf.keras.utils.register_keras_serializable()
+    def mae(self, y_true, y_pred):
+        '''The mean absolute error metric computed using the mean of the output.'''
+        num_outputs = y_true.shape[1]
+        mean = y_pred[:, :num_outputs]
+        return tf.reduce_mean(tf.abs(y_true - mean)) / self.normalizations_dict['mae']
+
+    @tf.keras.utils.register_keras_serializable()
+    def quantile_loss(self, y_true, y_pred, quantile=0.5):
+        '''The quantile loss function.'''
+        num_outputs = y_true.shape[1]
+        y_pred = y_pred[:, :num_outputs]
+        error = y_true - y_pred
+        return tf.reduce_mean(tf.maximum(quantile * error, (quantile - 1) * error))
+
+    @tf.keras.utils.register_keras_serializable()
+    def negative_log_likelihood(self, y_true, y_pred):
+        '''The negative log likelihood loss function computed using the mean and variance.'''
+        num_outputs = y_true.shape[1]
+        mean = y_pred[:, :num_outputs]
+        log_var = y_pred[:, num_outputs:]
+        nll = 0.5 * log_var + 0.5 * tf.square(y_true - mean) * tf.exp(-log_var)
+        return tf.reduce_mean(nll)  # Sum over all outputs
+
+    @tf.keras.utils.register_keras_serializable()
+    def negative_log_likelihood_huber(self, y_true, y_pred, delta=0.003, norm=1):
+        '''Gaussian negative log-likelihood with a Huber loss for robustness.'''
+        num_outputs = tf.shape(y_true)[1]
+        mean = y_pred[:, :num_outputs]
+        log_var = y_pred[:, num_outputs:]
+        
+        quadratic = tf.minimum(tf.abs(y_true - mean), delta)
+        linear = tf.abs(y_true - mean) - quadratic
+        huber_loss = 0.5 * tf.square(quadratic) + delta * linear
+        
+        nll = 0.5 * log_var + huber_loss * tf.exp(-log_var)
+        return tf.reduce_mean(nll) / norm
+
+    @tf.keras.utils.register_keras_serializable()
+    def mse(self, y_true, y_pred):
+        '''The mean squared error metric computed using the mean of the output.'''
+        num_outputs = y_true.shape[1]
+        mean = y_pred[:, :num_outputs]
+        return tf.reduce_mean(tf.square(y_true - mean)) / self.normalizations_dict['mse']
+
+    @tf.keras.utils.register_keras_serializable()
+    def r_squared(self, y_true, y_pred):
+        '''The R-squared metric computed using the mean of the output.'''
+        num_outputs = y_true.shape[1]
+        mean = y_pred[:, :num_outputs]
+        ss_res = tf.reduce_sum(tf.square(y_true - mean))
+        ss_tot = tf.reduce_sum(tf.square(y_true - tf.reduce_mean(y_true, axis=0)))
+        return 1 - ss_res / (ss_tot + tf.keras.backend.epsilon())
+
+    @tf.keras.utils.register_keras_serializable()
+    def NLL(self, y_true, y_pred):
+        '''The negative log likelihood loss function computed using the mean and variance.'''
+        return -tf.reduce_mean(y_pred.log_prob(y_true))
+
+    @tf.keras.utils.register_keras_serializable()
+    def NLL_median(self, y_true, y_pred):
+        '''The negative log likelihood loss function computed using the mean and variance.'''
+        return tfp.stats.percentile(y_pred.log_prob(y_true),50., interpolation='midpoint')
+
+    @tf.keras.utils.register_keras_serializable()
+    def MSE(self, y_true, y_pred):
+        '''The mean squared error loss function computed using the mean of the output.'''
+        return tf.reduce_mean(tf.square(y_true - y_pred.mean()))
+
+    @tf.keras.utils.register_keras_serializable()
+    def MAE(self, y_true, y_pred):
+        '''The mean absolute error loss function computed using the mean of the output.'''
+        return tf.reduce_mean(tf.abs(y_true - y_pred.mean()))
+
+    @tf.keras.utils.register_keras_serializable()
+    def KL_divergence(self, posterior, prior):
+        '''The Kullback-Leibler divergence loss function.'''
+        return tfp.distributions.kl_divergence(posterior, prior)
 
 class MLObject:
     '''The class used to handle Machine Learning.'''
-    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator=False):
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_smooth_cols, y_pred_cols, with_generator=False):
         self.model_name = self.__class__.__name__
-        self.training_date = pd.Timestamp.date(pd.Timestamp.now()).strftime('%Y-%m-%d')
+        self.training_date = pd.Timestamp.time(pd.Timestamp.now()).strftime('%H%M')
         print(f'{self.model_name} - {self.training_date}')
         self.with_generator = with_generator
         self.y_cols = y_cols
@@ -50,6 +138,7 @@ class MLObject:
         print(f'y_cols: {y_cols}')
         self.y_cols_raw = y_cols_raw
         self.y_pred_cols = y_pred_cols
+        self.y_smooth_cols = y_smooth_cols
 
         if with_generator: # if the data is too large, use tensorflow DataGenerator
             # to be implemented
@@ -58,11 +147,12 @@ class MLObject:
             self.df_data: pd.DataFrame = df_data
         self.y = self.df_data[self.y_cols].astype('float32')
         self.X = self.df_data[self.x_cols].astype('float32')
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=42, shuffle=True)
-        
         self.set_scaler(self.X)
-        self.X_train = self.scaler.transform(self.X_train)
-        self.X_test = self.scaler.transform(self.X_test)
+        self.X = self.scaler.transform(self.X)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=42, shuffle=True)
+
+        self.closses = CustomLosses({'mae': np.mean(np.abs(self.df_data[self.y_cols].values - self.df_data[self.y_smooth_cols].values)),
+                                     'mse': np.mean(np.square(self.df_data[self.y_cols].values - self.df_data[self.y_smooth_cols].values))})
 
         self.model_path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.training_date, self.model_name)
         if not os.path.exists(self.model_path):
@@ -157,7 +247,7 @@ class MLObject:
         self.drop = params['drop']
         self.mae_tr_list = []
 
-    def set_model(self, model_path: str):
+    def set_model(self, model_path: str, compile: bool = True):
         '''Sets the model from the model path.
         
         Parameters:
@@ -168,7 +258,8 @@ class MLObject:
         --------
             Model: The model.'''
         self.model_path = os.path.join(DIR, model_path)
-        self.nn_r = load_model(self.model_path)
+        self.nn_r = load_model(self.model_path, compile=compile)
+
         return self.nn_r
 
     def set_scaler(self, train: pd.DataFrame = None):
@@ -198,43 +289,6 @@ class MLObject:
             list_tmp = list(self.params.values()) + self.mae_tr_list
             f.write('\t'.join([str(value) for value in list_tmp] + ['\n']))
 
-    def negative_log_likelihood(self, y_true, y_pred):
-        '''The negative log likelihood loss function computed using the mean and variance.'''
-        num_outputs = y_true.shape[1]
-        mean = y_pred[:, :num_outputs]
-        log_var = y_pred[:, num_outputs:]
-        precision = tf.exp(-log_var)
-        nll = 0.5 * tf.reduce_mean(log_var + precision * (y_true - mean) ** 2, axis=0)  # Per output
-        return tf.reduce_sum(nll)  # Sum over all outputs
-
-    def mae(self, y_true, y_pred):
-        '''The mean absolute error metric computed using the mean of the output.'''
-        num_outputs = y_true.shape[1]
-        mean = y_pred[:, :num_outputs]
-        return tf.reduce_mean(tf.abs(y_true - mean))
-
-    def NLL(self, y_true, y_pred):
-        '''The negative log likelihood loss function computed using the mean and variance.'''
-        return -tf.reduce_mean(y_pred.log_prob(y_true))
-
-    def MSE(self, y_true, y_pred):
-        '''The mean squared error loss function computed using the mean of the output.'''
-        return tf.reduce_mean(tf.square(y_true - y_pred.mean()))
-
-    def MAE(self, y_true, y_pred):
-        '''The mean absolute error loss function computed using the mean of the output.'''
-        return tf.reduce_mean(tf.abs(y_true - y_pred.mean()))
-
-    def KL_divergence(self, posterior, prior):
-        '''The Kullback-Leibler divergence loss function.'''
-        return tfp.distributions.kl_divergence(posterior, prior)
-
-    def combined_loss(self, y_true, y_pred):
-        '''A combined loss function.'''
-        nll_loss = self.NLL(y_true, y_pred)
-        mae_loss = self.MAE(y_true, y_pred)
-        return nll_loss
-
     class custom_callback(tf_keras.callbacks.Callback):
         '''Custom callback class to end the model training and plot the predictions.'''
         def __init__(self, predictor):
@@ -243,18 +297,15 @@ class MLObject:
 
         def on_epoch_end(self, epoch, logs={}):
             if (epoch + 1) % 5 == 0:
-                self.predictor.predict(start=0, end=1000, mask_column='index', write_bkg=False, save_predictions_plot=True)
-            if( logs['mae'] <= 0.003 and logs['accuracy'] > 0.65 ):
+                self.predictor.predict(start='2024-06-20 23:10:00', end='2024-06-20 23:20:00', mask_column='datetime', write_bkg=False, save_predictions_plot=True)
+            if logs['mae'] <= 1.019:
                 self.model.stop_training = True
 
     def save_predictions_plots(self, tiles_df, start, end, params):
         '''Saves the prediction plots.'''
-        Plotter(df=tiles_df, label='tiles').df_plot_tiles(self.y_cols, x_col='datetime', init_marker=',',
-                                                        show=False, smoothing_key='pred')
-        for col in self.y_cols_raw:
-            Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred')
-        Plotter().plot_pred_true(tiles_df, self.y_pred_cols, self.y_cols_raw)
-        Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params, (start, end))
+        title = os.path.join(os.path.dirname(params['model_path']), f'tiles_{start}_{end}.png')
+        Plotter(df=tiles_df, label=title).df_plot_tiles(self.y_cols, x_col='datetime', init_marker=',',
+                                                        show=False, smoothing_key='pred', save=True)
 
 class FFNNPredictor(MLObject):
     '''The class for the Feed Forward Neural Network model.'''
@@ -349,7 +400,7 @@ class FFNNPredictor(MLObject):
         return history
 
     @logger_decorator(logger)
-    def predict(self, start:str|int = 0, end:str|int = -1, mask_column='index', write_bkg=True, write_frg=False, batch_size=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def predict(self, start:str|int = 0, end:str|int = -1, mask_column='index', write_bkg=True, write_frg=False, num_batches=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
@@ -359,7 +410,7 @@ class FFNNPredictor(MLObject):
             mask_column (str): The column to mask the data.
             write_bkg (bool): Whether to write the background data. Default is `True`.
             write_frg (bool): Whether to write the foreground data. Default is `False`.
-            batch_size (int): The batch size for the prediction. Default is 1.
+            num_batches (int): The batch size for the prediction. Default is 1.
             save_predictions_plot (bool): Whether to save the predictions plot. Default is `False`.
             support_variables (list): The support variables to plot.
         '''
@@ -367,8 +418,9 @@ class FFNNPredictor(MLObject):
         if df_data.empty:
             return pd.DataFrame(), pd.DataFrame()
         scaled_data = self.scaler.transform(df_data[self.x_cols])
-        if batch_size > 1:
+        if num_batches > 1:
             pred_x_tot = np.array([])
+            batch_size = len(scaled_data)//num_batches
             for i in range(0, len(scaled_data), batch_size):
                 pred_x_tot = np.append(pred_x_tot, self.nn_r.predict(scaled_data[i:i + batch_size]))
         else:
@@ -461,7 +513,7 @@ class PBNNPredictor(MLObject):
             opt = tf_keras.optimizers.Adam()
 
         self.nn_r.compile(optimizer=opt,
-                      loss=self.combined_loss,
+                      loss=self.NLL_median,
                       metrics=['mae', 'accuracy'])
     
     @logger_decorator(logger)
@@ -514,7 +566,7 @@ class PBNNPredictor(MLObject):
         return history
     
     @logger_decorator(logger)
-    def predict(self, start = 0, end = -1, runs=250, mask_column='index', write_bkg=True, write_frg=False, batch_size=1, save_predictions_plot=True, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def predict(self, start = 0, end = -1, runs=250, mask_column='index', write_bkg=True, write_frg=False, num_batches=1, save_predictions_plot=True, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
@@ -525,8 +577,9 @@ class PBNNPredictor(MLObject):
         if df_data.empty:
             return pd.DataFrame(), pd.DataFrame()
         scaled_data = self.scaler.transform(df_data[self.x_cols])
-        if batch_size > 1:
+        if num_batches > 1:
             preds = np.array([])
+            batch_size = len(scaled_data), num_batches
             for i in range(0, len(scaled_data), batch_size):
                 preds = np.append(preds, self.nn_r.predict(scaled_data[i:i + batch_size]))
         else:
@@ -567,94 +620,71 @@ class BNNPredictor(MLObject):
     logger = Logger('BNNPredictor').get_logger()
 
     @logger_decorator(logger)
-    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator=False):
-        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, with_generator)
-    
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_smooth_cols, y_pred_cols, with_generator=False):
+        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_smooth_cols, y_pred_cols, with_generator)
+
     @logger_decorator(logger)
     def create_model(self):
         '''Builds the Bayesian Neural Network model.'''
 
-        self.nn_r = tf_keras.Sequential([
-            tf_keras.Input(shape=(len(self.x_cols), )),
+        self.nn_r = Sequential([
+            Input(shape=(len(self.x_cols), )),
         ])
 
         for units in list(self.units_for_layers):
-            self.nn_r.add(tf_keras.layers.Dense(units, activation='relu'))
-        self.nn_r.add(tf_keras.layers.Dense(2*len(self.y_cols), activation='linear'))
+            self.nn_r.add(Dense(units, activation='relu'))
+        self.nn_r.add(Dense(2*len(self.y_cols), activation='linear'))
 
-        self.nn_r.compile(optimizer=tf_keras.optimizers.Adam(),
-                      loss=self.negative_log_likelihood,
-                      metrics=[self.mae, 'accuracy'])
+        self.nn_r.compile(optimizer=Adam(),
+                  loss=self.closses.negative_log_likelihood_huber,
+                  metrics=[self.closses.negative_log_likelihood, self.closses.mae, self.closses.mse, self.closses.r_squared])
     
     @logger_decorator(logger)
     def train(self):
         '''Trains the model.'''
-        es = tf_keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', min_delta=0.002,
+        es = EarlyStopping(monitor='val_loss', mode='min', min_delta=0.002,
                            patience=10, start_from_epoch=190)
-        mc = tf_keras.callbacks.ModelCheckpoint(self.model_path,
+        mc = ModelCheckpoint(self.model_path,
                              monitor='val_loss', mode='min', verbose=0, save_best_only=True)
         
         if not self.lr:
             callbacks = [self.custom_callback(self)]
         else:
-            call_lr = tf_keras.callbacks.LearningRateScheduler(self.scheduler)
-            callbacks = [self.custom_callback(self)]
+            call_lr = LearningRateScheduler(self.scheduler)
+        callbacks = [mc, self.custom_callback(self)]
 
         if self.with_generator:
             history = self.nn_r.fit(self.df_data, epochs=self.epochs, batch_size=32, validation_split=0.3)
         else:
             history = self.nn_r.fit(self.X_train, self.y_train, epochs=self.epochs, batch_size=self.bs, validation_split=0.3,
                       callbacks=callbacks)
-        
 
-        # pred_train = nn_r.predict(self.X_train)
-        # pred_test = nn_r.predict(self.X_test)
-        # idx = 0
-        # text = ''
-        # for col in self.y_cols:
-        #     mae_tr = MAE(self.y_train.iloc[:, idx], pred_train[:, idx])
-        #     self.mae_tr_list.append(mae_tr)
-        #     mae_te = MAE(self.y_test.iloc[:, idx], pred_test[:, idx])
-        #     diff_i = (self.y_test.iloc[:, idx] - pred_test[:, idx])
-        #     mean_diff_i = (diff_i).mean()
-        #     meae_tr = MeAE(self.y_train.iloc[:, idx], pred_train[:, idx])
-        #     meae_te = MeAE(self.y_test.iloc[:, idx], pred_test[:, idx])
-        #     median_diff_i = (diff_i).median()
-        #     text += f"MAE_train_{col} : {mae_tr:0.5f}\t" + \
-        #             f"MAE_test_{col} : {mae_te:0.5f}\t" + \
-        #             f"mean_diff_test_pred_{col} : {mean_diff_i:0.5f}\t" + \
-        #             f"MeAE_train_{col} {meae_tr:0.5f}\t" + \
-        #             f"MeAE_test_{col} {meae_te:0.5f}\t" + \
-        #             f"median_diff_test_pred_{col} {median_diff_i:0.5f}\n"
-        #     idx = idx + 1
-
-        # nn_r.save(self.model_path)
         with open(os.path.join(os.path.dirname(self.model_path), 'params.txt'), "w") as params_file:
             for key, value in self.params.items():
                 params_file.write(f'{key} : {value}\n')
-        # with open(os.path.join(os.path.dirname(self.model_path), 'performance.txt'), "w") as text_file:
-        #     text_file.write(text)
-        # self.text = text
         return history
     
     @logger_decorator(logger)
-    def predict(self, start = 0, end = -1, mask_column='index', write_bkg=True, write_frg=False, batch_size=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def predict(self, start = 0, end = -1, mask_column='index', write_bkg=True, write_frg=False, num_batches=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
         ----------
             start (int): The starting index. Default is 0.
-            end (int): The ending index. Defualt is -1.'''
-        df_data = Data.get_masked_dataframe(data=self.df_data, start=start, stop=end, column=mask_column, reset_index=False)
-        if df_data.empty:
-            return pd.DataFrame(), pd.DataFrame()
-        scaled_data = self.scaler.transform(df_data[self.x_cols])
-        if batch_size > 1:
-            y_pred = np.array([])
-            for i in range(0, len(scaled_data), batch_size):
-                y_pred = np.append(y_pred, self.nn_r.predict(scaled_data[i:i + batch_size]))
+            end (int): The ending index. Defualt is -1.
+            '''
+        if start != 0 or end != -1:
+            df_data = Data.get_masked_dataframe(data=self.df_data, start=start, stop=end, column=mask_column, reset_index=False)
+            if df_data.empty:
+                return pd.DataFrame(), pd.DataFrame()
+            scaled_data = self.scaler.transform(df_data[self.x_cols])
         else:
-            y_pred = self.nn_r.predict(scaled_data)
+            df_data = self.df_data
+            scaled_data = self.X
+        y_pred = np.zeros(shape=(0, 2*len(self.y_cols)))
+        batch_size = len(scaled_data)//num_batches
+        for i in range(0, len(scaled_data), batch_size):
+            y_pred = np.append(y_pred, self.nn_r.predict(scaled_data[i:i + batch_size]), axis=0)
         mean_pred = y_pred[:, :len(self.y_cols)]
         log_var_pred = y_pred[:, len(self.y_cols):]
         std_pred = np.sqrt(np.exp(log_var_pred))
@@ -663,8 +693,9 @@ class BNNPredictor(MLObject):
         y_pred = pd.concat([y_pred, y_std], axis=1)
         y_pred['datetime'] = df_data['datetime'].values
         y_pred.reset_index(drop=True, inplace=True)
-        df_ori = df_data[self.y_cols].reset_index(drop=True)
-        df_ori['datetime'] = df_data['datetime'].values
+        y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(self.y_pred_cols, self.y_cols)}).drop(columns=self.y_cols)
+        df_ori = df_data[self.y_cols].copy()
+        df_ori.loc[:, 'datetime'] = df_data['datetime'].values
         df_ori.reset_index(drop=True, inplace=True)
         if write_bkg:
             path = os.path.join(os.path.dirname(self.model_path))
@@ -679,7 +710,6 @@ class BNNPredictor(MLObject):
                     path = os.path.dirname(self.model_path)
                 File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
         if save_predictions_plot:
-            y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(self.y_pred_cols, self.y_cols)}).drop(columns=self.y_cols)
             tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime'] + support_variables], y_pred)
             self.save_predictions_plots(tiles_df, start, end, self.params)
         return df_ori, y_pred
@@ -780,7 +810,7 @@ class RNNPredictor(FFNNPredictor):
         return history
 
     @logger_decorator(logger)
-    def predict(self, start = 0, end = -1, write_bkg=True, write_frg=False, batch_size=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def predict(self, start = 0, end = -1, write_bkg=True, write_frg=False, num_batches=1, save_predictions_plot=False, support_variables=[]) -> tuple[pd.DataFrame, pd.DataFrame]:
         '''Predicts the output data.
         
         Parameters:
@@ -795,9 +825,9 @@ class RNNPredictor(FFNNPredictor):
         data = self.scaler.transform(df_data)
         data = np.array([data[i:i + self.params['timesteps']] for i in np.arange(len(data) - self.params['timesteps'])])
         data = np.reshape(data, (data.shape[0], data.shape[1], data.shape[2]))
-        if batch_size > 1:
+        if num_batches > 1:
             pred_x_tot = np.array([])
-            batch_size = len(data)//self.params['timesteps']
+            batch_size = self.params['timesteps']
             for i in range(0, len(data), batch_size):
                 pred_x_tot = np.append(pred_x_tot, self.nn_r.predict(data[i:i + batch_size]))
             pred_x_tot = np.reshape(pred_x_tot, (len(data), len(self.y_cols)))

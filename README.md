@@ -90,7 +90,15 @@ Contributions are welcome. Please open an issue to discuss your idea or submit a
 
 ### TO-DO:
 ```
-- create unique MLObject class
+- autoencoder per background
+- portare a icsc repo
+- reduce_median in bnn
+- standardizzare
+- creazione segnali sintetici
+- allenare senza i solar flare e analizzare per vedere quanti solar flare vengono identificati
+- non-parametric focus
+- distributed/on cloud
+- datagenerator
 - improve lambda_callback
 - train on normalized signals
 - improve get_feature_importance

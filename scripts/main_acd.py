@@ -2,6 +2,7 @@
 This module contains the class to manipulate the runs from Fermi.
 '''
 import os
+import sys
 import concurrent.futures
 import re
 import glob
@@ -9,14 +10,13 @@ import ROOT
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
-try:
-    from modules.plotter import Plotter
-    from modules.config import DATA_LATACD_FOLDER_NAME, DATA_LATACD_INPUT_FOLDER_NAME
-    from modules.utils import Logger, logger_decorator, File
-except:
-    from plotter import Plotter
-    from config import DATA_LATACD_FOLDER_NAME, DATA_LATACD_INPUT_FOLDER_NAME
-    from utils import Logger, logger_decorator, File
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+from modules.plotter import Plotter
+from modules.config import DATA_LATACD_PROCESSED_FOLDER_NAME, DATA_LATACD_RAW_FOLDER_NAME
+from modules.utils import Logger, logger_decorator, File
 
 DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -134,7 +134,7 @@ class ACDReconRates:
         try:
             chain = ROOT.TChain(treeName) # pylint: disable=maybe-no-member
         except Exception as e:
-            with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
+            with open(os.path.join(DATA_LATACD_PROCESSED_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
                 error_file.write(f"Error {e} in {run}\n")
         for line in rootfiles:
             if not line.endswith('.root'):
@@ -144,7 +144,7 @@ class ACDReconRates:
             try:
                 chain.Add(os.path.join(run_path, run))
             except Exception as e:
-                with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
+                with open(os.path.join(DATA_LATACD_PROCESSED_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
                     error_file.write(f"Error {e} in {run}\n")
         return chain
 
@@ -237,10 +237,10 @@ class ACDReconRates:
             dict_np = ROOT.RDataFrame(myTree).AsNumpy() # pylint: disable=maybe-no-member
             df = pd.DataFrame(dict_np)
             # df.to_csv('test.csv')
-            notnull = df['acdE_acdtile'].apply(lambda x: any(x))
-            df = df[notnull]#.reset_index(drop=True)
+            notnull = df['acdE_acdtile'].apply(any)
+            df = df[notnull]
             if 'gltGemEngine' in df.columns:
-                df = df[df['gltGemEngine'] != 3]#.reset_index(drop=True)
+                df = df[df['gltGemEngine'] != 3]
 
             df.drop(columns=['gltGemSummary', 'gltGemEngine'], inplace=True)
             time0, time_last = df['time'].min(), df['time'].max()
@@ -275,7 +275,7 @@ class ACDReconRates:
             mask = return_df.loc[:, return_df.columns != 'MET'].any(axis=1)
 
             if len(return_df[mask]) != len(return_df):
-                with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'dimensions_checks.txt'), 'a') as file:
+                with open(os.path.join(DATA_LATACD_PROCESSED_FOLDER_NAME, 'dimensions_checks.txt'), 'a') as file:
                     file.write(f"{len(return_df[mask])} {len(return_df)} {INPUT_ROOTS_FOLDER}\n")
             # Plotter(df = return_df, label = 'Tiles').df_plot_tiles(x_col = 'MET',
             #                                                                 excluded_cols = [],
@@ -295,15 +295,15 @@ class ACDReconRates:
             # Plotter.show()
             File.write_df_on_file(return_df,
                                     filename=output_filename,
-                                    fmt='both')
+                                    fmt='pk')
         except Exception as e:
-            with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
+            with open(os.path.join(DATA_LATACD_PROCESSED_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
                 error_file.write(f"Error {e} in {INPUT_ROOTS_FOLDER}\n")
 
     @logger_decorator(logger)
     def do_work_parallel(self, binning, workers=1):
-        input_runs_folder = DATA_LATACD_INPUT_FOLDER_NAME
-        output_runs_folder = DATA_LATACD_FOLDER_NAME
+        input_runs_folder = DATA_LATACD_RAW_FOLDER_NAME
+        output_runs_folder = DATA_LATACD_PROCESSED_FOLDER_NAME
         input_folder_list = os.listdir(input_runs_folder)
         if not os.path.exists(output_runs_folder):
             os.makedirs(output_runs_folder)
@@ -325,7 +325,7 @@ class ACDReconRates:
                 try:
                     future.result()
                 except Exception as exc:
-                    with open(os.path.join(DATA_LATACD_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
+                    with open(os.path.join(DATA_LATACD_PROCESSED_FOLDER_NAME, 'countrates_errors.txt'), 'a') as error_file:
                         error_file.write(f"Error {exc}\n")
 
     def del_txt(self, folder):
@@ -336,7 +336,7 @@ class ACDReconRates:
 if __name__ == '__main__':
     fileSizes = os.path.join(DIR, 'ACD_tiles_size2.txt')
     arr = ACDReconRates()
-    arr.del_txt(DATA_LATACD_INPUT_FOLDER_NAME)
+    arr.del_txt(DATA_LATACD_RAW_FOLDER_NAME)
     arr.fill_dictSizes(fileSizes)
-    arr.do_work_parallel(1, workers=4)
+    arr.do_work_parallel(1, workers=3)
     print("... done, bye bye")

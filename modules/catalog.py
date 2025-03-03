@@ -8,11 +8,11 @@ import pandas as pd
 # import re
 # from scipy import fftpack
 try:
-    from modules.config import DATA_LATACD_FOLDER_NAME
+    from modules.config import DATA_LATACD_PROCESSED_FOLDER_NAME
     from modules.utils import Time, Logger, logger_decorator, File
     from modules.plotter import Plotter
 except:
-    from config import DATA_LATACD_FOLDER_NAME
+    from config import DATA_LATACD_PROCESSED_FOLDER_NAME
     from utils import Time, Logger, logger_decorator, File
     from plotter import Plotter
 
@@ -22,7 +22,7 @@ class CatalogReader():
     logger = Logger('CatalogReader').get_logger()
 
     @logger_decorator(logger)
-    def __init__(self, h_names, data_dir = DATA_LATACD_FOLDER_NAME, start = 0, end = -1):
+    def __init__(self, h_names, data_dir = DATA_LATACD_PROCESSED_FOLDER_NAME, start = 0, end = -1):
         '''
         Initialize the CatalogReader object.
 
