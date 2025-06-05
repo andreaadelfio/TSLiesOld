@@ -6,11 +6,16 @@
 /m_check
 /modules/lime
 /modules/__pycache__
-/utils
+/utils/*
+/best
+/catalogs
+/intesa sanpaolo
 
 # Extensions
 *.pyc
 *.log
+*.csv
+*.txt
 
 # Files
 sc_meta.txt

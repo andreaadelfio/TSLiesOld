@@ -11,11 +11,12 @@ import matplotlib.dates as mdates
 import pandas as pd
 import numpy as np
 from scipy import fftpack
+import gc
+from tqdm import tqdm
 try:
     from modules.config import INPUTS_OUTPUTS_FILE_PATH,\
                                 LOGGING_FOLDER_PATH,\
                                 LOGGING_FILE_NAME,\
-                                INPUTS_OUTPUTS_FOLDER,\
                                 DIR,\
                                 DATA_LATACD_PROCESSED_FOLDER_NAME,\
                                 DATA_FOLDER_NAME
@@ -23,7 +24,6 @@ except:
     from config import INPUTS_OUTPUTS_FILE_PATH,\
                                 LOGGING_FOLDER_PATH,\
                                 LOGGING_FILE_NAME,\
-                                INPUTS_OUTPUTS_FOLDER,\
                                 DIR,\
                                 DATA_LATACD_PROCESSED_FOLDER_NAME,\
                                 DATA_FOLDER_NAME
@@ -116,7 +116,7 @@ class Time:
     logger = Logger('Time').get_logger()
 
     fermi_ref_time = datetime(2001, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-    fermi_launch_time = datetime(2008, 8, 7, 3, 35, 44)
+    fermi_launch_time = datetime(2008, 8, 7, 3, 35, 44, tzinfo=timezone.utc)
 
     @staticmethod
     def from_met_to_datetime(met_list: list) -> list:
@@ -192,7 +192,7 @@ class Time:
         -------
         - datetime_list (list of datetime): The datetime object without milliseconds.
         '''
-        return [dt.replace(microsecond=0) for dt in datetime_list]
+        return [dt.replace(microsecond=0, tzinfo=timezone.utc) for dt in datetime_list]
 
     @staticmethod
     def get_week_from_datetime(datetime_dict: dict) -> list:
@@ -210,6 +210,7 @@ class Time:
         for dt1, dt2 in datetime_dict.values():
             weeks_set.add(((dt1 - Time.fermi_launch_time).days) // 7 + 10)
             weeks_set.add(((dt2 - Time.fermi_launch_time).days) // 7 + 10)
+        print(weeks_set)
         return list(range(min(weeks_set), max(weeks_set) + 1))
 
     @staticmethod
@@ -359,6 +360,8 @@ class Data():
         -------
             DataFrame: The merged dataframe.
         '''
+        second_dataframe[on_column] = pd.to_datetime(second_dataframe[on_column], utc=True)
+        first_dataframe.loc[:, on_column] = pd.to_datetime(first_dataframe[on_column], utc=True)
         return pd.merge(first_dataframe, second_dataframe, on=on_column, how='inner')
 
 class File:
@@ -454,14 +457,14 @@ class File:
 
     @logger_decorator(logger)
     @staticmethod
-    def read_dfs_from_runs_pk_folder(folder_path=INPUTS_OUTPUTS_FOLDER, add_smoothing=False, mode='mean', window=30):
+    def read_dfs_from_runs_pk_folder(folder_path=INPUTS_OUTPUTS_FILE_PATH, add_smoothing=False, mode='mean', window=30, start=0, stop=-1):
         '''
         Read the dataframe from pickle files in a folder.
 
         Parameters:
         ----------
             folder_path (str, optional): The name of the folder to read the dataframe from.
-                                      Defaults to INPUTS_OUTPUTS_FOLDER.
+                                      Defaults to INPUTS_OUTPUTS_FILE_PATH.
 
         Returns:
         -------
@@ -470,9 +473,9 @@ class File:
         folder_path = os.path.join(folder_path, 'pk')
         merged_dfs: pd.DataFrame = None
         if os.path.exists(folder_path):
-            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
+            dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path)
                         if file.endswith('.pk')]
-            dir_list = sorted(dir_list, key=lambda x: int(re.search(r"\d+", os.path.basename(x)).group(0)))
+            dir_list = sorted(dir_list, key=lambda x: int(re.search(r"\d+", os.path.basename(x)).group(0)))[start:stop]
             dfs = [pd.read_pickle(file) for file in dir_list]
             dfs = [df[(df.loc[:, df.columns.difference(['MET'])] != 0).any(axis=1)] for df in dfs]
             if add_smoothing:
@@ -484,48 +487,56 @@ class File:
         return merged_dfs
 
     @logger_decorator(logger)
-    def read_dfs_from_weekly_pk_folder(self, folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
+    def read_dfs_from_weekly_pk_folder(self, folder_path=INPUTS_OUTPUTS_FILE_PATH, custom_sorter=lambda x: int(x.split('w')[-1].split('.')[0]), cols_list=None, start=None, stop=None, y_cols=[]):
         '''
         Read the dataframe from pickle files in a folder.
 
         Parameters:
         ----------
             folder_path (str, optional): The name of the folder to read the dataframe from.
-                                      Defaults to INPUTS_OUTPUTS_FOLDER.
+                                      Defaults to INPUTS_OUTPUTS_FILE_PATH.
 
         Returns:
         -------
             DataFrame: The dataframe read from the file.
         '''
-        if folder_path != INPUTS_OUTPUTS_FOLDER:
+        if folder_path != INPUTS_OUTPUTS_FILE_PATH:
             folder_path = os.path.join(DATA_FOLDER_NAME, folder_path)
         folder_path = os.path.join(folder_path, 'pk')
         self.logger.info('Reading from: %s.', folder_path)
         merged_dfs: pd.DataFrame = None
         if os.path.exists(folder_path):
             dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path) 
-                        if file.endswith('.pk') and start <= int(file.split('_w')[-1].split('.')[0]) <= stop]
+                        if file.endswith('.pk') and start <= int(file.split('w')[-1].split('.')[0]) <= stop]
+            if dir_list == []:
+                return None
             dir_list = sorted(dir_list, key=custom_sorter)
-            dfs = [pd.read_pickle(file)[cols_list] if cols_list else pd.read_pickle(file) for file in dir_list]
-            merged_dfs = pd.concat(dfs, ignore_index=True).drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug
+            dfs = []
+            for file in tqdm(dir_list, desc='Reading dfs from files'):
+                tmp_df = pd.read_pickle(file)[cols_list] if cols_list else pd.read_pickle(file)
+                for col in y_cols:
+                    tmp_df = tmp_df[tmp_df[col] != 0]
+                dfs.append(tmp_df)
+                gc.collect()
+            merged_dfs = pd.concat(dfs, ignore_index=True)#.drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug
         return merged_dfs
 
     # # @staticmethod
     # @logger_decorator(logger)
-    # def read_dfs_from_weekly_csv_folder_dask(self, folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
+    # def read_dfs_from_weekly_csv_folder_dask(self, folder_path=INPUTS_OUTPUTS_FILE_PATH, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
     #     '''
     #     Read the dataframe from csv files in a folder.
 
     #     Parameters:
     #     ----------
     #         folder_path (str, optional): The name of the folder to read the dataframe from.
-    #                                   Defaults to INPUTS_OUTPUTS_FOLDER.
+    #                                   Defaults to INPUTS_OUTPUTS_FILE_PATH.
 
     #     Returns:
     #     -------
     #         DataFrame: The dataframe read from the file.
     #     '''
-    #     if folder_path != INPUTS_OUTPUTS_FOLDER:
+    #     if folder_path != INPUTS_OUTPUTS_FILE_PATH:
     #         folder_path = os.path.join(DATA_FOLDER_NAME, folder_path)
 
     #     folder_path = os.path.join(folder_path, 'csv')
@@ -542,20 +553,20 @@ class File:
 
     # # @staticmethod
     # @logger_decorator(logger)
-    # def read_dfs_from_weekly_pk_folder_dask(self, folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
+    # def read_dfs_from_weekly_pk_folder_dask(self, folder_path=INPUTS_OUTPUTS_FILE_PATH, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0]), cols_list=None, start=None, stop=None):
     #     '''
     #     Read the dataframe from pickle files in a folder.
 
     #     Parameters:
     #     ----------
     #         folder_path (str, optional): The name of the folder to read the dataframe from.
-    #                                   Defaults to INPUTS_OUTPUTS_FOLDER.
+    #                                   Defaults to INPUTS_OUTPUTS_FILE_PATH.
 
     #     Returns:
     #     -------
     #         DataFrame: The dataframe read from the file.
     #     '''
-    #     if folder_path != INPUTS_OUTPUTS_FOLDER:
+    #     if folder_path != INPUTS_OUTPUTS_FILE_PATH:
     #         folder_path = os.path.join(DATA_FOLDER_NAME, folder_path)
 
     #     folder_path = os.path.join(folder_path, 'pk')
@@ -573,20 +584,20 @@ class File:
 
     @logger_decorator(logger)
     @staticmethod
-    def read_dfs_from_csv_folder(folder_path=INPUTS_OUTPUTS_FOLDER, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0])):
+    def read_dfs_from_csv_folder(folder_path=INPUTS_OUTPUTS_FILE_PATH, custom_sorter=lambda x: int(x.split('_w')[-1].split('.')[0])):
         '''
         Read the dataframe from csv files in a folder.
 
         Parameters:
         ----------
             folder_path (str, optional): The name of the folder to read the dataframe from.
-                                      Defaults to INPUTS_OUTPUTS_FOLDER.
+                                      Defaults to INPUTS_OUTPUTS_FILE_PATH.
 
         Returns:
         -------
             DataFrame: The dataframe read from the file.
         '''
-        if folder_path != INPUTS_OUTPUTS_FOLDER:
+        if folder_path != INPUTS_OUTPUTS_FILE_PATH:
             folder_path = os.path.join(DATA_FOLDER_NAME, folder_path)
         folder_path = os.path.join(folder_path, 'csv')
         if os.path.exists(folder_path):
@@ -612,14 +623,14 @@ class File:
 
     @logger_decorator(logger)
     @staticmethod
-    def check_integrity_runs_pk_folder(folder_path=INPUTS_OUTPUTS_FOLDER):
+    def check_integrity_runs_pk_folder(folder_path=INPUTS_OUTPUTS_FILE_PATH):
         '''
         Checks the integrity of the dataframe from pickle files in a folder.
 
         Parameters:
         ----------
             folder_path (str, optional): The name of the folder to read the dataframe from.
-                                      Defaults to INPUTS_OUTPUTS_FOLDER.
+                                      Defaults to INPUTS_OUTPUTS_FILE_PATH.
         '''
         print('Checking integrity...')
         folder_path = os.path.join(folder_path, 'pk')
@@ -636,4 +647,21 @@ class File:
                     # os.remove(file)
 
 if __name__ == '__main__':
-    File.check_integrity_runs_pk_folder(DATA_LATACD_PROCESSED_FOLDER_NAME)
+    y_cols_raw = ['top_low', 'top_middle', 'top_high', 'Xpos_low', 'Xpos_middle', 'Xpos_high', 'Xneg_low', 'Xneg_middle', 'Xneg_high', 'Ypos_low', 'Ypos_middle', 'Ypos_high', 'Yneg_low', 'Yneg_middle', 'Yneg_high']
+    y_pred_cols = [col + '_pred' for col in y_cols_raw]
+
+    x_cols = ['SC_POSITION_0', 'SC_POSITION_1', 'SC_POSITION_2', 'LAT_GEO', 'LON_GEO',
+                'RAD_GEO', 'RA_ZENITH', 'DEC_ZENITH', 'B_MCILWAIN', 'L_MCILWAIN', 
+                'GEOMAG_LAT', 'LAMBDA', 'RA_SCZ', 'START', 'STOP', 'MET',
+                'LAT_MODE', 'LAT_CONFIG', 'DATA_QUAL', 'LIVETIME', 'DEC_SCZ', 'RA_SCX',
+                'DEC_SCX', 'RA_NPOLE', 'DEC_NPOLE', 'ROCK_ANGLE',
+                'QSJ_1', 'QSJ_2', 'QSJ_3', 'QSJ_4', 'RA_SUN', 'DEC_SUN',
+                'SC_VELOCITY_0', 'SC_VELOCITY_1', 'SC_VELOCITY_2',
+                'GOES_XRSA_HARD', 'GOES_XRSB_SOFT', 'GOES_XRSA_HARD_EARTH_OCCULTED',
+                'GOES_XRSB_SOFT_EARTH_OCCULTED', 'TIME_FROM_SAA', 'SAA_EXIT']
+    x_cols_excluded = ['LIVETIME', 'GOES_XRSA_HARD_EARTH_OCCULTED', 'GOES_XRSB_SOFT_EARTH_OCCULTED', 'STOP', 'MET']
+    x_cols = [col for col in x_cols if col not in x_cols_excluded]
+    y_cols = y_cols_raw
+    y_smooth_cols = [f'{col}_smooth' for col in y_cols_raw]
+
+    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=850, cols_list=x_cols + y_cols + y_smooth_cols + ['datetime', 'MET'], y_cols=y_cols)

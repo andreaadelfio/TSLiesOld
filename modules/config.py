@@ -10,8 +10,10 @@ USER = os.environ.get('USERNAME')
 DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 # DIR = '/media/andrea/DISK4T1/ACD LAT Adelfio/'
 
-# Folders: parent (data), children (solar, spacecraft, LAT_ACD/output runs)
+# MARK: Data Folders: parent (data), children (solar, spacecraft, LAT_ACD)
 DATA_FOLDER_NAME = os.path.join(DIR, 'data')
+
+LATACD_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD')
 
 SOLAR_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'solar')
 
@@ -19,49 +21,47 @@ SC_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'spacecraft/LAT/weekly')
 
 # ACD_DATA = 'old'
 # ACD_DATA = 'new'
-ACD_DATA = 'newRuns_v7_extracted_v3'
-DATA_LATACD_RAW_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD', 'raw', ACD_DATA)
-DATA_LATACD_PROCESSED_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'LAT_ACD', 'processed', ACD_DATA)
-
-# MARK: Results
-DATE_FOLDER = pd.Timestamp.date(pd.Timestamp.now()).strftime('%Y-%m-%d')
-RESULTS_FOLDER_NAME = os.path.join(DIR, 'results', DATE_FOLDER)
-BACKGROUND_PREDICTION_FOLDER_NAME = os.path.join(RESULTS_FOLDER_NAME, 'background_prediction')
-TRIGGER_FOLDER_NAME = os.path.join(RESULTS_FOLDER_NAME, 'anomalies')
-PLOT_TRIGGER_FOLDER_NAME = os.path.join(TRIGGER_FOLDER_NAME, 'plots')
-
-# Folders: parent (data), children (solar, spacecraft, LAT_ACD/output runs)
-SOLAR_FILENAME = 'solar_activity'
-SOLAR_FILE_PATH = os.path.join(SOLAR_FOLDER_NAME, SOLAR_FILENAME)
-
+# ACD_DATA = 'new_old'
+# ACD_DATA = 'maldera'
+# ACD_DATA = 'newRuns_v16'
+# ACD_DATA = 'for_alberto'
+# ACD_DATA = 'newRuns_v7_extracted_v3'
+# ACD_DATA = 'test'
+ACD_DATA = 'new_with_correct_triggs'
+DATA_LATACD_RAW_FOLDER_NAME = os.path.join(LATACD_FOLDER_NAME, 'raw', ACD_DATA)
+DATA_LATACD_PROCESSED_FOLDER_NAME = os.path.join(LATACD_FOLDER_NAME, 'processed', ACD_DATA)
 INPUTS_OUTPUTS_FILENAME = 'inputs_outputs'
-INPUTS_OUTPUTS_FOLDER = os.path.join(DATA_FOLDER_NAME, 'inputs_outputs')
-INPUTS_OUTPUTS_FILE_PATH = os.path.join(INPUTS_OUTPUTS_FOLDER, INPUTS_OUTPUTS_FILENAME)
+INPUTS_OUTPUTS_FILE_PATH = os.path.join(DATA_LATACD_PROCESSED_FOLDER_NAME, INPUTS_OUTPUTS_FILENAME)
 
+# MARK: Logging
 LOGGING_FOLDER_NAME = 'logs'
 LOGGING_FOLDER_PATH = os.path.join(DIR, LOGGING_FOLDER_NAME)
 LOGGING_FILE_NAME = f'{USER}.log'
 
-FOLDERS_LIST = [DIR, 
-                DATA_FOLDER_NAME, 
-                SOLAR_FOLDER_NAME, 
-                SC_FOLDER_NAME, 
-                RESULTS_FOLDER_NAME, 
-                BACKGROUND_PREDICTION_FOLDER_NAME, 
-                TRIGGER_FOLDER_NAME, 
-                PLOT_TRIGGER_FOLDER_NAME, 
-                SOLAR_FILE_PATH, 
-                INPUTS_OUTPUTS_FOLDER, 
-                INPUTS_OUTPUTS_FILE_PATH, 
+# MARK: Results
+now = pd.Timestamp.now()
+DATE_FOLDER = pd.Timestamp.date(now).strftime('%Y-%m-%d')
+TIME_FOLDER = pd.Timestamp.time(now).strftime('%H%M')
+RESULTS_FOLDER_NAME = os.path.join(DIR, 'results', DATE_FOLDER)
+BACKGROUND_PREDICTION_FOLDER_NAME = os.path.join(RESULTS_FOLDER_NAME, 'background_prediction')
+TRIGGER_FOLDER_NAME = os.path.join(RESULTS_FOLDER_NAME, 'anomalies')
+PLOT_TRIGGER_FOLDER_NAME = os.path.join(TRIGGER_FOLDER_NAME, TIME_FOLDER, 'plots')
+
+FOLDERS_LIST = [DIR,
+                DATA_FOLDER_NAME,
+                SOLAR_FOLDER_NAME,
+                SC_FOLDER_NAME,
+                RESULTS_FOLDER_NAME,
+                BACKGROUND_PREDICTION_FOLDER_NAME,
+                TRIGGER_FOLDER_NAME,
+                PLOT_TRIGGER_FOLDER_NAME,
+                INPUTS_OUTPUTS_FILE_PATH,
                 LOGGING_FOLDER_PATH]
-for dir in FOLDERS_LIST:
-    if not os.path.exists(dir):
-        os.makedirs(dir)
 
 if __name__ == '__main__':
     vars_copy = vars().copy()
-    filtered_vars = [var for var in vars_copy if '__' not in var]
+    filtered_vars = [var for var in vars_copy if '__' not in var and isinstance(vars_copy[var], str)]
     max_len = max(map(len, filtered_vars))
 
     for var in filtered_vars:
-        print(f"{var:<{max_len}} {vars_copy[var]}")
+        print(f"{var:>{max_len}} : {vars_copy[var]}")

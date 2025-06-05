@@ -2,12 +2,13 @@
 This module contains the implementation of the FOCuS algorithm for change point detection.
 '''
 import os
-import json
 from math import log
 import multiprocessing
+from datetime import timedelta
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+
 try:
     from modules.plotter import Plotter
     from modules.utils import Data, Logger, logger_decorator
@@ -71,8 +72,8 @@ class Quadratic:
     def evaluate(self, mu):
         return np.maximum(self.a*mu**2 + self.b*mu, 0)
 
-    def update(self, X_T):
-        return Quadratic(self.a - 1, self.b + 2*X_T)
+    def update(self, X_T, decay_factor=0.8):
+        return Quadratic(self.a - 1, self.b * decay_factor + 2 * X_T)
 
     def ymax(self):
         return -self.b**2/(4*self.a) 
@@ -89,7 +90,15 @@ class Quadratic:
 class Trigger:
     logger = Logger('Trigger').get_logger()
 
-    def focus_step_quad(self, quadratic_list, X_T):
+    def __init__(self, tiles_df, y_cols, y_cols_pred, y_cols_raw, units, latex_y_cols):
+        self.tiles_df = tiles_df
+        self.y_cols = y_cols
+        self.y_cols_raw = y_cols_raw
+        self.y_cols_pred = y_cols_pred
+        self.units = units
+        self.latex_y_cols = latex_y_cols
+
+    def focus_step_quad(self, quadratic_list, X_T, decay_factor=0.99):
         new_quadratic_list = []
         global_max = 0
         time_offset = 0
@@ -106,7 +115,7 @@ class Trigger:
                 
         else: #list not empty: go through and prune
             
-            updated_q = quadratic_list[0].update(X_T) #check leftmost quadratic separately
+            updated_q = quadratic_list[0].update(X_T, decay_factor) #check leftmost quadratic separately
             if updated_q.b < 0: #our leftmost quadratic is negative i.e. we have no quadratics
                 return new_quadratic_list, global_max, time_offset
             else:
@@ -169,11 +178,10 @@ class Trigger:
         '''
         Calculates the z-score of the signal and the offset of the change point.
         '''
-        result = {f'{face}_significance': signal}
+        result = {f'{face}_significance': signal, f'{face}_offset': signal*0}
         return result
 
-
-    def trigger_face(self, signal, face, diff):
+    def trigger_gauss_focus(self, signal, face, diff):
         '''
         From the original python implementation of
         FOCuS Poisson by Kester Ward (2021). All rights reserved.
@@ -184,13 +192,13 @@ class Trigger:
             x_t = signal[T]
             if diff[T] > 60:
                 curve_list = []
-            curve_list, global_max, offset = self.focus_step_quad(curve_list, x_t)
+            curve_list, global_max, offset = self.focus_step_quad(curve_list, x_t, 0.95)
             result[f'{face}_offset'].append(offset)
             result[f'{face}_significance'].append(np.sqrt(2 * global_max))
         return result
 
     @logger_decorator(logger)
-    def trigger(self, tiles_df, y_cols, y_pred_cols, thresholds: dict):
+    def run(self, thresholds: dict, type='z_score', save_anomalies_plots=True, support_vars=[], file=''):
         '''Run the trigger algorithm on the dataset.
 
         Args:
@@ -208,66 +216,61 @@ class Trigger:
             os.makedirs(PLOT_TRIGGER_FOLDER_NAME)
 
         triggs_dict = {}
-        diff = tiles_df['MET'].diff()
-        pool = multiprocessing.Pool()
+        diff = self.tiles_df['MET'].diff()
+        pool = multiprocessing.Pool(8)
         results = []
-        for face in y_cols:
-            result = pool.apply_async(self.trigger_face_z_score, (tiles_df[f'{face}_norm'], face, diff))
-            # result = self.trigger_face(tiles_df[f'{face}_norm'], face, diff)
+        
+        triggerer = self.trigger_face_z_score if type.lower() == 'z_score' else self.trigger_gauss_focus
+        for face, face_pred in zip(self.y_cols, self.y_cols_pred):
+            signal = (self.tiles_df[face] - self.tiles_df[face_pred]) / self.tiles_df[f'{face}_std']
+            result = pool.apply_async(triggerer, (signal, face, diff))
             results.append(result)
 
         for result in results:
             triggs_dict.update(result.get())
-            # triggs_dict.update(result)
         pool.close()
         pool.join()
 
         triggs_df = pd.DataFrame(triggs_dict)
-        triggs_df['datetime'] = tiles_df['datetime']
+        triggs_df['datetime'] = self.tiles_df['datetime']
         return_df = triggs_df.copy()
-        # triggs_df.to_csv(os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'triggers.csv'), index=False)
         mask = False
-        for face in y_cols:
+        for face in self.y_cols:
             mask |= triggs_df[f'{face}_significance'] > thresholds[face]
 
         triggs_df = triggs_df[mask]
-        # Plotter(df = triggs_df, label = 'Inputs and outputs').df_plot_tiles(y_cols=y_cols, x_col = 'datetime', init_marker = ',', show = True, smoothing_key='pred')
 
         count = 0
-        anomalies_faces = {face: [] for face in y_cols}
-        old_stopping_time = {face: -1 for face in y_cols}
+        anomalies_faces = {face: [] for face in self.y_cols}
+        old_stopping_time = {face: -1 for face in self.y_cols}
 
         for index, row in tqdm(triggs_df.iterrows(), total=len(triggs_df), desc='Identifying triggers'):
-            for face in y_cols:
+            for face in self.y_cols:
                 if row[f'{face}_significance'] > thresholds[face]:
-                    changepoint, stopping_time = index+1, index
-                    significance = row[f'{face}_significance']
-                    sigma_val = thresholds[face]
-                    datetime = str(row['datetime'])
+                    new_start_index = row[f'{face}_offset'] + index
+                    new_start_datetime = str(row['datetime'] + timedelta(seconds=row[f'{face}_offset']))
+                    new_stop_index = index + 1
+                    new_stop_datetime = str(row['datetime'] + timedelta(seconds=1))
 
-                    if index == old_stopping_time[face] + 1 or changepoint <= old_stopping_time[face] + 120 and anomalies_faces[face]:
+                    if index == old_stopping_time[face] + 1 or new_start_index <= old_stopping_time[face] + 60:
                         last_anomaly = anomalies_faces[face].pop()
-                        new_changepoint = last_anomaly[1]
-                        new_significance = last_anomaly[7]
-                        datetime = last_anomaly[5]
-                        max_significance = max(new_significance, significance)
-                        max_point = index if significance > new_significance else last_anomaly[-1]
-                        new_stopping_time = stopping_time
-                        new_anomaly = (face, new_changepoint, new_changepoint, new_stopping_time, datetime, datetime, significance, max_significance, sigma_val, thresholds[face], max_point)
+                        old_start_index = last_anomaly[1]
+                        old_start_datetime = last_anomaly[3]
+                        new_anomaly = (face, old_start_index, new_stop_index, old_start_datetime, new_stop_datetime)
                     else:
                         count += 1
-                        new_anomaly = (face, changepoint, changepoint, stopping_time, datetime, datetime, significance, significance, sigma_val, thresholds[face], changepoint)
+                        new_anomaly = (face, new_start_index, new_stop_index, new_start_datetime, new_stop_datetime)
 
                     anomalies_faces[face].append(new_anomaly)
-                    old_stopping_time[face] = stopping_time
+                    old_stopping_time[face] = new_stop_index
         
         anomalies_list = []
-        for face in y_cols:
+        for face in self.y_cols:
             anomalies_list += anomalies_faces[face]
 
         print('Merging triggers...', end=' ')
         merged_anomalies = {}
-        for face, start, changepoint, stopping_time, start_datetime, stop_datetime, significance, max_significance, sigma_val, threshold, max_point in anomalies_list:
+        for face, start, stopping_time, start_datetime, stop_datetime in anomalies_list:
             if returned := self.is_mergeable(start, merged_anomalies, minutes=1):
                 start, old_start = returned
                 if start < old_start:
@@ -275,15 +278,27 @@ class Trigger:
                     del merged_anomalies[old_start]
                 elif start > old_start:
                     start = old_start
-                merged_anomalies[start][face] = {'changepoint': changepoint, 'stopping_time': stopping_time, 'start_datetime': start_datetime, 'stop_datetime': stop_datetime, 'significance': significance, 'max_significance': max_significance, 'sigma_val': sigma_val, 'threshold': threshold, 'max_point': max_point}
+                merged_anomalies[start][face] = {'start_index': start, 'stop_index': stopping_time, 'start_datetime': start_datetime, 'stop_datetime': stop_datetime}
             else:
-                merged_anomalies[start] = {face: {'changepoint': changepoint, 'stopping_time': stopping_time, 'start_datetime': start_datetime, 'stop_datetime': stop_datetime, 'significance': significance, 'max_significance': max_significance, 'sigma_val': sigma_val, 'threshold': threshold, 'max_point': max_point}}
+                merged_anomalies[start] = {face: {'start_index': start, 'stop_index': stopping_time, 'start_datetime': start_datetime, 'stop_datetime': stop_datetime}}
         print(f'{len(merged_anomalies)} anomalies in total.')
 
-        with open(os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'detections.csv'), 'w') as f:
-            f.write("start_datetime,start_met,triggered_faces\n")
-            for start, anomaly in sorted(merged_anomalies.items(), key=lambda x: int(x[0]), reverse=True):
-                f.write(f"{tiles_df['datetime'][int(start)]},{tiles_df['MET'][int(start)]},{'_'.join(anomaly.keys())}\n")
+        detections_file_path = os.path.join(PLOT_TRIGGER_FOLDER_NAME, f'detections_{file}.csv')
+        with open(detections_file_path, 'w') as f:
+            f.write("start_datetime,stop_datetime,start_met,stop_met,triggered_faces\n")
+            for anomaly_start, anomaly in sorted(merged_anomalies.items(), key=lambda x: int(x[0]), reverse=True):
+                anomaly_end = -1
+                for face in anomaly.values():
+                    if face['stop_index'] > anomaly_end:
+                        anomaly_end = face['stop_index']
+                    if face['start_index'] < anomaly_start:
+                        anomaly_start = face['start_index']
+                f.write(f"{self.tiles_df['datetime'][int(anomaly_start)]},{self.tiles_df['datetime'][int(anomaly_end)]},{self.tiles_df['MET'][int(anomaly_start)]},{self.tiles_df['MET'][int(anomaly_end)]},{'/'.join(anomaly.keys())}\n")
+
+        self.tiles_df = Data.merge_dfs(self.tiles_df[self.y_cols + self.y_cols_pred + support_vars + ['datetime'] + [f'{y_col}_std' for y_col in self.y_cols]], return_df, on_column='datetime')
+        if save_anomalies_plots:
+            Plotter(df = merged_anomalies).plot_anomalies_in_catalog(type, support_vars, thresholds, self.tiles_df, self.y_cols_raw, self.y_cols_pred, only_in_catalog=False, show=False, units=self.units, latex_y_cols=self.latex_y_cols, detections_file_path=detections_file_path)
+
         return merged_anomalies, return_df
             
     def is_mergeable(self, start: int, merged_anomalies: dict, minutes = 1) -> tuple[int, int]:
@@ -303,15 +318,4 @@ class Trigger:
 
 
 if __name__ == '__main__':
-    y_cols = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
-    y_pred_cols = [col + '_pred' for col in y_cols]
-
-    fermi_data = pd.read_pickle('data/background_prediction/1/pk/frg.pk')
-    nn_pred = pd.read_pickle('data/background_prediction/1/pk/bkg.pk')
-    
-    nn_pred = nn_pred.assign(**{col: nn_pred[cols_init] for col, cols_init in zip(y_pred_cols, y_cols)}).drop(columns=y_cols)
-    tiles_df = Data.merge_dfs(nn_pred, fermi_data)
-    Plotter(df=tiles_df, label='tiles').df_plot_tiles(x_col='datetime', marker=',',
-                                                        show=True, smoothing_face='pred')
-
-    Trigger().trigger(tiles_df, y_cols, y_pred_cols, 3)
+    print('to be implemented')
