@@ -21,7 +21,7 @@ from modules.solar import SunMonitor
 from modules.utils import Data, File, Time, Logger, logger_decorator
 from modules.config import INPUTS_OUTPUTS_FILE_PATH
 
-from scripts.main_config import h_names, y_smooth_cols, y_cols, y_cols_raw, units, x_cols
+from scripts.main_config import h_names, y_smooth_cols, y_cols, y_cols_raw, units, x_cols, latex_y_cols
 
 logger = Logger('Main Dataset').get_logger()
 
@@ -65,16 +65,15 @@ def get_inputs_outputs_df():
     # tile_signal_df = Data.get_masked_dataframe(data=tile_signal_df,
     #                                               start='2024-05-05 04:00:00',
     #                                               stop='2024-05-06 04:00:00')
-    Plotter(df = tile_signal_df[['Xpos', 'Xpos_smooth', 'top', 'top_smooth', 'datetime', 'MET']], label = 'Inputs').df_plot_tiles(x_col = 'MET',
+    Plotter(df = tile_signal_df, label = 'Inputs').df_plot_tiles(x_col = 'MET',
                                                                     top_x_col='datetime',
+                                                                    latex_y_cols=latex_y_cols,
                                                                     y_cols=y_cols,
-                                                                    excluded_cols = ['datetime', 'MET'],
+                                                                    excluded_cols = x_cols + ['datetime', 'MET'],
                                                                     smoothing_key='smooth',
                                                                     show = True)
     saa_exit_time = 0
-    inputs_outputs_list = []
     for week in tqdm([week for week in weeks_list if week not in []], desc='Creating weekly datasets'):
-        # print(f'Week {week}...')
         sc_params_df, saa_exit_time = get_sc_params_df(week, saa_exit_time)
         inputs_outputs = Data.merge_dfs(tile_signal_df, sc_params_df)
         if len(inputs_outputs) == 0:
@@ -90,37 +89,29 @@ def get_inputs_outputs_df():
         #                                                                 smoothing_key='smooth',
         #                                                                 show = True)
         File.write_df_on_file(inputs_outputs,
-                              filename=f'{INPUTS_OUTPUTS_FILE_PATH}_w{week}',
-                              fmt='both')
-        inputs_outputs_list.append(inputs_outputs)
-    return pd.concat(inputs_outputs_list, ignore_index=True)
-
+                              filename=os.path.join(INPUTS_OUTPUTS_FILE_PATH, f'w{week}'),
+                              fmt='pk')
 
 # MARK: Main
 if __name__ == '__main__':
-    inputs_outputs_df = get_inputs_outputs_df()
-    # inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=1000)
+    # inputs_outputs_df = get_inputs_outputs_df()
+    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=864, stop=1000, cols_list=y_cols + x_cols + y_smooth_cols + ['datetime'], y_cols=y_cols)
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
     #                                               start='2024-01-30 22:35:00',
     #                                               stop='2024-02-01 23:40:00')
-
-    Plotter(df = inputs_outputs_df[['Xpos', 'Xpos_smooth', 'GOES_XRSA_HARD', 'GOES_XRSB_SOFT', 'MET', 'datetime']], label = 'Outputs').df_plot_tiles(
-                                                    y_cols=y_cols,
-                                                    x_col ='MET',
-                                                    top_x_col='datetime',
-                                                    excluded_cols = ['SUN_IS_EARTH_OCCULTED', 'MET', 'datetime', 'TIME_FROM_SAA', 'SAA_EXIT', 'GOES_XRSA_HARD_EARTH_OCCULTED', 'GOES_XRSB_SOFT_EARTH_OCCULTED'],
-                                                    init_marker=',',
-                                                    smoothing_key='smooth',
-                                                    save = True,
-                                                    units=units)
-    # Plotter(df = inputs_outputs_df, label = 'Outputs').df_plot_tiles(
-    #                                                 y_cols=y_cols,
-    #                                                 x_col ='MET',
-    #                                                 top_x_col='datetime',
-    #                                                 excluded_cols = x_cols,
-    #                                                 init_marker=',',
-    #                                                 smoothing_key='smooth',
-    #                                                 save = False,
-    #                                                 units=units)
+    # for date in [('2024-08-25 00:00:00.827','2024-08-26 05:29:55.045')]:
+    #     tmp_inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
+    #                                                   start=date[0],
+    #                                                   stop=date[1])
+    #     if len(tmp_inputs_outputs_df) > 0:
+    Plotter(df = inputs_outputs_df, label = 'Outputs').df_plot_tiles(
+                                                        y_cols=y_cols,
+                                                        latex_y_cols=latex_y_cols,
+                                                        x_col ='MET',
+                                                        top_x_col='datetime',
+                                                        excluded_cols = x_cols + ['SUN_IS_EARTH_OCCULTED', 'MET', 'datetime', 'TIME_FROM_SAA', 'SAA_EXIT', 'GOES_XRSA_HARD_EARTH_OCCULTED', 'GOES_XRSB_SOFT_EARTH_OCCULTED'],
+                                                        smoothing_key='smooth',
+                                                        save = True,
+                                                        units=units)
     
     Plotter.show()

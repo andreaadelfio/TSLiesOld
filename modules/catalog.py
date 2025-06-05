@@ -5,8 +5,6 @@ import os
 import ROOT
 import numpy as np
 import pandas as pd
-# import re
-# from scipy import fftpack
 try:
     from modules.config import DATA_LATACD_PROCESSED_FOLDER_NAME
     from modules.utils import Time, Logger, logger_decorator, File
@@ -31,23 +29,12 @@ class CatalogReader():
         - start (int): The index of the first run directory to consider.
         - end (int): The index of the last run directory to consider.
         '''
+        self.start = start
+        self.end = end if end != -1 else None
         self.data_dir = data_dir
-        self.runs_roots = [f'{self.data_dir}/{filename}' for filename in os.listdir(data_dir)]
-        self.runs_roots.sort()
-        self.runs_roots = self.runs_roots[start:end]
         self.h_names = h_names
         self.runs_times = {}
         self.runs_dict = {}
-
-    @logger_decorator(logger)
-    def get_runs_roots(self):
-        '''
-        Get the list of run directories.
-
-        Returns:
-        - runs_dirs (list): The list of run directories.
-        '''
-        return self.runs_roots
 
     @logger_decorator(logger)
     def get_runs_times(self):
@@ -59,41 +46,41 @@ class CatalogReader():
         '''
         return self.runs_times
 
-    @logger_decorator(logger)
-    def get_runs_dict_root(self, runs_roots = None, binning = None):
-        '''
-        Fills a dictionary with (run_id)->(signals) for each run.
+    # @logger_decorator(logger)
+    # def get_runs_dict_root(self, runs_roots = None, binning = None):
+    #     '''
+    #     Fills a dictionary with (run_id)->(signals) for each run.
 
-        Parameters:
-        - runs_dirs (list): The list of run directories to consider.
-        - binning (int): The binning factor for the histograms (optional).
-        - smooth (bool): Flag indicating whether to apply smoothing to the histograms (optional).
+    #     Parameters:
+    #     - runs_dirs (list): The list of run directories to consider.
+    #     - binning (int): The binning factor for the histograms (optional).
+    #     - smooth (bool): Flag indicating whether to apply smoothing to the histograms (optional).
 
-        Returns:
-        - runs_dict (dict): The dictionary of runs and their properties.
-        '''
-        if runs_roots is None:
-            runs_roots = self.runs_roots
-        for fname in runs_roots:
-            froot = ROOT.TFile.Open(fname, 'read') # pylint: disable=maybe-no-member
-            hist = froot.Get(self.h_names[0])
-            histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
-            datetime = np.array(Time.from_met_to_datetime(histx - 1))
-            names = ['datetime', 'MET']
-            arr_list = [datetime, histx]
+    #     Returns:
+    #     - runs_dict (dict): The dictionary of runs and their properties.
+    #     '''
+    #     if runs_roots is None:
+    #         runs_roots = self.runs_roots
+    #     for fname in runs_roots:
+    #         froot = ROOT.TFile.Open(fname, 'read') # pylint: disable=maybe-no-member
+    #         hist = froot.Get(self.h_names[0])
+    #         histx = np.array([hist.GetBinCenter(i) for i in range(1, hist.GetNbinsX() + 1)])
+    #         datetime = np.array(Time.from_met_to_datetime(histx - 1))
+    #         names = ['datetime', 'MET']
+    #         arr_list = [datetime, histx]
             
-            self.runs_times[fname] = (datetime[0], datetime[-1])
-            for h_name in self.h_names:
-                hist = froot.Get(h_name)
-                if binning:
-                    hist.Rebin(binning)
-                histc = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX() + 1)])
+    #         self.runs_times[fname] = (datetime[0], datetime[-1])
+    #         for h_name in self.h_names:
+    #             hist = froot.Get(h_name)
+    #             if binning:
+    #                 hist.Rebin(binning)
+    #             histc = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX() + 1)])
 
-                names.extend([h_name.split('hist_')[-1]])
-                arr_list.extend([histc])
-            self.runs_dict[fname] = np.rec.fromarrays(arrayList=arr_list, names=names)
-            froot.Close()
-        return self.runs_dict
+    #             names.extend([h_name.split('hist_')[-1]])
+    #             arr_list.extend([histc])
+    #         self.runs_dict[fname] = np.rec.fromarrays(arrayList=arr_list, names=names)
+    #         froot.Close()
+    #     return self.runs_dict
 
     @logger_decorator(logger)
     def get_signal_df_from_catalog(self) -> pd.DataFrame:
@@ -106,7 +93,7 @@ class CatalogReader():
         Returns:
         - runs_dict (pandas.Dataframe): The dataframe containing the signals for each run.
         '''
-        catalog_df = File.read_dfs_from_runs_pk_folder(folder_path=self.data_dir, add_smoothing=True, mode='mean', window=35)
+        catalog_df = File.read_dfs_from_runs_pk_folder(folder_path=self.data_dir, add_smoothing=True, mode='mean', window=35, start=self.start, stop=self.end)
         catalog_df['datetime'] = np.array(Time.from_met_to_datetime(catalog_df['MET'] - 1))
         self.runs_times['catalog'] = (catalog_df['datetime'][0], catalog_df['datetime'].iloc[-1])
         return catalog_df
@@ -117,6 +104,6 @@ if __name__ == '__main__':
 
     Plotter(df = tile_signal_df[['top', 'top_smooth', 'datetime']], label = 'Inputs').df_plot_tiles(x_col = 'datetime',
                                                                     excluded_cols = ['MET'],
-                                                                    marker = ',',
                                                                     smoothing_key='smooth',
+                                                                    y_cols=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg'],
                                                                     show = True)

@@ -136,7 +136,7 @@ class SpacecraftOpener:
         return Data.convert_to_df(self.data)
 
     @logger_decorator(logger)
-    def saa_boundary(self):
+    def saa_boundaries(self):
         '''The coordinates of the SAA boundary in latitude and East longitude
         
         Returns:
@@ -161,7 +161,7 @@ class SpacecraftOpener:
         Returns:
             pd.DataFrame: The spacecraft data with the SAA column added.
         '''
-        lat_saa, lon_saa = self.saa_boundary()
+        lat_saa, lon_saa = self.saa_boundaries()
         saa_path = Path(np.vstack((lon_saa, lat_saa)).T)
         sc_df_distance = np.sqrt((sc_df['LON_GEO'].diff())**2 + (sc_df['LAT_GEO'].diff())**2)
         sc_df_distance = (sc_df_distance > 1) & (sc_df_distance < 300)

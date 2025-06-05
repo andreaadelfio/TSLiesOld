@@ -2,23 +2,25 @@
 Plotter module for plotting data points and curves.
 '''
 import os
-import operator
 from datetime import timedelta
+import glob
+import gc
+import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import seaborn as sns
+from astropy.io import fits
 
 from sklearn.metrics import confusion_matrix
 try:
     from modules.utils import Logger, logger_decorator, Time
-    from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
+    from modules.config import DIR, BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 except:
     from utils import Logger, logger_decorator, Time
-    from config import BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
+    from config import DIR, BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 
 
 class Plotter:
@@ -53,70 +55,30 @@ class Plotter:
                 "font.size": 25
             })
 
-    @logger_decorator(logger)
-    def plot(self, marker = '-', lw = 0, show = True):
-        '''
-        Plot a single curve.
+    # @logger_decorator(logger)
+    # def plot_tiles(self, marker = '-', lw = 0.2, with_smooth = False, show = True):
+    #     '''
+    #     Plot multiple curves as tiles.
 
-        Parameters:
-        ----------
-            marker (str): The marker style for the plot (default: '-').
-        '''
-        plt.figure()
-        plt.tight_layout(pad = 0.4)
-        plt.plot(self.x, self.y, marker = marker, lw = lw, label = self.label)
-        plt.legend()
-        plt.title(self.label)
-        plt.xlim(self.x[0], self.x[len(self.x) - 1])
-        if show:
-            plt.show()
-
-    @logger_decorator(logger)
-    def plot_tiles(self, marker = '-', lw = 0.2, with_smooth = False, show = True):
-        '''
-        Plot multiple curves as tiles.
-
-        Parameters:
-        ----------
-            lw (float): Line width of the curves (default: 0.1).
-            with_smooth (bool): Whether to plot smoothed curves as well (default: False).
-        '''
-        i = 0
-        _, axs = plt.subplots(len(self.xy), 1, sharex=True)
-        plt.tight_layout(pad = 0.4)
-        axs[0].set_title(self.label)
-        for label, xy in self.xy.items():
-            axs[i].plot(xy[0], xy[1], marker = marker, lw = lw, label=label)
-            if with_smooth:
-                axs[i].plot(xy[0], xy[2], marker = marker, label=f'{label} smooth')
-            axs[i].legend()
-            axs[i].grid()
-            axs[i].set_xlim(xy[0][0], xy[0][-1])
-            i += 1
-        if show:
-            plt.show()
-
-    @logger_decorator(logger)
-    def multiplot(self, marker = '-', lw = 0.1, with_smooth = False, show = True):
-        '''
-        Plots multiple curves on the same figure. Uses the `xy` variable passed to the Plotter.
-
-        Parameters:
-        ----------
-            lw (float): Line width of the curves (default: 0.1).
-            with_smooth (bool): Whether to plot smoothed curves as well (default: False).
-        '''
-        plt.figure()
-        plt.tight_layout(pad = 0.4)
-        plt.title(self.label)
-        for label, xy in self.xy.items():
-            plt.plot(xy[0], xy[1], marker = marker, lw = lw, label = label)
-            if with_smooth:
-                plt.plot(xy[0], xy[2], marker = marker, label = f'{label} smooth')
-            plt.legend()
-        plt.xlim(xy[0][0], xy[0][-1])
-        if show:
-            plt.show()
+    #     Parameters:
+    #     ----------
+    #         lw (float): Line width of the curves (default: 0.1).
+    #         with_smooth (bool): Whether to plot smoothed curves as well (default: False).
+    #     '''
+    #     i = 0
+    #     _, axs = plt.subplots(len(self.xy), 1, sharex=True)
+    #     plt.tight_layout(pad = 0.4)
+    #     axs[0].set_title(self.label)
+    #     for label, xy in self.xy.items():
+    #         axs[i].plot(xy[0], xy[1], marker = marker, lw = lw, label=label)
+    #         if with_smooth:
+    #             axs[i].plot(xy[0], xy[2], marker = marker, label=f'{label} smooth')
+    #         axs[i].legend()
+    #         axs[i].grid()
+    #         axs[i].set_xlim(xy[0][0], xy[0][-1])
+    #         i += 1
+    #     if show:
+    #         plt.show()
 
     @logger_decorator(logger)
     def df_plot_corr_tiles(self, x_col, excluded_cols = None, marker = '-', ms = 1, lw = 0.1, smoothing_key = 'smooth', show = True):
@@ -167,7 +129,7 @@ class Plotter:
             plt.show()
 
     @logger_decorator(logger)
-    def df_plot_tiles(self, y_cols, x_col, top_x_col = None, excluded_cols = None, init_marker = '-', lw = 0.1, smoothing_key = 'smooth', show = True, save = False, units = {}):
+    def df_plot_tiles(self, y_cols, x_col, latex_y_cols, top_x_col = None, excluded_cols = None, init_marker = ',', lw = 0.1, smoothing_key = 'smooth', show = True, save = False, units = None, show_std=True):
         '''
         Plot multiple curves as tiles.
 
@@ -176,7 +138,8 @@ class Plotter:
             lw (float): Line width of the curves (default: 0.1).
             with_smooth (bool): Whether to plot smoothed curves as well (default: False).
         '''
-
+        if units is None:
+            units = {}
         if not excluded_cols:
             excluded_cols = []
         df_columns = [column for column in self.df.columns if f'_{smoothing_key}' not in column and '_std' not in column and column not in excluded_cols and column != x_col and column != top_x_col]
@@ -195,11 +158,13 @@ class Plotter:
             if column in y_cols:
                 fmt = 'k-.'
                 plot_lw = None
-            axs[i].plot(x.values, self.df[column], fmt, lw=plot_lw, label=f"{column} [{units[column] if column in units else 'NA'}]")
+            label = f"${latex_y_cols[column]}$ [${units[column] if column in units else 'NA'}$]" if column in latex_y_cols else f'{column} [{units[column] if column in units else "NA"}]'
+            axs[i].plot(x.values, self.df[column], fmt, lw=plot_lw, label=label)
 
             if smoothing_key and f'{column}_{smoothing_key}' in self.df.columns:
-                axs[i].plot(x.values, self.df[f'{column}_{smoothing_key}'], 'r-', ms=0.2, label=f'{column} {smoothing_key}')
-                if f'{column}_std' in self.df.columns:
+                label = f'${latex_y_cols[column]}$ {smoothing_key}' if column in latex_y_cols else f'{column} {smoothing_key}'
+                axs[i].plot(x.values, self.df[f'{column}_{smoothing_key}'], 'r-', ms=0.2, label=label)
+                if f'{column}_std' in self.df.columns and show_std:
                     axs[i].fill_between(x.values, self.df[f'{column}_{smoothing_key}']-self.df[f'{column}_std'], self.df[f'{column}_{smoothing_key}']+self.df[f'{column}_std'], label='prediction error')
             
             if i >= n_cols * (n_rows - 1) - (n_cols * n_rows - n_plots):
@@ -239,6 +204,7 @@ class Plotter:
                 os.path.join(self.label),
                 dpi=200, bbox_inches='tight')
             plt.close(fig)
+            gc.collect()
 
     @logger_decorator(logger)
     def plot_tile(self, tiles_df, face='top', col='datetime', smoothing_key = 'smooth', units = {}, support_vars = None, show_std=True, save=False):
@@ -271,23 +237,23 @@ class Plotter:
 
         plt.show()
         if save:
-            print(os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'Output.png'))
+            # print(os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'Output.png'))
             fig.savefig(
                 os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'Output.png'),
                 dpi=200, bbox_inches='tight')
 
-    @logger_decorator(logger)
-    def plot_pred_true(self, tiles_df, col_pred=['top_pred', 'Xpos_pred', 'Xneg_pred', 'Ypos_pred', 'Yneg_pred'], y_cols_raw=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']):
-        with sns.plotting_context("talk"):
-            fig = plt.figure("pred_vs_true", layout="tight")
-            fig.set_size_inches(24, 12)
-            plt.axis('equal')
-            plt.plot(tiles_df[y_cols_raw], tiles_df[col_pred], '.', alpha=0.2)
-            min_y, max_y = min(tiles_df[col_pred].min()), max(tiles_df[col_pred].max())
-            plt.plot([min_y, max_y], [min_y, max_y], '-')
-            plt.xlabel('True signal')
-            plt.ylabel('Predicted signal')
-        plt.legend(y_cols_raw)
+    # @logger_decorator(logger)
+    # def plot_pred_true(self, tiles_df, col_pred=['top_pred', 'Xpos_pred', 'Xneg_pred', 'Ypos_pred', 'Yneg_pred'], y_cols_raw=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']):
+    #     with sns.plotting_context("talk"):
+    #         fig = plt.figure("pred_vs_true", layout="tight")
+    #         fig.set_size_inches(24, 12)
+    #         plt.axis('equal')
+    #         plt.plot(tiles_df[y_cols_raw], tiles_df[col_pred], '.', alpha=0.2)
+    #         min_y, max_y = min(tiles_df[col_pred].min()), max(tiles_df[col_pred].max())
+    #         plt.plot([min_y, max_y], [min_y, max_y], '-')
+    #         plt.xlabel('True signal')
+    #         plt.ylabel('Predicted signal')
+    #     plt.legend(y_cols_raw)
 
     @logger_decorator(logger)
     def plot_history(self, history):
@@ -326,23 +292,65 @@ class Plotter:
         if show:
             plt.show()
 
-    @logger_decorator(logger)
-    def plot_anomalies(self, support_vars, thresholds, tiles_df, y_cols, y_pred_cols, save=True, show=False, extension='png', units={}):
-        '''Plots the anomalies passed as `df` in Plotter.'''
-        if not os.path.exists(PLOT_TRIGGER_FOLDER_NAME):
-            os.makedirs(PLOT_TRIGGER_FOLDER_NAME)
+    def read_fits_file(self):
+        fits_file_path = os.path.join(DIR, 'catalogs', 'total_catalog.fits')
+        file_paths = glob.glob(fits_file_path)
+        df = pd.DataFrame()
+        for file_path in file_paths:
+            with fits.open(file_path) as hdul:
+                data = hdul[1].data
+                df_tmp = pd.DataFrame(data)
+                df_tmp['TRIGGER_TIME'] = pd.to_datetime(df_tmp['TRIGGER_TIME'], utc=False)
+                df_tmp['END_TIME'] = pd.to_datetime(df_tmp['END_TIME'], utc=False)
+                df_tmp['TIME'] = pd.to_datetime(df_tmp['TIME'], utc=False)
+                df = pd.concat([df, df_tmp])
+        return df
 
-        for anomaly_start, anomalies in tqdm(self.df.items(), desc='Plotting anomalies'):
+    def read_detections_files(self, directory):
+        sorted_df = pd.read_csv(directory)
+        sorted_df['start_datetime'] = pd.to_datetime(sorted_df['start_datetime'], utc=False)
+        sorted_df['stop_datetime'] = pd.to_datetime(sorted_df['stop_datetime'], utc=False)
+        return sorted_df
+    
+    @logger_decorator(logger)
+    def plot_anomalies_in_catalog(self, trigger_algo_type, support_vars, thresholds, tiles_df, y_cols, y_pred_cols, only_in_catalog=True, save=True, show=False, extension='png', units={}, latex_y_cols={}, detections_file_path=''):
+        '''Plots the anomalies passed as `df` in Plotter.'''
+        # if not os.path.exists(PLOT_TRIGGER_FOLDER_NAME):
+        #     os.makedirs(PLOT_TRIGGER_FOLDER_NAME)
+        # tiles_df['datetime'] = pd.to_datetime(tiles_df['datetime'], utc=True)
+        
+        fits_df = self.read_fits_file()
+        detections_df = self.read_detections_files(detections_file_path)
+        
+        results = {}
+        for detection in detections_df.itertuples():
+            comparison_df = fits_df[
+                ((fits_df['TIME'] <= np.datetime64(detection.start_datetime)) & (np.datetime64(detection.start_datetime) <= fits_df['END_TIME'])) |
+                ((fits_df['TIME'] <= np.datetime64(detection.stop_datetime)) & (np.datetime64(detection.stop_datetime) <= fits_df['END_TIME']))
+            ]
+            if len(comparison_df) > 0:
+                for row in comparison_df.itertuples():
+                    if row not in [result['catalog_triggers'] for result in results.values()] or detection.start_datetime.strftime('%Y-%m-%d %H:%M:%S') not in results:
+                        results[detection.start_datetime.strftime('%Y-%m-%d %H:%M:%S')] = {
+                            'det_start_met': detection.start_met,
+                            'det_stop_met': detection.stop_met,
+                            'det_start_datetime': detection.start_datetime,
+                            'det_stop_datetime': detection.stop_datetime,
+                            'det_faces': detection.triggered_faces,
+                            'catalog_triggers': [row._asdict()]
+                        }
+                    else:
+                        results[detection.start_met]['catalog_triggers'] += row._asdict()
+
+        for an_time, anomalies in tqdm(self.df.items(), desc=f'Plotting anomalies with {trigger_algo_type}'):
             faces = list(anomalies.keys())
             
-            # Define the number of rows dynamically (space between signal and residuals + support vars)
             num_signal_residual_pairs = len(y_cols)
             num_support_vars = len(support_vars)
             total_rows = 2 * num_signal_residual_pairs + num_support_vars
 
-            # Use GridSpec for custom subplot layout
             fig = plt.figure(figsize=(8.5, 7.5 + 0.37 * total_rows))
-            gs0 = GridSpec(6, 1, figure=fig, hspace=0.2, left=0.1, right=0.99, top=0.98, bottom=0.04)
+            gs0 = GridSpec(num_signal_residual_pairs + num_support_vars, 1, figure=fig, hspace=0.05, left=0.1, right=0.99, top=0.98, bottom=0.04)
             gss = []
             for i in range(num_signal_residual_pairs):
                 gss.append(GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[i], hspace=0.))
@@ -351,87 +359,266 @@ class Plotter:
             axs = []
 
             anomaly_end = -1
+            anomaly_start = tiles_df.index[-1]
             for anomaly in anomalies.values():
-                if anomaly['stopping_time'] > anomaly_end:
-                    anomaly_end = anomaly['stopping_time']
-            anomaly_delta = max((anomaly_end - int(anomaly_start)) // 5, 120)
+                if anomaly['stop_index'] > anomaly_end:
+                    anomaly_end = anomaly['stop_index']
+                if anomaly['start_index'] < anomaly_start:
+                    anomaly_start = anomaly['start_index']
+            in_catalog = tiles_df['datetime'][anomaly_start].strftime('%Y-%m-%d %H:%M:%S') in results
+            if not in_catalog and only_in_catalog:
+                plt.close(fig)
+                continue
+            if in_catalog:
+                cat_event = results[tiles_df['datetime'][anomaly_start].strftime('%Y-%m-%d %H:%M:%S')]['catalog_triggers'][0]
+            anomaly_duration = anomaly_end - int(anomaly_start)
+            anomaly_delta = max((anomaly_duration) // 5, 120)
             start = max(int(anomaly_start) - anomaly_delta, 0)
             end = min(anomaly_end + anomaly_delta, len(tiles_df))
             start_xlim = tiles_df['datetime'][int(anomaly_start)] - timedelta(seconds=anomaly_delta)
             end_xlim = tiles_df['datetime'][anomaly_end] + timedelta(seconds=anomaly_delta-1)
-            i=0
+
+            tiles_df_subset = tiles_df[start:end]
+
+            latex_faces = [latex_y_cols[col] for col in faces]
+            i = 0
             for face, face_pred in zip(y_cols, y_pred_cols):
-                current_row = 0
+                formatter = mticker.ScalarFormatter(useMathText=True)
+                formatter.set_powerlimits((0, 0))
                 ax_signal = fig.add_subplot(gss[i][:-1, :])
-                current_row += 1
                 axs.append(ax_signal)
 
                 ax_residuals = fig.add_subplot(gss[i][-1, :], sharex=ax_signal)
-                current_row += 1
                 axs.append(ax_residuals)
 
-                current_row += 1
 
                 face_color = "black"
+                max_val = max(max(tiles_df_subset[f'{face}_significance']), thresholds[face] * 1.1)
                 if face in faces:
-                    face_color = None
-                    changepoint = anomalies[face]['changepoint']
-                    stopping_time = anomalies[face]['stopping_time']
+                    # face_color = None
+                    changepoint = anomalies[face]['stop_index']
+                    stopping_time = anomalies[face]['start_index']
                     ax_signal.axvline(tiles_df['datetime'][changepoint], color='red', lw=0.8)
                     ax_signal.axvline(tiles_df['datetime'][stopping_time], color='red', lw=0.8)
                     ax_signal.fill(
                         (tiles_df['datetime'][int(anomaly_start)], tiles_df['datetime'][anomaly_end],
                         tiles_df['datetime'][anomaly_end], tiles_df['datetime'][int(anomaly_start)]),
-                        (-5, -5, 15, 15), color="yellow", alpha=0.1
+                        (-5, -5, max_val, max_val), color="red", alpha=0.1
                     )
                     ax_residuals.axvline(tiles_df['datetime'][changepoint], color='red', lw=0.8)
                     ax_residuals.axvline(tiles_df['datetime'][stopping_time], color='red', lw=0.8)
                     ax_residuals.fill(
                         (tiles_df['datetime'][int(anomaly_start)], tiles_df['datetime'][anomaly_end],
                         tiles_df['datetime'][anomaly_end], tiles_df['datetime'][int(anomaly_start)]),
-                        (-5, -5, 15, 15), color="yellow", alpha=0.1
+                        (-5, -5, max_val, max_val), color="red", alpha=0.1
                     )
-                ax_residuals.set_ylabel(f'{face} [{units[face]}]')
-                ax_residuals.yaxis.set_label_coords(-0.06,1.02)
+                    if in_catalog:
+                        ax_signal.axvline(cat_event['TIME'], color='green', lw=0.8)
+                        ax_signal.axvline(cat_event['TRIGGER_TIME'], color='blue', lw=0.8)
+                        ax_signal.axvline(cat_event['END_TIME'], color='green', lw=0.8)
+                        ax_signal.fill(
+                            (cat_event['TIME'], cat_event['END_TIME'],
+                            cat_event['END_TIME'], cat_event['TIME']),
+                            (-5, -5, max_val, max_val), color="yellow", alpha=0.1
+                        )
+                        ax_residuals.axvline(cat_event['TIME'], color='green', lw=0.8)
+                        ax_residuals.axvline(cat_event['TRIGGER_TIME'], color='blue', lw=0.8)
+                        ax_residuals.axvline(cat_event['END_TIME'], color='green', lw=0.8)
+                        ax_residuals.fill(
+                            (cat_event['TIME'], cat_event['END_TIME'],
+                            cat_event['END_TIME'], cat_event['TIME']),
+                            (-5, -5, max_val, max_val), color="yellow", alpha=0.1
+                        )
+                # ax_residuals.set_ylabel(f'${latex_y_cols[face]}$')
+                # ax_residuals_2 = ax_residuals.twinx()
+                # ax_residuals_2.tick_params(axis='y', which='both', left=False, right=False, labelleft=False, labelright=False)
+                # ax_residuals_2.set_ylabel(f'[{units[face]}]')
 
-                # ax_residuals.set_ylabel()
-                ax_residuals.axhline(thresholds[face], color="orange", label=f"${thresholds[face]}\\sigma$")
-                ax_residuals.plot(tiles_df[start:end]['datetime'], tiles_df[start:end][f'{face}_significance'],
-                                color="blue", label=r"k-score $S$", lw=0.7)
-                # ax_residuals.plot(tiles_df[start:end]['datetime'], tiles_df[start:end][face] - tiles_df[start:end][face_pred],
-                #                 label='residuals', color=face_color)
-                ax_signal.plot(tiles_df[start:end]['datetime'], tiles_df[start:end][face], label='signal',
+                ax_residuals.yaxis.set_label_coords(-0.06, 1.02)
+                ax_signal.yaxis.set_label_coords(-0.06, 1.02)
+
+                if f'{face}_std' in tiles_df.columns:
+                    ax_signal.fill_between(tiles_df_subset['datetime'], tiles_df_subset[face_pred] - tiles_df_subset[f'{face}_std'], tiles_df_subset[face_pred] + tiles_df_subset[f'{face}_std'], alpha=0.6)
+                    
+                ax_residuals.axhline(thresholds[face], color="darkorange", ls='-.', label=f"${thresholds[face]}\\sigma$ threshold")
+                ax_residuals.plot(tiles_df_subset['datetime'], tiles_df_subset[f'{face}_significance'],
+                                color="blue", label=f"$S_{{{trigger_algo_type}}}$", lw=0.7)
+                ax_signal.plot(tiles_df_subset['datetime'], tiles_df_subset[face], label=f'${latex_y_cols[face]}$',
                             color=face_color)
-                ax_signal.plot(tiles_df[start:end]['datetime'], tiles_df[start:end][face_pred], label='background',
+                ax_signal.plot(tiles_df_subset['datetime'], tiles_df_subset[face_pred], label='background',
                             color='red')
-                ax_signal.legend(loc="upper left")
-                ax_residuals.legend(loc="upper left")
-                max_val = max(max(tiles_df[start:end][f'{face}_significance']), thresholds[face] * 1.1)
-                ax_signal.set_ylim(min(tiles_df[start:end][face]), 1.01 * max(tiles_df[start:end][face]))
+                ax_signal.yaxis.set_major_formatter(formatter)
+                ax_signal.set_ylabel(f'$[{units[face]}]$')
+                ax_signal.legend(loc="upper right")
+                ax_residuals.legend(loc="upper right")
+                ax_signal.set_ylim(min(tiles_df_subset[face]), 1.01 * max(tiles_df_subset[face]))
                 ax_residuals.set_ylim(0, 1.01 * max_val)
                 ax_signal.set_xlim(start_xlim, end_xlim)
                 ax_residuals.set_xlim(start_xlim, end_xlim)
 
+                # ax_signal.tick_params(axis="y", labelrotation=45)
+                # ax_residuals.tick_params(axis="y", labelrotation=45)
+                
                 plt.setp(ax_signal.get_xticklabels(), visible=False)
-                i+=1
+                if num_support_vars > 0 or i < len(y_cols) - 1:
+                    plt.setp(ax_residuals.get_xticklabels(), visible=False)
+                i += 1
+                
+            for var in support_vars:
+                formatter = mticker.ScalarFormatter(useMathText=True)
+                formatter.set_powerlimits((0, 0))
+                ax_support = fig.add_subplot(gss[i][0:1, :])
+                axs.append(ax_support)
+                ax_support.plot(tiles_df_subset['datetime'], tiles_df_subset[var], color="green", label=var)
+                ax_support.set_ylabel(f'[{units[var] if var in units else "N/A"}]')
+                ax_support.yaxis.set_major_formatter(formatter)
+                ax_support.legend(loc="upper right")
+
+            plt.draw()
+            fig.canvas.draw()
+            for ax in axs:
+                ax.grid(ls='--', alpha=0.6)
+                current_label = ax.yaxis.get_label().get_text()
+                offset_text = ax.yaxis.get_offset_text().get_text()
+                if current_label:
+                    ax.set_ylabel(f'{current_label}\n({offset_text})')
+                ax.yaxis.offsetText.set_visible(False)
+
+            axs[-1].set_xlim(start_xlim, end_xlim)
+            start_datetime = tiles_df['datetime'][int(anomaly_start)].strftime('%Y-%m-%d %H:%M:%S')
+            axs[-1].set_xlabel(f"datetime ({start_datetime})")
+            axs[0].set_title(f"Triggers with {trigger_algo_type} in ${', '.join(latex_faces)}$, $t_{{{'trigger'}}}$={start_datetime}, duration={anomaly_duration}s")
+
+            if save:
+                path_name = f"{start_datetime}_{'_'.join(faces)}_{cat_event['NAME']}_{cat_event['CAT_NAME']}" if in_catalog else f"{start_datetime}_{'_'.join(faces)}"
+                fig.savefig(
+                    os.path.join(PLOT_TRIGGER_FOLDER_NAME, f"{path_name}.{extension}"),
+                    dpi=180, bbox_inches='tight')
+            if show:
+                plt.show()
+            plt.close('all')
+
+        results_path = os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'comparison_results.csv')
+        if not os.path.exists(results_path):
+            results_df = pd.DataFrame(results.values())
+        else:
+            results_df = pd.read_csv(results_path)
+            results_df = pd.concat([results_df, pd.DataFrame(results.values())])
+        if results_df.empty:
+            return
+        results_df.to_csv(results_path, index=False)
+
+
+    
+    @logger_decorator(logger)
+    def plot_anomalies(self, trigger_algo_type, support_vars, thresholds, tiles_df, y_cols, y_pred_cols, save=True, show=False, extension='png', units={}, latex_y_cols={}):
+        '''Plots the anomalies passed as `df` in Plotter.'''
+        for an_time, anomalies in tqdm(self.df.items(), desc=f'Plotting anomalies with {trigger_algo_type}'):
+            faces = list(anomalies.keys())
+            
+            num_signal_residual_pairs = len(y_cols)
+            num_support_vars = len(support_vars)
+            total_rows = 2 * num_signal_residual_pairs + num_support_vars
+
+            fig = plt.figure(figsize=(8.5, 7.5 + 0.37 * total_rows))
+            gs0 = GridSpec(num_signal_residual_pairs + num_support_vars, 1, figure=fig, hspace=0.2, left=0.1, right=0.99, top=0.98, bottom=0.04)
+            gss = []
+            for i in range(num_signal_residual_pairs):
+                gss.append(GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[i], hspace=0.))
+            gss.append(GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[-1], hspace=0.))
+
+            axs = []
+
+            anomaly_end = -1
+            anomaly_start = tiles_df.index[-1]
+            for anomaly in anomalies.values():
+                if anomaly['start_index'] > anomaly_end:
+                    anomaly_end = anomaly['start_index']
+                if anomaly['stop_index'] < anomaly_start:
+                    anomaly_start = anomaly['stop_index']
+            anomaly_delta = 20#max((anomaly_end - int(anomaly_start)) // 5, 120)
+            start = max(int(anomaly_start) - anomaly_delta, 0)
+            end = min(anomaly_end + anomaly_delta, len(tiles_df))
+            start_xlim = tiles_df['DAT_DEFF'][int(anomaly_start)] - timedelta(seconds=anomaly_delta)
+            end_xlim = tiles_df['DAT_DEFF'][anomaly_end] + timedelta(seconds=anomaly_delta-1)
+
+            tiles_df_subset = tiles_df[start:end]
+
+            i = 0
+            for face, face_pred in zip(y_cols, y_pred_cols):
+                ax_signal = fig.add_subplot(gss[i][:-1, :])
+                axs.append(ax_signal)
+
+                ax_residuals = fig.add_subplot(gss[i][-1, :], sharex=ax_signal)
+                axs.append(ax_residuals)
+
+
+                face_color = "black"
+                max_val = max(max(tiles_df_subset[f'{face}_significance']), thresholds[face] * 1.1)
+                if face in faces:
+                    face_color = None
+                    changepoint = anomalies[face]['stop_index']
+                    stopping_time = anomalies[face]['start_index']
+                    ax_signal.axvline(tiles_df['DAT_DEFF'][changepoint], color='red', lw=0.8)
+                    ax_signal.axvline(tiles_df['DAT_DEFF'][stopping_time], color='red', lw=0.8)
+                    ax_signal.fill(
+                        (tiles_df['DAT_DEFF'][int(anomaly_start)], tiles_df['DAT_DEFF'][anomaly_end],
+                        tiles_df['DAT_DEFF'][anomaly_end], tiles_df['DAT_DEFF'][int(anomaly_start)]),
+                        (-5, -5, max_val, max_val), color="red", alpha=0.1
+                    )
+                    ax_residuals.axvline(tiles_df['DAT_DEFF'][changepoint], color='red', lw=0.8)
+                    ax_residuals.axvline(tiles_df['DAT_DEFF'][stopping_time], color='red', lw=0.8)
+                    ax_residuals.fill(
+                        (tiles_df['DAT_DEFF'][int(anomaly_start)], tiles_df['DAT_DEFF'][anomaly_end],
+                        tiles_df['DAT_DEFF'][anomaly_end], tiles_df['DAT_DEFF'][int(anomaly_start)]),
+                        (-5, -5, max_val, max_val), color="red", alpha=0.1
+                    )
+                ax_residuals.set_ylabel(f'${face}$')
+                ax_residuals_2 = ax_residuals.twinx()
+                ax_residuals_2.tick_params(axis='y', which='both', left=False, right=False, labelleft=False, labelright=False)
+                if face in units:
+                    ax_residuals_2.set_ylabel(f'[{units[face]}]')
+
+                ax_residuals.yaxis.set_label_coords(-0.06, 1.02)
+                ax_residuals_2.yaxis.set_label_coords(1.02, 1.02)
+
+                if f'{face}_std' in tiles_df.columns:
+                    ax_signal.fill_between(tiles_df_subset['DAT_DEFF'], tiles_df_subset[face_pred] - tiles_df_subset[f'{face}_std'], tiles_df_subset[face_pred] + tiles_df_subset[f'{face}_std'], label='prediction error', alpha=0.7)
+                    
+                ax_residuals.axhline(thresholds[face], color="orange", label=f"${thresholds[face]}\\sigma$")
+                ax_residuals.plot(tiles_df_subset['DAT_DEFF'], tiles_df_subset[f'{face}_significance'],
+                                color="blue", label=r"$S$", lw=0.7)
+                ax_signal.plot(tiles_df_subset['DAT_DEFF'], tiles_df_subset[face], label='signal',
+                            color=face_color)
+                ax_signal.plot(tiles_df_subset['DAT_DEFF'], tiles_df_subset[face_pred], label='background',
+                            color='red')
+                ax_signal.legend(loc="upper left")
+                ax_residuals.legend(loc="upper left")
+                # ax_signal.set_ylim(min(tiles_df_subset[face]), 1.01 * max(tiles_df_subset[face]))
+                # ax_residuals.set_ylim(0, 1.01 * max_val)
+                ax_signal.set_xlim(start_xlim, end_xlim)
+                ax_residuals.set_xlim(start_xlim, end_xlim)
+
+                plt.setp(ax_signal.get_xticklabels(), visible=False)
+                i += 1
 
             for var in support_vars:
                 ax_support = fig.add_subplot(gss[i][0:1, :])
                 axs.append(ax_support)
 
-                ax_support.plot(tiles_df[start:end]['datetime'], tiles_df[start:end][var], color="green", label=var)
+                ax_support.plot(tiles_df_subset['DAT_DEFF'], tiles_df_subset[var], color="green", label=var)
                 ax_support.set_ylabel(f'[{units[var] if var in units else "NA"}]')
                 ax_support.legend(loc="upper left")
 
             axs[-1].set_xlim(start_xlim, end_xlim)
-            start_datetime = tiles_df['datetime'][int(anomaly_start)]
-            stop_datetime = tiles_df['datetime'][anomaly_end]
-            axs[-1].set_xlabel(f"datetime {start_datetime - timedelta(seconds=anomaly_delta)}")
-            axs[0].set_title(f"Triggers in ${', '.join(faces)}$ between {start_datetime} and {stop_datetime}")
+            start_datetime = tiles_df['DAT_DEFF'][int(anomaly_start)].strftime('%Y-%m-%d %H:%M:%S')
+            stop_datetime = tiles_df['DAT_DEFF'][anomaly_end].strftime('%Y-%m-%d %H:%M:%S')
+            axs[-1].set_xlabel(f"datetime {tiles_df['DAT_DEFF'][int(anomaly_start)] - timedelta(seconds=anomaly_delta)}")
+            axs[0].set_title(f"Triggers from {trigger_algo_type} in ${', '.join(faces)}$ between {start_datetime} and {stop_datetime}")
 
             if save:
                 fig.savefig(
-                    os.path.join(PLOT_TRIGGER_FOLDER_NAME, f"{tiles_df['datetime'][changepoint]}_{'_'.join(faces)}.{extension}"),
+                    os.path.join('intesa sanpaolo', f"{start_datetime}_{'_'.join(faces)}.{extension}"),
                     dpi=200, bbox_inches='tight')
             if show:
                 plt.show()
@@ -456,3 +643,4 @@ class Plotter:
 
 if __name__ == '__main__':
     print('to do')
+    print(Plotter().read_fits_file())
