@@ -7,21 +7,22 @@ TODO:
 '''
 
 # MARK: Imports
-import sys
 import os
 import pandas as pd
 # import numpy as np
 from tqdm import tqdm
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from modules.plotter import Plotter
 from modules.utils import Data, File, Time, Logger, logger_decorator
 from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME, INPUTS_OUTPUTS_FILE_PATH
-from modules.background import FFNNPredictor, PBNNPredictor, BNNPredictor, RNNPredictor, MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor
+from modules.background.ffnnpredictor import FFNNPredictor
+from modules.background.pbnnpredictor import PBNNPredictor  
+from modules.background.bnnpredictor import BNNPredictor
+from modules.background.rnnpredictor import RNNPredictor
+from modules.background.knnpredictors import MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor
 from modules.spacecraft import SpacecraftOpener
-from modules.catalog import CatalogReader
+from modules.dataset import DatasetReader
 from modules.solar import SunMonitor
 from modules.trigger import Trigger
 from pipeline_config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded, units, h_names, y_smooth_cols
@@ -33,8 +34,8 @@ logger = Logger('Anomaly Detection Pipeline').get_logger()
 def get_tiles_signal_df():
     '''Get the tile signal dataframe from the catalog'''
     print('Catalog...', end='')
-    cr = CatalogReader(h_names=h_names, start=0, end=-1)
-    tile_signal_df = cr.get_signal_df_from_catalog()
+    cr = DatasetReader(h_names=h_names, start=0, end=-1)
+    tile_signal_df = cr.get_signal_df_from_dataset()
     runs_times = cr.get_runs_times()
     weeks_list = Time.get_week_from_datetime(runs_times)
     print(' done')
@@ -87,15 +88,15 @@ if __name__ == '__main__':
 
     # MARK: Get inputs_outputs dataframe
     # inputs_outputs_df = get_inputs_outputs_df()
-    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder('inputs_outputs', start=0, stop=818)
+    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=1000)
     # inputs_outputs_df = File().read_dfs_from_weekly_pk_folder('inputs_outputs', start=0, stop=839)
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
     #                                               start='2024-06-20 23:10:00',
     #                                               stop='2024-06-20 23:20:00')
 
     # exclude points with negative values
-    for col in y_cols_raw:
-        inputs_outputs_df = inputs_outputs_df[inputs_outputs_df[col] > 0.01]
+    # for col in y_cols_raw:
+    #     inputs_outputs_df = inputs_outputs_df[inputs_outputs_df[col] > 0.01]
 
     Plotter(df = inputs_outputs_df[y_cols+ y_smooth_cols + ['datetime', 'MET']], label = 'Outputs').df_plot_tiles(
                                                     y_cols=y_cols,
@@ -111,14 +112,14 @@ if __name__ == '__main__':
 
     # MARK: Choose NN model
     # nn = FFNNPredictor(inputs_outputs_df, y_cols, x_cols, y_cols_raw, y_pred_cols, False)
-    # nn = PBNNPredictor(inputs_outputs_df, y_cols, x_cols, y_cols_raw, y_pred_cols, False)
-    nn = BNNPredictor(inputs_outputs_df, y_cols, x_cols, y_cols_raw, y_smooth_cols, y_pred_cols, False)
+    nn = PBNNPredictor(inputs_outputs_df, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, False)
+    # nn = BNNPredictor(inputs_outputs_df, y_cols, x_cols, y_cols_raw, y_smooth_cols, y_pred_cols, False)
     # nn = RNNPredictor(inputs_outputs_df, y_cols, x_cols, y_cols_raw, y_pred_cols, False)
 
     # MARK: Set NN hyperparameters
     hyperparams_combinations = {
-        'units_for_layers' : ([100], [90], [90], [90], [90], [90], [70], [40]),
-        'epochs' : [150],
+        'units_for_layers' : ([100], [90], [70], [40]),
+        'epochs' : [30],
         'bs' : [1000],
         'do' : [0.02],
         'norm' : [0],
@@ -128,31 +129,31 @@ if __name__ == '__main__':
         'loss_type' : ['mae']
     }
 
-    # for params in nn.get_hyperparams_combinations(hyperparams_combinations, use_previous=False):
-    #     nn.set_hyperparams(params)
-    #     nn.create_model()
-    #     history = nn.train()
-    #     if history.history['loss'][-1] > 0.0040:
-    #         continue
-    #     Plotter().plot_history(history)
-    #     nn.update_summary()
-    #     Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
-    #     for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
-    #                        ('2024-03-28 20:50:00', '2024-03-28 21:10:00'),
-    #                        ('2024-05-08 20:30:00', '2024-05-08 23:40:00'),
-    #                        ('2024-05-11 01:00:00', '2024-05-11 03:00:00'),
-    #                        ('2024-05-15 14:15:00', '2024-05-15 15:40:00'),
-    #                        ('2024-05-08 01:00:00', '2024-05-08 05:00:00'), 
-    #                        ('2024-06-20 23:10:00', '2024-06-20 23:20:00'), 
-    #                        ('2024-06-23 05:35:00', '2024-06-23 14:40:00'), 
-    #                        (str(inputs_outputs_df['datetime'].iloc[0]), str(inputs_outputs_df['datetime'].iloc[35000])),
-    #                        (str(inputs_outputs_df['datetime'].iloc[35000]), str(inputs_outputs_df['datetime'].iloc[43000]))]:
-    #         nn.predict(start=start, end=end, mask_column='datetime', write_bkg=False, save_predictions_plot=True, support_variables=['GOES_XRSA_HARD_EARTH_OCCULTED'])
+    for params in nn.get_hyperparams_combinations(hyperparams_combinations, use_previous=False):
+        nn.set_hyperparams(params)
+        nn.create_model()
+        history = nn.train()
+        if history.history['loss'][-1] > 0.0040:
+            continue
+        Plotter().plot_history(history)
+        nn.update_summary()
+        Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
+        for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
+                           ('2024-03-28 20:50:00', '2024-03-28 21:10:00'),
+                           ('2024-05-08 20:30:00', '2024-05-08 23:40:00'),
+                           ('2024-05-11 01:00:00', '2024-05-11 03:00:00'),
+                           ('2024-05-15 14:15:00', '2024-05-15 15:40:00'),
+                           ('2024-05-08 01:00:00', '2024-05-08 05:00:00'), 
+                           ('2024-06-20 23:10:00', '2024-06-20 23:20:00'), 
+                           ('2024-06-23 05:35:00', '2024-06-23 14:40:00'), 
+                           (str(inputs_outputs_df['datetime'].iloc[0]), str(inputs_outputs_df['datetime'].iloc[35000])),
+                           (str(inputs_outputs_df['datetime'].iloc[35000]), str(inputs_outputs_df['datetime'].iloc[43000]))]:
+            nn.predict(start=start, end=end, mask_column='datetime', write_bkg=False, save_predictions_plot=True, support_variables=['GOES_XRSA_HARD_EARTH_OCCULTED'])
 
 
     # MARK: Choose best model and trigger on the predicted data
-    nn.set_model(model_path='results/2025-02-21/background_prediction/1230/BNNPredictor/0/model.keras', compile=False)
-    # y_pred = File.read_df_from_file('results/2025-02-16/background_prediction/1752/BNNPredictor/0/pk/bkg')
+    # nn.set_model(model_path='results/2025-03-03/background_prediction/1644/BNNPredictor/0/model.keras', compile=False)
+    # y_pred = File.read_df_from_file('results/2025-03-03/background_prediction/1644/BNNPredictor/0/pk/bkg')
     y_pred = None
     if y_pred is None or len(y_pred) == 0:
         start, end = 0, -1
@@ -185,11 +186,4 @@ if __name__ == '__main__':
     # Plotter(df = tiles_df, label = 'Inputs and outputs').df_plot_tiles(y_cols=y_cols, x_col = 'datetime', excluded_cols = x_cols + x_cols_excluded + y_smooth_cols + ['MET'], init_marker = ',', show = True, smoothing_key='pred')
     
     thresholds = {'top': 6.5, 'Xpos': 6.5, 'Ypos': 6.5, 'Xneg': 6.5, 'Yneg': 6.5}
-    # merged_anomalies_list, triggs_df = Trigger().trigger(tiles_df, y_cols_raw, y_pred, thresholds)
-    merged_anomalies_list, triggs_df = Trigger().trigger(tiles_df, y_cols_raw, y_pred, thresholds)
-    support_vars = ['GOES_XRSA_HARD_EARTH_OCCULTED']
-    # tiles_df = Data.merge_dfs(tiles_df, triggs_df, on_column='datetime')
-    for col in y_cols_raw:
-        tiles_df[f'{col}_significance'] = triggs_df[f'{col}_significance']
-
-    Plotter(df = merged_anomalies_list).plot_anomalies(support_vars, thresholds, tiles_df, y_cols_raw, y_pred_cols, show=False, units=units)
+    Trigger(tiles_df, y_cols_raw, y_pred_cols, y_cols_raw, units).run(thresholds, type='focus', save_anomalies_plots=True, support_vars=['GOES_XRSA_HARD_EARTH_OCCULTED'])

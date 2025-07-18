@@ -9,14 +9,9 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
-try:
-    from modules.plotter import Plotter
-    from modules.utils import Data, Logger, logger_decorator
-    from modules.config import TRIGGER_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
-except:
-    from plotter import Plotter
-    from utils import Data, Logger, logger_decorator
-    from config import TRIGGER_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
+from modules.plotter import Plotter
+from modules.utils import Data, Logger, logger_decorator
+from modules.config import TRIGGER_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 
 
 
@@ -196,9 +191,40 @@ class Trigger:
             result[f'{face}_offset'].append(offset)
             result[f'{face}_significance'].append(np.sqrt(2 * global_max))
         return result
+    
+
+    def compute_direction(self, values_dict):
+
+        orig_max_values = pd.Series(values_dict)[['Xpos_middle', 'Xneg_middle', 'Ypos_middle', 'Yneg_middle', 'top_middle']]
+        max_values = orig_max_values.clip(lower=0)
+        if max_values['Xpos_middle'] >= max_values['Xneg_middle']:
+            vx = max_values['Xpos_middle']
+        else:
+            vx = -max_values['Xneg_middle']
+
+        if max_values['Ypos_middle'] >= max_values['Yneg_middle']:
+            vy = max_values['Ypos_middle']
+        else:
+            vy = -max_values['Yneg_middle']
+        vz = max_values['top_middle']
+        norm = np.sqrt(vx*vx + vy*vy + vz*vz)
+        if norm == 0:
+            print('max_values:', orig_max_values)
+            print('vx, vy, vz:', vx, vy, vz)
+        ux = vx / norm
+        uy = vy / norm
+        uz = vz / norm
+
+        theta = np.arccos(uz)                      # angolo da +Z
+        phi = np.arctan2(uy, ux) % (2*np.pi)     # azimutale nel piano XY
+
+        return {
+            'theta_deg': np.degrees(theta),
+            'phi_deg': np.degrees(phi)
+        }
 
     @logger_decorator(logger)
-    def run(self, thresholds: dict, type='z_score', save_anomalies_plots=True, support_vars=[], file=''):
+    def run(self, thresholds: dict, type='z_score', save_anomalies_plots=True, support_vars=[], file='', catalog=None):
         '''Run the trigger algorithm on the dataset.
 
         Args:
@@ -217,7 +243,7 @@ class Trigger:
 
         triggs_dict = {}
         diff = self.tiles_df['MET'].diff()
-        pool = multiprocessing.Pool(8)
+        pool = multiprocessing.Pool(5)
         results = []
         
         triggerer = self.trigger_face_z_score if type.lower() == 'z_score' else self.trigger_gauss_focus
@@ -293,11 +319,22 @@ class Trigger:
                         anomaly_end = face['stop_index']
                     if face['start_index'] < anomaly_start:
                         anomaly_start = face['start_index']
-                f.write(f"{self.tiles_df['datetime'][int(anomaly_start)]},{self.tiles_df['datetime'][int(anomaly_end)]},{self.tiles_df['MET'][int(anomaly_start)]},{self.tiles_df['MET'][int(anomaly_end)]},{'/'.join(anomaly.keys())}\n")
+                triggered_faces = [face for face in anomaly.keys()]
+                inputs_outputs_df_tmp = self.tiles_df[anomaly_start:anomaly_end + 1]
+                print(self.tiles_df[anomaly_start:anomaly_end + 1][self.y_cols + self.y_cols_pred])
+                print(inputs_outputs_df_tmp[triggered_faces])
+                max_indices = inputs_outputs_df_tmp[triggered_faces].idxmax().values[0]
+                values_dict = {}
+                for face, face_pred in zip(self.y_cols, self.y_cols_pred):
+                    values_dict[face] = (inputs_outputs_df_tmp.loc[max_indices, face] - inputs_outputs_df_tmp.loc[max_indices, face_pred])
+
+                print(self.tiles_df['datetime'][int(anomaly_start)], self.tiles_df['datetime'][int(anomaly_end)], self.compute_direction(values_dict))
+
+                f.write(f"{self.tiles_df['datetime'][int(anomaly_start)]},{self.tiles_df['datetime'][int(anomaly_end)]},{self.tiles_df['MET'][int(anomaly_start)]},{self.tiles_df['MET'][int(anomaly_end)]},{'/'.join(triggered_faces)}\n")
 
         self.tiles_df = Data.merge_dfs(self.tiles_df[self.y_cols + self.y_cols_pred + support_vars + ['datetime'] + [f'{y_col}_std' for y_col in self.y_cols]], return_df, on_column='datetime')
         if save_anomalies_plots:
-            Plotter(df = merged_anomalies).plot_anomalies_in_catalog(type, support_vars, thresholds, self.tiles_df, self.y_cols_raw, self.y_cols_pred, only_in_catalog=False, show=False, units=self.units, latex_y_cols=self.latex_y_cols, detections_file_path=detections_file_path)
+            Plotter(df = merged_anomalies).plot_anomalies_in_catalog(type, support_vars, thresholds, self.tiles_df, self.y_cols_raw, self.y_cols_pred, only_in_catalog=True, show=False, units=self.units, latex_y_cols=self.latex_y_cols, detections_file_path=detections_file_path, catalog=catalog)
 
         return merged_anomalies, return_df
             

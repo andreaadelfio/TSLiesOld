@@ -3,7 +3,6 @@ Plotter module for plotting data points and curves.
 '''
 import os
 from datetime import timedelta
-import glob
 import gc
 import matplotlib.ticker as mticker
 import matplotlib.pyplot as plt
@@ -12,15 +11,10 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import seaborn as sns
-from astropy.io import fits
 
 from sklearn.metrics import confusion_matrix
-try:
-    from modules.utils import Logger, logger_decorator, Time
-    from modules.config import DIR, BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
-except:
-    from utils import Logger, logger_decorator, Time
-    from config import DIR, BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
+from modules.utils import Logger, logger_decorator, Time
+from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME, PLOT_TRIGGER_FOLDER_NAME
 
 
 class Plotter:
@@ -237,10 +231,10 @@ class Plotter:
 
         plt.show()
         if save:
-            # print(os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'Output.png'))
             fig.savefig(
                 os.path.join(PLOT_TRIGGER_FOLDER_NAME, 'Output.png'),
                 dpi=200, bbox_inches='tight')
+            
 
     # @logger_decorator(logger)
     # def plot_pred_true(self, tiles_df, col_pred=['top_pred', 'Xpos_pred', 'Xneg_pred', 'Ypos_pred', 'Yneg_pred'], y_cols_raw=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']):
@@ -257,12 +251,12 @@ class Plotter:
 
     @logger_decorator(logger)
     def plot_history(self, history):
-        for feature in history.history.keys():
+        for feature in history['history'].keys():
             if 'val' in feature or feature == 'lr':
                 continue
             plt.figure(f"history_{feature}", layout="tight")
-            plt.plot(history.history[feature][1:])
-            plt.plot(history.history[f'val_{feature}'][1:])
+            plt.plot(history['history'][feature][1:])
+            plt.plot(history['history'][f'val_{feature}'][1:])
             plt.ylabel(feature)
             plt.xlabel('epoch')
             plt.legend(['train', 'validation'], loc='upper left')
@@ -291,21 +285,7 @@ class Plotter:
         plt.yticks(rotation=0)
         if show:
             plt.show()
-
-    def read_fits_file(self):
-        fits_file_path = os.path.join(DIR, 'catalogs', 'total_catalog.fits')
-        file_paths = glob.glob(fits_file_path)
-        df = pd.DataFrame()
-        for file_path in file_paths:
-            with fits.open(file_path) as hdul:
-                data = hdul[1].data
-                df_tmp = pd.DataFrame(data)
-                df_tmp['TRIGGER_TIME'] = pd.to_datetime(df_tmp['TRIGGER_TIME'], utc=False)
-                df_tmp['END_TIME'] = pd.to_datetime(df_tmp['END_TIME'], utc=False)
-                df_tmp['TIME'] = pd.to_datetime(df_tmp['TIME'], utc=False)
-                df = pd.concat([df, df_tmp])
-        return df
-
+    
     def read_detections_files(self, directory):
         sorted_df = pd.read_csv(directory)
         sorted_df['start_datetime'] = pd.to_datetime(sorted_df['start_datetime'], utc=False)
@@ -313,20 +293,16 @@ class Plotter:
         return sorted_df
     
     @logger_decorator(logger)
-    def plot_anomalies_in_catalog(self, trigger_algo_type, support_vars, thresholds, tiles_df, y_cols, y_pred_cols, only_in_catalog=True, save=True, show=False, extension='png', units={}, latex_y_cols={}, detections_file_path=''):
+    def plot_anomalies_in_catalog(self, trigger_algo_type, support_vars, thresholds, tiles_df, y_cols, y_pred_cols, only_in_catalog=True, save=True, show=False, extension='png', units={}, latex_y_cols={}, detections_file_path='', catalog=None):
         '''Plots the anomalies passed as `df` in Plotter.'''
-        # if not os.path.exists(PLOT_TRIGGER_FOLDER_NAME):
-        #     os.makedirs(PLOT_TRIGGER_FOLDER_NAME)
-        # tiles_df['datetime'] = pd.to_datetime(tiles_df['datetime'], utc=True)
         
-        fits_df = self.read_fits_file()
         detections_df = self.read_detections_files(detections_file_path)
         
         results = {}
         for detection in detections_df.itertuples():
-            comparison_df = fits_df[
-                ((fits_df['TIME'] <= np.datetime64(detection.start_datetime)) & (np.datetime64(detection.start_datetime) <= fits_df['END_TIME'])) |
-                ((fits_df['TIME'] <= np.datetime64(detection.stop_datetime)) & (np.datetime64(detection.stop_datetime) <= fits_df['END_TIME']))
+            comparison_df = catalog[
+                ((catalog['TIME'] <= np.datetime64(detection.start_datetime)) & (np.datetime64(detection.start_datetime) <= catalog['END_TIME'])) |
+                ((catalog['TIME'] <= np.datetime64(detection.stop_datetime)) & (np.datetime64(detection.stop_datetime) <= catalog['END_TIME']))
             ]
             if len(comparison_df) > 0:
                 for row in comparison_df.itertuples():
@@ -643,4 +619,3 @@ class Plotter:
 
 if __name__ == '__main__':
     print('to do')
-    print(Plotter().read_fits_file())

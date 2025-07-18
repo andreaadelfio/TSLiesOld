@@ -9,7 +9,7 @@
 /utils/*
 /best
 /catalogs
-/intesa sanpaolo
+/applications/intesa sanpaolo
 
 # Extensions
 *.pyc

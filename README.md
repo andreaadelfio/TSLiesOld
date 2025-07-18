@@ -1,116 +1,395 @@
-# ACDAnomalies
+# TSLies - Time Series Anomaly Detection Framework
 
 ## What is it?
-Anomaly Detection in the Fermi Anti-Coincidence Detector (ACD) with Machine Learning techinques and the Poisson-FOCuS triggering algorithm.
+**TSLies** (Time Series anomaLIES) is an advanced anomaly detection framework using state-of-the-art Machine Learning techniques and the Poisson-FOCuS triggering algorithm for real-time anomaly detection in time series data. This framework provides a comprehensive suite of ML models, from deterministic to Bayesian approaches, for robust background modeling and anomaly detection in any time series dataset.
 
 ## Table of contents
 - [Main Features](#main-features)
+- [Architecture Overview](#architecture-overview)
+- [Machine Learning Models](#machine-learning-models)
 - [Installation and Dependencies](#installation-and-dependencies)
 - [Modules](#modules)
-- [Scripts](#scripts)
+- [Scripts and Pipelines](#scripts-and-pipelines)
 - [Usage](#usage)
-- [Contibution](#contributing)
+- [Data Structure](#data-structure)
+- [Contributing](#contributing)
 - [Contact](#contact)
 
 ## Main Features
 
-This repository contains a series of modules and scripts used for a series of tasks:
-- data preprocessing;
-- data augmentation;
-- model training;
-- model evaluation;
-- triggering.
+This repository provides a comprehensive framework for anomaly detection in time series data:
+
+### Core Capabilities
+- **Real-time Background Modeling**: Multiple ML architectures for background prediction
+- **Bayesian Uncertainty Quantification**: Probabilistic models for reliable anomaly detection
+- **Spectral Domain Learning**: Frequency-domain neural networks
+- **FOCuS Change Point Detection**: Optimal changepoint detection algorithm
+- **Multi-dataset Validation**: Cross-referencing with external event catalogs and metadata
+- **Automated Visualization**: Scientific plotting with LaTeX formatting
+
+### Key Innovations
+- **Hybrid Model Ensemble**: Combination of deterministic and Bayesian approaches
+- **Modular Architecture**: Individual files for each ML model type for maximum maintainability
+- **Scalable Pipeline Architecture**: Modular design for large-scale data processing
+- **Advanced Uncertainty Handling**: Critical for low false-positive anomaly detection
+
+## Architecture Overview
+
+The framework follows a modular, three-stage pipeline architecture suitable for any time series anomaly detection task:
+
+```mermaid
+flowchart TD
+    A[Raw Time Series Data] --> B[Data Preprocessing]
+    C[External Features] --> B
+    D[Contextual Data] --> B
+    B --> E[Feature Engineering]
+    E --> F[Background Modeling]
+    F --> G[Anomaly Detection]
+    G --> H[Catalog Validation]
+    H --> I[Scientific Visualization]
+```
+
+### Data Flow
+1. **Input Integration**: Time series data, external features, contextual information
+2. **Background Prediction**: ML models predict normal system behavior
+3. **Anomaly Detection**: FOCuS algorithm identifies deviations from background
+4. **Validation**: Cross-reference detections with known event catalogs or external metadata
+5. **Analysis**: Generate scientific plots and performance metrics
+
+## Machine Learning Models
+
+### Deterministic Models
+- **FFNNPredictor**: Feed-Forward Neural Network for baseline background modeling
+- **SpectralDomainFFNNPredictor**: Novel frequency-domain neural network using FFT-based loss functions
+- **RNNPredictor**: Recurrent Neural Network for temporal dependencies
+
+### Bayesian Models (with Uncertainty Quantification)
+- **BNNPredictor**: Bayesian Neural Network with variational inference
+- **PBNNPredictor**: Probabilistic Bayesian Neural Network with enhanced uncertainty
+- **ABNNPredictor**: Approximate Bayesian Neural Network for computational efficiency
+- **MCMCBNNPredictor**: MCMC-based Bayesian Neural Network for full posterior sampling
+
+### Non-Parametric Models
+- **MedianKNeighborsRegressor**: K-Nearest Neighbors with median aggregation
+- **MultiMeanKNeighborsRegressor**: Multi-output K-NN for baseline comparisons
+
+### Model Selection Criteria
+- **Uncertainty Quantification**: Essential for reliable anomaly detection
+- **Computational Efficiency**: Real-time processing requirements
+- **Interpretability**: Understanding model decisions and feature importance
 
 ## Installation and Dependencies
 
-To install this repository, clone it from [ACDAnomalies](https://github.com/andreaadelfio/ACDAnomalies) and install the required packages:
+### Prerequisites
+- Python 3.8+
+- CUDA-compatible GPU (recommended for neural networks)
+
+### Quick Installation
+```bash
+git clone https://github.com/andreaadelfio/TSLies.git
+cd TSLies
+pip install -e .
 ```
-git clone https://github.com/andreaadelfio/ACDAnomalies.git
-cd ACDAnomalies
-pip install -r requirements.txt
+
+Or install from PyPI (when available):
+```bash
+pip install tslies
 ```
-A ROOT installation is required to use the [ROOT python library](https://root.cern/manual/python/). Check the [website](https://root.cern/install/).
+
+### Python Dependencies
+Core packages include:
+- `tensorflow>=2.16.0` (neural networks)
+- `tensorflow-probability>=0.23.0` (Bayesian models)
+- `tf-keras>=2.16.0` (Keras integration)
+- `pandas>=1.3.0` (data manipulation)
+- `scikit-learn>=1.0.0` (classical ML)
+- `matplotlib>=3.5.0` (visualization)
+- `seaborn>=0.11.0` (advanced plotting)
+- `numpy>=1.21.0` (numerical computing)
+- `astropy>=5.0.0` (astronomical data formats)
 
 ## Modules
 
-The codes are organized in a modular way for easy importation and usage in the main scripts.
-All modules can be found in the [**/modules**](/modules) folder.
+TSLies is organized into a modular architecture separating generic time series functionality from domain-specific applications:
 
-1. [**config.py**](/modules/config.py): This module is used to define the configuration parameters for the project. The configuration parameters are defined as a series of constants.
+### Core Modules (`modules/`)
 
-2. [**countrates.py**](/modules/countrates.py): This module is used to get the count rates for the ACD data in [`root`](https://root.cern.ch/root/html600/notes/release-notes.html#ttreereader) format.
+#### **modules/config.py**
+Centralized configuration management:
+- File paths and directory structure
+- Model hyperparameters
+- Configurable thresholds and parameters
 
-3. [**catalog.py**](/modules/catalog.py): This module is used to read the ACD data and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
+#### **modules/background/**
+Complete ML model ecosystem with modular architecture:
+- `mlobject.py`: Base class with common ML functionality
+- `losses.py`: Custom loss functions (spectral, Bayesian NLL)
+- `ffnnpredictor.py`: Feed-Forward Neural Network predictor
+- `rnnpredictor.py`: Recurrent Neural Network for temporal dependencies
+- `bnnpredictor.py`: Bayesian Neural Network with uncertainty quantification
+- `pbnnpredictor.py`: Probabilistic Bayesian Neural Network
+- `abnnpredictor.py`: Approximate Bayesian Neural Network
+- `mcmcbnnpredictor.py`: MCMC-based Bayesian Neural Network
+- `spectraldomainffnnpredictor.py`: Frequency-domain neural network
+- `knnpredictors.py`: K-Nearest Neighbors regressors (median/mean variants)
+- Automated hyperparameter optimization and model persistence
 
-4. [**spacecraft.py**](/modules/spacecraft.py): This module is used to retrieve the spacecraft data and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
+#### **modules/trigger.py**
+Advanced anomaly detection:
+- FOCuS algorithm implementation (Kester Ward, 2021)
+- Z-score and Gaussian change point detection
+- Multi-face trigger merging
+- Temporal clustering and filtering
 
-5. [**solar.py**](/modules/solar.py): This module is used to retrieve the sun monitor data from GOES and convert it into a [`pandas.DataFrame`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html).
+#### **modules/plotter.py** 
+Scientific visualization suite:
+- Automated anomaly plotting with customizable overlays
+- LaTeX-formatted scientific notation
+- Multi-panel time series with residuals
+- Export-ready publication figures
 
-6. [**background.py**](/modules/background.py): This modules is used to create, train and validate a Machine Learning model.
+#### **modules/utils.py**
+Essential utilities:
+- Data manipulation and masking
+- Time series processing
+- Logging and debugging
+- File I/O operations
 
-7. [**trigger.py**](/modules/trigger.py): This module is used to find anomalies in the ACD data given the background model, with a triggering algorithm.
+#### **modules/dataset.py**
+Primary data processing:
+- Raw data file parsing and conversion
+- Multi-channel data handling
+- Temporal binning and aggregation
 
-8. [**plotter.py**](/modules/plotter.py): This module contains some plotting functions adapted to the specific cases.
+### Domain-Specific Applications (`applications/`)
 
-9. [**utils.py**](/modules/utils.py): This module continas some utility functions.
+#### **applications/acd/**
+ACD (Anti-Coincidence Detector) specific modules:
 
-## Scripts
+- **spacecraft.py**: Spacecraft parametric data integration
+- **solar.py**: Solar environmental monitoring data integration  
+- **catalogs.py**: Event catalog cross-referencing and validation
+- **main_*.py**: Complete analysis pipelines for ACD data
 
-This folder contains the main scripts that manage dataset preparation ([**main_dataset.py**](/scripts/main_dataset.py)), machine learning training ([**main_ml.py**](/scripts/main_ml.py)) and triggering algorithm separately ([**main_trigger.py**](/scripts/main_trigger.py)).
+## Scripts and Pipelines
+
+### Main Scripts
+
+#### **scripts/main_ml.py**
+Comprehensive ML training pipeline:
+- Model comparison and selection
+- Hyperparameter grid search
+- Cross-validation and performance metrics
+- Model persistence and checkpointing
+
+#### **scripts/main_trigger.py** 
+Anomaly detection execution:
+- Real-time triggering on data streams
+- Multi-model ensemble predictions
+- Catalog cross-referencing
+- Performance evaluation and reporting
+
+#### **scripts/main_dataset.py**
+Data preparation and preprocessing:
+- Multi-source data integration
+- Feature engineering and selection
+- Data quality control and validation
+
+#### **scripts/main_acd.py**
+Raw data processing:
+- Data file parsing and conversion
+- Statistical preprocessing and binning
+- Data format standardization
+
+### Pipeline Architecture
+
+#### **pipelines/pipeline.py**
+End-to-end processing pipeline:
+- Automated data ingestion
+- Model training and validation
+- Anomaly detection and analysis
+- Result visualization and export
+
+The pipeline supports:
+- **Batch Processing**: Historical data analysis
+- **Streaming Mode**: Real-time anomaly detection
+- **Distributed Computing**: Large-scale data processing
+- **Checkpoint Recovery**: Robust fault tolerance
 
 ## Usage
 
-To use these modules, import the required modules into your main script and call the necessary functions. You can find examples in the [**/scripts**](/scripts) folder. 
+### Quick Start with TSLies
 
-> [!TIP]
-> Start from the scripts found in the [**/scripts**](/scripts) folder.
+1. **Import core TSLies modules**:
+   ```python
+   # Import core TSLies components
+   from modules.config import DIR, BACKGROUND_PREDICTION_FOLDER_NAME
+   from modules.background import FFNNPredictor, BNNPredictor
+   from modules.trigger import Trigger
+   from modules.plotter import Plotter
+   ```
 
-The **config.py** expects a certain directory structure, such as:
-``` bash
-ACDAnomalies
-├── data
-│   ├── anomalies
-│   ├── inputs_outputs
-│   ├── LAT_ACD
-│   ├── model_nn
-│   ├── solar
-│   └── spacecraft
-├── logs
-├── modules
-└── scripts
+2. **Train a background model**:
+   ```python
+   # Create and train a neural network background model
+   model = FFNNPredictor(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols)
+   model.set_hyperparams(params)
+   model.create_model()
+   history = model.train()
+   ```
+
+3. **Run anomaly detection**:
+   ```python
+   # Apply FOCuS algorithm for changepoint detection
+   trigger = Trigger(tiles_df, y_cols, y_pred_cols, y_cols_raw, units, latex_y_cols)
+   anomalies, significance_df = trigger.run(thresholds, type='focus')
+   ```
+
+4. **Visualize results**:
+   ```python
+   # Generate scientific plots
+   plotter = Plotter(df=anomalies)
+   plotter.plot_anomalies_in_catalog(trigger_type, support_vars, thresholds, tiles_df, y_cols, y_pred_cols)
+   ```
+
+### ACD-Specific Application
+
+For ACD (Anti-Coincidence Detector) specific analysis:
+
+```python
+# Import ACD-specific modules
+from applications.acd.spacecraft import SpacecraftOpener
+from applications.acd.solar import SunMonitor  
+from applications.acd.catalogs import CatalogReader
+
+# Or run complete ACD pipelines
+from applications.acd import main_ml, main_trigger, main_acd
 ```
 
-> [!IMPORTANT]
-> Ensure that the configuration parameters in [**config.py**](/modules/config.py) are set correctly for your project and folders (see the [`DIR`](/modules/config.py#L9) variable describing the path to your ACDAnomalies, e.g. `DIR = /home/andreaadelfio/ACDAnomalies`). If you want your data folder to be in a different path, change the `DIR` variable.
-> 
+### Advanced Usage
+
+#### Model Comparison
+```python
+# Compare multiple ML architectures
+from modules.background import (
+    FFNNPredictor, 
+    BNNPredictor, 
+    SpectralDomainFFNNPredictor,
+    RNNPredictor
+)
+
+models = [FFNNPredictor, BNNPredictor, SpectralDomainFFNNPredictor, RNNPredictor]
+results = {}
+
+for ModelClass in models:
+    model = ModelClass(df_data, y_cols, x_cols, ...)
+    model.create_model()
+    history = model.train()
+    results[ModelClass.__name__] = model.evaluate()
+```
+
+#### Real-time Processing
+```python
+# Stream processing setup
+from pipelines.pipeline import get_inputs_outputs_df
+
+for data_batch in data_stream:
+    df = get_inputs_outputs_df(data_batch)
+    predictions = model.predict(df)
+    anomalies = trigger.run(predictions)
+    if anomalies:
+        send_alert(anomalies)
+```
+
+## Data Structure
+
+### Required Directory Layout
+```
+ACDAnomalies/
+├── results/                 # Model outputs and analysis
+│   └── YYYY-MM-DD/
+│       ├── background_prediction/
+│       └── trigger_results/
+├── logs/                   # System logs and debugging
+├── modules/               # Core source code
+├── scripts/              # Main execution scripts
+└── pipelines/           # End-to-end workflows
+```
 
 ## Contributing
 
-Contributions are welcome. Please open an issue to discuss your idea or submit a pull request with your changes.
+We welcome contributions to this Time Series Anomaly Detection Framework! This project benefits from:
 
-### TO-DO:
-```
-- autoencoder per background
-- portare a icsc repo
-- reduce_median in bnn
-- standardizzare
-- creazione segnali sintetici
-- allenare senza i solar flare e analizzare per vedere quanti solar flare vengono identificati
-- non-parametric focus
-- distributed/on cloud
-- datagenerator
-- improve lambda_callback
-- train on normalized signals
-- improve get_feature_importance
-- add feature importance difference before / after an anomaly
-- separate get_feature_importance based on SHAP / lime use
-```
+### Areas for Contribution
+- **New ML Architectures**: Transformer models, Graph Neural Networks
+- **Improved Uncertainty Quantification**: Advanced Bayesian techniques
+- **Real-time Optimization**: Performance improvements for streaming data
+- **Domain-specific Applications**: Adaptations for specific time series domains
+- **Documentation**: Tutorials, examples, and API documentation
+
+### Development Priorities
+
+#### Recently Completed ✅
+- **Modular Architecture**: Separated ML models into individual files for better maintainability
+- **Background Model Organization**: Each predictor type now has its dedicated module
+- **Import System**: Flexible imports from both individual files and centralized package
+
+#### High Priority
+- **Autoencoder Background Models**: Unsupervised anomaly detection
+- **Distributed Computing**: Scalability for large datasets  
+- **Model Interpretability**: SHAP/LIME integration for feature importance
+- **Standardized Evaluation**: Consistent benchmarking across models
+
+#### Medium Priority  
+- **Synthetic Data Generation**: Controlled testing environments
+- **Non-parametric FOCuS**: Extended change point detection
+- **Cloud Deployment**: Docker containers and cloud infrastructure
+- **Advanced Data Generators**: TensorFlow/PyTorch data pipelines
+
+#### Future Directions
+- **Multi-domain Integration**: Support for various time series applications (Science, finance, healthcare, etc.)
+- **Real-time Dashboard**: Web-based monitoring and alerting
+- **Federated Learning**: Distributed model training across institutions
+- **Physics-Informed Neural Networks**: Incorporating domain-specific knowledge
+
+### Development Guidelines
+1. **Code Quality**: Follow PEP 8, include type hints, comprehensive docstrings
+2. **Testing**: Unit tests for all new functionality
+3. **Documentation**: Update README and inline documentation
+4. **Performance**: Profile code for computational efficiency
+5. **Reproducibility**: Ensure deterministic results with random seeds
+
 
 ## Contact
 
-If you need help on the project or you want to discuss about it, you can contact me at the following e-mails:
+**Lead Developer**: Andrea Adelfio  
+**Institution**: INFN (Istituto Nazionale di Fisica Nucleare)  
+**Email**: 
 - <and.adelfio@gmail.com>
 - <andrea.adelfio@pg.infn.it>
+
+**Project Status**: Active development  
+**License**: [Specify license]  
+**DOI**: [Add DOI when available]
+
+### Acknowledgments
+- **FOCuS Algorithm**: Kester Ward (2021) - Original Python implementation
+- **Research Community**: Open-source machine learning libraries and frameworks
+- **Computing Resources**: High-performance computing support
+
+---
+
+### Citation
+If you use ACDAnomalies in your research, please cite:
+```
+@software{adelfio2024acdanomalies,
+  author = {Adelfio, Andrea},
+  title = {ACDAnomalies},
+  url = {https://github.com/andreaadelfio/ACDAnomalies},
+  year = {2024},
+  institution = {INFN}
+}
+```
 
 <hr>
 

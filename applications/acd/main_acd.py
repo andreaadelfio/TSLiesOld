@@ -2,7 +2,6 @@
 This module contains the class to manipulate the runs from Fermi.
 '''
 import os
-import sys
 import concurrent.futures
 import re
 import glob
@@ -11,8 +10,6 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from modules.plotter import Plotter
 from modules.config import DATA_LATACD_PROCESSED_FOLDER_NAME, DATA_LATACD_RAW_FOLDER_NAME
@@ -475,5 +472,5 @@ if __name__ == '__main__':
     arr = ACDReconRates()
     arr.del_txt(DATA_LATACD_RAW_FOLDER_NAME)
     arr.fill_dictSizes(fileSizes)
-    arr.do_work_parallel(1, workers=3)
+    arr.do_work_parallel(1, workers=2)
     print("... done, bye bye")

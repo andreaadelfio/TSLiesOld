@@ -7,12 +7,8 @@ import os
 from sklearn.preprocessing import StandardScaler
 from keras.model import load_model
 
-try:
-    import modules.lime.lime_tabular as lime_tabular
-    from modules.plotter import Plotter
-except:
-    import lime.lime_tabular as lime_tabular
-    from plotter import Plotter
+import modules.lime.lime_tabular as lime_tabular
+from modules.plotter import Plotter
 
 def get_feature_importance(model_path, inputs_outputs_df, y_cols, x_cols, num_sample = 100, model = None, show=True, save=True):
     '''Get the feature importance using LIME and SHAP and plots it with matplotlib barh.

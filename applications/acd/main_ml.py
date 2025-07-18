@@ -1,29 +1,37 @@
 '''
-Main file to run the project
+ACD-specific ML training and evaluation script
+
+This script demonstrates the use of the generic time series framework 
+for ACD (Anti-Coincidence Detector) anomaly detection tasks.
+
 Author: Andrea Adelfio
 Created date: 03/02/2024
 Modified date: 10/12/2024
 TODO:
 '''
 
-import sys
 import os
 import pandas as pd
 import numpy as np
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
-
+from modules.background.spectraldomainffnnpredictor import SpectralDomainFFNNPredictor
+from modules.background.ffnnpredictor import FFNNPredictor
+from modules.background.pbnnpredictor import PBNNPredictor
+from modules.background.bnnpredictor import BNNPredictor
+from modules.background.abnnpredictor import ABNNPredictor
+from modules.background.mcmcbnnpredictor import MCMCBNNPredictor
+from modules.background.rnnpredictor import RNNPredictor
+from modules.background.knnpredictors import MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor
+# from modules.background import SpectralDomainFFNNPredictor, FFNNPredictor, PBNNPredictor, BNNPredictor, RNNPredictor, MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor, ABNNPredictor, MCMCBNNPredictor
 from modules.plotter import Plotter
 from modules.utils import File
 from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME
-from modules.background import FFNNPredictor, PBNNPredictor, BNNPredictor, RNNPredictor, MultiMedianKNeighborsRegressor, MultiMeanKNeighborsRegressor, ABNNPredictor, MCMCBNNPredictor
 
-from scripts.main_config import y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols, x_cols_excluded, units, latex_y_cols
+from .main_config import y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols, x_cols_excluded, units, latex_y_cols
 
-def run_rnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
+def run_rnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols):
     '''Runs the neural network model'''
-    rnn = RNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred)
+    rnn = RNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols)
     hyperparams_combinations = {
         'units_for_layers' : ([90, 180], [90], [90], [90], [90], [90], [90], [70], [50], [30]),
         'epochs' : [5],
@@ -53,16 +61,16 @@ def run_rnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, x_cols):
 
 def run_ffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols):
     '''Runs the neural network model'''
-    nn = FFNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, y_smooth_cols, cols_pred)
+    nn = FFNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols)
     hyperparams_combinations = {
-        'units_for_layers' : ([90], [90], [90], [90], [70], [50]),
-        'epochs' : [30],
+        'units_for_layers' : ([90], [90], [90], [70], [50]),
+        'epochs' : [50],
         'bs' : [1000],
         'do' : [0.02],
         'norm' : [0],
         'drop' : [0],
         'opt_name' : ['Adam'],
-        'lr' : [None],
+        'lr' : [0.001],
         'loss_type' : ['mae']
     }
 
@@ -70,9 +78,42 @@ def run_ffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_col
         nn.set_hyperparams(params, use_previous=False)
         nn.create_model()
         history = nn.train()
-        if history.history['loss'][-1] > 0.0040:
-            continue
-        Plotter().plot_history(history)
+        nn.update_summary()
+        Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
+        # for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
+        #                    ('2024-03-28 20:50:00', '2024-03-28 21:10:00'),
+        #                    ('2024-05-08 20:30:00', '2024-05-08 23:40:00'),
+        #                    ('2024-05-11 01:00:00', '2024-05-11 03:00:00'),
+        #                    ('2024-05-15 14:15:00', '2024-05-15 15:40:00'),
+        #                    ('2024-05-08 01:00:00', '2024-05-08 05:00:00'), 
+        #                    ('2024-06-20 22:35:00', '2024-06-20 23:40:00'), 
+        #                    ('2024-06-23 05:35:00', '2024-06-23 14:40:00'), 
+        #                    (str(inputs_outputs['datetime'].iloc[0]), str(inputs_outputs['datetime'].iloc[35000])),
+        #                    (str(inputs_outputs['datetime'].iloc[35000]), str(inputs_outputs['datetime'].iloc[43000]))]:
+        #     nn.predict(start=start, end=end, mask_column='datetime', write_bkg=False, save_predictions_plot=True, support_variables=['SOLAR_a'])
+        # nn.predict(start=0, end=-1)
+        # if history.history['loss'][-1] < 0.0040:
+        #     get_feature_importance(nn.model_path, inputs_outputs, y_cols, x_cols, num_sample=10, show=False)
+
+def run_spectralffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols):
+    '''Runs the neural network model'''
+    nn = SpectralDomainFFNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols)
+    hyperparams_combinations = {
+        'units_for_layers' : ([90], [90], [90], [70], [50]),
+        'epochs' : [50],
+        'bs' : [1000],
+        'do' : [0.02],
+        'norm' : [0],
+        'drop' : [0],
+        'opt_name' : ['Adam'],
+        'lr' : [0.001],
+        'loss_type' : ['mae']
+    }
+
+    for params in nn.get_hyperparams_combinations(hyperparams_combinations, use_previous=False):
+        nn.set_hyperparams(params, use_previous=False)
+        nn.create_model()
+        history = nn.train()
         nn.update_summary()
         Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
         # for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
@@ -163,7 +204,7 @@ def run_bnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols
 
 def run_abnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols):
     '''Runs the neural network model'''
-    nn = ABNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, y_smooth_cols, cols_pred, False)
+    nn = ABNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols)
     hyperparams_combinations = {
         'units_for_layers' : ([90], [90], [70], [50]),
         'epochs' : [500],
@@ -200,7 +241,7 @@ def run_abnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_col
 
 def run_mcmcbnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols):
     '''Runs the neural network model'''
-    nn = MCMCBNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, y_smooth_cols, cols_pred, False)
+    nn = MCMCBNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols)
     hyperparams_combinations = {
         'units_for_layers' : ([90], [90], [70], [50]),
         'epochs' : [500],
@@ -243,9 +284,6 @@ def run_multimean_knn(inputs_outputs, y_cols, x_cols):
     start, end = 60000, 63000
     _, y_pred = multi_reg.predict(start=start, end=end)
     y_pred = pd.DataFrame(y_pred, columns=y_cols)
-    Plotter().plot_tile(inputs_outputs[start:end].reset_index(), y_pred, face='Xpos')
-    Plotter().show()
-    Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME)
 
 def run_multimedian_knn(inputs_outputs, y_cols, x_cols):
     '''Runs the multi median knn model'''
@@ -255,9 +293,6 @@ def run_multimedian_knn(inputs_outputs, y_cols, x_cols):
     start, end = 60000, 73000
     _, y_pred = multi_reg.predict(start=start, end=end)
     y_pred = pd.DataFrame(y_pred, columns=y_cols)
-    Plotter().plot_tile_knn(inputs_outputs[start:end].reset_index(), y_pred, face='Xpos')
-    Plotter().show()
-    Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME)
 
 def run_median(inputs_outputs):
     '''Runs the multi median knn model'''
@@ -290,7 +325,7 @@ def run_median(inputs_outputs):
 ########### Main ############
 if __name__ == '__main__':
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
-    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=849, cols_list=x_cols + y_cols + y_smooth_cols + ['datetime', 'MET'], y_cols=y_cols)
+    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=818, cols_list=x_cols + y_cols + y_smooth_cols + ['datetime', 'MET'], y_cols=y_cols, resample_skip=2)
     # only take values different from 0
     # Plotter(df=inputs_outputs_df).plot_correlation_matrix(show=False, save=True)
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
@@ -311,9 +346,10 @@ if __name__ == '__main__':
     # run_mcmcbnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_abnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_bnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
-    run_pbnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
+    # run_spectralffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
+    # run_pbnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_rnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
-    # run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
+    run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_multimean_knn(inputs_outputs_df, y_cols, x_cols)
     # run_multimedian_knn(inputs_outputs_df, y_cols, x_cols)
     # run_median(inputs_outputs_df, y_cols)

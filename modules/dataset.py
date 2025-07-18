@@ -1,31 +1,26 @@
 '''
 This module contains the class to manage the acd dataset.
 '''
-import os
-import ROOT
+# import os
+# import ROOT
 import numpy as np
 import pandas as pd
-try:
-    from modules.config import DATA_LATACD_PROCESSED_FOLDER_NAME
-    from modules.utils import Time, Logger, logger_decorator, File
-    from modules.plotter import Plotter
-except:
-    from config import DATA_LATACD_PROCESSED_FOLDER_NAME
-    from utils import Time, Logger, logger_decorator, File
-    from plotter import Plotter
+from modules.config import DATA_LATACD_PROCESSED_FOLDER_NAME
+from modules.utils import Time, Logger, logger_decorator, File
+from modules.plotter import Plotter
 
 
-class CatalogReader():
-    '''Class to read the catalog of runs and their properties'''
-    logger = Logger('CatalogReader').get_logger()
+class DatasetReader():
+    '''Class to read the dataset of runs and their properties'''
+    logger = Logger('DatasetReader').get_logger()
 
     @logger_decorator(logger)
     def __init__(self, h_names, data_dir = DATA_LATACD_PROCESSED_FOLDER_NAME, start = 0, end = -1):
         '''
-        Initialize the CatalogReader object.
+        Initialize the DatasetReader object.
 
         Parameters:
-        - data_dir (str): The directory path where the catalog data is stored.
+        - data_dir (str): The directory path where the dataset data is stored.
         - start (int): The index of the first run directory to consider.
         - end (int): The index of the last run directory to consider.
         '''
@@ -83,7 +78,7 @@ class CatalogReader():
     #     return self.runs_dict
 
     @logger_decorator(logger)
-    def get_signal_df_from_catalog(self) -> pd.DataFrame:
+    def get_signal_df_from_dataset(self) -> pd.DataFrame:
         '''
         Get the pandas.Dataframe containing the signals for each run.
 
@@ -93,14 +88,14 @@ class CatalogReader():
         Returns:
         - runs_dict (pandas.Dataframe): The dataframe containing the signals for each run.
         '''
-        catalog_df = File.read_dfs_from_runs_pk_folder(folder_path=self.data_dir, add_smoothing=True, mode='mean', window=35, start=self.start, stop=self.end)
-        catalog_df['datetime'] = np.array(Time.from_met_to_datetime(catalog_df['MET'] - 1))
-        self.runs_times['catalog'] = (catalog_df['datetime'][0], catalog_df['datetime'].iloc[-1])
-        return catalog_df
+        dataset_df = File.read_dfs_from_runs_pk_folder(folder_path=self.data_dir, add_smoothing=True, mode='mean', window=35, start=self.start, stop=self.end, cols_list=self.h_names + ['MET'])
+        dataset_df['datetime'] = np.array(Time.from_met_to_datetime(dataset_df['MET'] - 1))
+        self.runs_times['dataset'] = (dataset_df['datetime'][0], dataset_df['datetime'].iloc[-1])
+        return dataset_df
 
 if __name__ == '__main__':
-    cr = CatalogReader(h_names=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg'], start=0, end=-1)
-    tile_signal_df = cr.get_signal_df_from_catalog()
+    cr = DatasetReader(h_names=['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg'], start=0, end=-1)
+    tile_signal_df = cr.get_signal_df_from_dataset()
 
     Plotter(df = tile_signal_df[['top', 'top_smooth', 'datetime']], label = 'Inputs').df_plot_tiles(x_col = 'datetime',
                                                                     excluded_cols = ['MET'],

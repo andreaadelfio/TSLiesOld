@@ -1,5 +1,5 @@
 '''
-Configuration file containing the folders and filenames for ACNBkg modules.
+Configuration file containing the folders and filenames for time series anomaly detection modules.
 To check your configuration, run this file as a script.
 '''
 import os
@@ -28,9 +28,10 @@ SC_FOLDER_NAME = os.path.join(DATA_FOLDER_NAME, 'spacecraft/LAT/weekly')
 # ACD_DATA = 'newRuns_v7_extracted_v3'
 # ACD_DATA = 'test'
 ACD_DATA = 'new_with_correct_triggs'
+# ACD_DATA = 'missing'
 DATA_LATACD_RAW_FOLDER_NAME = os.path.join(LATACD_FOLDER_NAME, 'raw', ACD_DATA)
 DATA_LATACD_PROCESSED_FOLDER_NAME = os.path.join(LATACD_FOLDER_NAME, 'processed', ACD_DATA)
-INPUTS_OUTPUTS_FILENAME = 'inputs_outputs'
+INPUTS_OUTPUTS_FILENAME = 'inputs_outputs_runs'
 INPUTS_OUTPUTS_FILE_PATH = os.path.join(DATA_LATACD_PROCESSED_FOLDER_NAME, INPUTS_OUTPUTS_FILENAME)
 
 # MARK: Logging

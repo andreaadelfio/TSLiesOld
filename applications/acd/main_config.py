@@ -1,12 +1,13 @@
 '''
-This is a config file to identify features and targets between the dataframe columns.
+Configuration file to identify features and targets between the dataframe columns.
+Defines column mappings, units, and visualization settings for time series analysis.
 '''
 
 h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
 # h_names = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
 
-# y_cols_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
-# y_cols_raw = ['top', 'Xpos']
+y_cols_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
+# y_cols_raw = ['top_low']
 y_cols_raw = ['top_low', 'top_middle', 'top_high', 'Xpos_low', 'Xpos_middle', 'Xpos_high', 'Xneg_low', 'Xneg_middle', 'Xneg_high', 'Ypos_low', 'Ypos_middle', 'Ypos_high', 'Yneg_low', 'Yneg_middle', 'Yneg_high']
 # y_cols_raw = ['top_middle', 'top_high', 'Xpos_middle', 'Xpos_high', 'Xneg_middle', 'Xneg_high', 'Ypos_middle', 'Ypos_high', 'Yneg_middle', 'Yneg_high']
 # y_cols_raw = ['Xpos_low', 'Xpos_middle', 'Xpos_high']

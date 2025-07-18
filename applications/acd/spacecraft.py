@@ -1,5 +1,9 @@
 '''
-This module provides a class for opening and retrieving information from a spacecraft data file.
+ACD-specific module for Fermi spacecraft data handling.
+
+This module provides classes for opening and retrieving information from 
+Fermi spacecraft data files. This is a domain-specific application built 
+on the generic time series framework.
 
 Classes:
     SpacecraftOpener: A class for opening and retrieving information from a spacecraft data file.
@@ -20,14 +24,9 @@ import numpy as np
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
 
-try:
-    from modules.config import SC_FOLDER_NAME
-    from modules.utils import Time, Data, Logger, logger_decorator
-    from modules.plotter import Plotter
-except:
-    from config import SC_FOLDER_NAME
-    from plotter import Plotter
-    from utils import Time, Data, Logger, logger_decorator
+from modules.config import SC_FOLDER_NAME
+from modules.utils import Time, Data, Logger, logger_decorator
+from modules.plotter import Plotter
 
 class SpacecraftOpener:
     '''

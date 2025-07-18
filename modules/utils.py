@@ -13,20 +13,12 @@ import numpy as np
 from scipy import fftpack
 import gc
 from tqdm import tqdm
-try:
-    from modules.config import INPUTS_OUTPUTS_FILE_PATH,\
-                                LOGGING_FOLDER_PATH,\
-                                LOGGING_FILE_NAME,\
-                                DIR,\
-                                DATA_LATACD_PROCESSED_FOLDER_NAME,\
-                                DATA_FOLDER_NAME
-except:
-    from config import INPUTS_OUTPUTS_FILE_PATH,\
-                                LOGGING_FOLDER_PATH,\
-                                LOGGING_FILE_NAME,\
-                                DIR,\
-                                DATA_LATACD_PROCESSED_FOLDER_NAME,\
-                                DATA_FOLDER_NAME
+from modules.config import INPUTS_OUTPUTS_FILE_PATH,\
+                            LOGGING_FOLDER_PATH,\
+                            LOGGING_FILE_NAME,\
+                            DIR,\
+                            DATA_LATACD_PROCESSED_FOLDER_NAME,\
+                            DATA_FOLDER_NAME
 
 class Logger():
     '''
@@ -457,7 +449,7 @@ class File:
 
     @logger_decorator(logger)
     @staticmethod
-    def read_dfs_from_runs_pk_folder(folder_path=INPUTS_OUTPUTS_FILE_PATH, add_smoothing=False, mode='mean', window=30, start=0, stop=-1):
+    def read_dfs_from_runs_pk_folder(folder_path=INPUTS_OUTPUTS_FILE_PATH, add_smoothing=False, mode='mean', window=30, start=0, stop=-1, cols_list=None):
         '''
         Read the dataframe from pickle files in a folder.
 
@@ -476,18 +468,19 @@ class File:
             dir_list = [os.path.join(folder_path, file) for file in os.listdir(folder_path)
                         if file.endswith('.pk')]
             dir_list = sorted(dir_list, key=lambda x: int(re.search(r"\d+", os.path.basename(x)).group(0)))[start:stop]
-            dfs = [pd.read_pickle(file) for file in dir_list]
+            dfs = [pd.read_pickle(file)[cols_list] if cols_list else pd.read_pickle(file) for file in dir_list]
             dfs = [df[(df.loc[:, df.columns.difference(['MET'])] != 0).any(axis=1)] for df in dfs]
             if add_smoothing:
                 if mode == 'mean':
                     dfs = [File.add_smoothing_with_mean(df, window=window) for df in dfs]
                 elif mode == 'fft':
                     dfs = [File.add_smoothing_with_fft(df) for df in dfs]
+            print(dfs[0].columns)
             merged_dfs = pd.concat(dfs, ignore_index=True).drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug
         return merged_dfs
 
     @logger_decorator(logger)
-    def read_dfs_from_weekly_pk_folder(self, folder_path=INPUTS_OUTPUTS_FILE_PATH, custom_sorter=lambda x: int(x.split('w')[-1].split('.')[0]), cols_list=None, start=None, stop=None, y_cols=[]):
+    def read_dfs_from_weekly_pk_folder(self, folder_path=INPUTS_OUTPUTS_FILE_PATH, custom_sorter=lambda x: int(x.split('w')[-1].split('.')[0]), cols_list=None, start=None, stop=None, y_cols=[], resample_skip=1):
         '''
         Read the dataframe from pickle files in a folder.
 
@@ -513,9 +506,9 @@ class File:
             dir_list = sorted(dir_list, key=custom_sorter)
             dfs = []
             for file in tqdm(dir_list, desc='Reading dfs from files'):
-                tmp_df = pd.read_pickle(file)[cols_list] if cols_list else pd.read_pickle(file)
-                for col in y_cols:
-                    tmp_df = tmp_df[tmp_df[col] != 0]
+                tmp_df = pd.read_pickle(file)[cols_list].iloc[::resample_skip] if cols_list else pd.read_pickle(file).iloc[::resample_skip]
+                if y_cols:
+                    tmp_df = tmp_df[(tmp_df[y_cols] != 0).all(axis=1)]
                 dfs.append(tmp_df)
                 gc.collect()
             merged_dfs = pd.concat(dfs, ignore_index=True)#.drop_duplicates('MET', ignore_index=True) # patch, trovare sorgente del bug

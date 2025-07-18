@@ -1,19 +1,15 @@
 '''
-This module handles the retrieval of the solar activity from the GOES satellite using the sunpy module.
+ACD-specific module for handling solar activity retrieval from GOES satellite using sunpy.
+This is a domain-specific application built on the generic time series framework.
 '''
 import os
 import pandas as pd
 from sunpy import timeseries as ts
 from sunpy.net import Fido
 from sunpy.net import attrs as a
-try:
-    from modules.utils import Time, Logger, logger_decorator
-    from modules.plotter import Plotter
-    from modules.config import SOLAR_FOLDER_NAME
-except:
-    from utils import Time, Logger, logger_decorator
-    from plotter import Plotter
-    from config import SOLAR_FOLDER_NAME
+from modules.utils import Time, Logger, logger_decorator
+from modules.plotter import Plotter
+from modules.config import SOLAR_FOLDER_NAME
 
 
 class SunMonitor:
