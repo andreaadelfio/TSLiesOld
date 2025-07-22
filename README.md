@@ -40,8 +40,8 @@ The framework follows a modular, three-stage pipeline architecture suitable for 
 ```mermaid
 flowchart TD
     A[Raw Time Series Data] --> B[Data Preprocessing]
-    C[External Features] --> B
-    D[Contextual Data] --> B
+    C[External Features (if any)] --> B
+    D[Contextual Data (if any)] --> B
     B --> E[Feature Engineering]
     E --> F[Background Modeling]
     F --> G[Anomaly Detection]
@@ -60,14 +60,14 @@ flowchart TD
 
 ### Deterministic Models
 - **FFNNPredictor**: Feed-Forward Neural Network for baseline background modeling
-- **SpectralDomainFFNNPredictor**: Novel frequency-domain neural network using FFT-based loss functions
+- **SpectralDomainFFNNPredictor**: Frequency-domain Neural Network using FFT-based loss functions
 - **RNNPredictor**: Recurrent Neural Network for temporal dependencies
 
 ### Bayesian Models (with Uncertainty Quantification)
 - **BNNPredictor**: Bayesian Neural Network with variational inference
 - **PBNNPredictor**: Probabilistic Bayesian Neural Network with enhanced uncertainty
-- **ABNNPredictor**: Approximate Bayesian Neural Network for computational efficiency
-- **MCMCBNNPredictor**: MCMC-based Bayesian Neural Network for full posterior sampling
+- **ABNNPredictor**: Advanced Bayesian Neural Network with tensorflow-probability 
+- **MCMCBNNPredictor**: MCMC-based Bayesian Neural Network for full posterior sampling (to be finished)
 
 ### Non-Parametric Models
 - **MedianKNeighborsRegressor**: K-Nearest Neighbors with median aggregation
@@ -82,7 +82,7 @@ flowchart TD
 
 ### Prerequisites
 - Python 3.8+
-- CUDA-compatible GPU (recommended for neural networks)
+- CUDA-compatible GPU (recommended for neural networks training)
 
 ### Quick Installation
 ```bash
@@ -91,7 +91,7 @@ cd TSLies
 pip install -e .
 ```
 
-Or install from PyPI (when available):
+Or install from PyPI (not yet available):
 ```bash
 pip install tslies
 ```
@@ -117,7 +117,6 @@ TSLies is organized into a modular architecture separating generic time series f
 #### **modules/config.py**
 Centralized configuration management:
 - File paths and directory structure
-- Model hyperparameters
 - Configurable thresholds and parameters
 
 #### **modules/background/**
@@ -136,17 +135,17 @@ Complete ML model ecosystem with modular architecture:
 
 #### **modules/trigger.py**
 Advanced anomaly detection:
-- FOCuS algorithm implementation (Kester Ward, 2021)
-- Z-score and Gaussian change point detection
-- Multi-face trigger merging
+- FOCuS-Gaussian and FOCuS-Poisson algorithm implementation (Kester Ward, 2021)
+- Z-score detection
+- Multi-variate time series trigger merging
 - Temporal clustering and filtering
 
 #### **modules/plotter.py** 
 Scientific visualization suite:
-- Automated anomaly plotting with customizable overlays
+- Automated anomaly plotting
 - LaTeX-formatted scientific notation
 - Multi-panel time series with residuals
-- Export-ready publication figures
+- Export-ready figures for pubblications
 
 #### **modules/utils.py**
 Essential utilities:
@@ -171,50 +170,10 @@ ACD (Anti-Coincidence Detector) specific modules:
 - **catalogs.py**: Event catalog cross-referencing and validation
 - **main_*.py**: Complete analysis pipelines for ACD data
 
-## Scripts and Pipelines
+#### **applications/intesa sanpaolo/**
+Intesa Sanpaolo application:
 
-### Main Scripts
-
-#### **applications/acd/main_ml.py**
-Comprehensive ML training pipeline for ACD data:
-- Model comparison and selection
-- Hyperparameter grid search
-- Cross-validation and performance metrics
-- Model persistence and checkpointing
-
-#### **applications/acd/main_trigger.py** 
-ACD-specific anomaly detection execution:
-- Real-time triggering on ACD data streams
-- Multi-model ensemble predictions
-- Catalog cross-referencing with astronomical events
-- Performance evaluation and reporting
-
-#### **applications/acd/main_dataset.py**
-ACD data preparation and preprocessing:
-- Multi-source ACD data integration
-- Feature engineering and selection
-- Data quality control and validation
-
-#### **applications/acd/main_acd.py**
-Raw ACD data processing:
-- ACD data file parsing and conversion
-- Statistical preprocessing and binning
-- Data format standardization
-
-### Pipeline Architecture
-
-#### **pipelines/pipeline.py**
-End-to-end processing pipeline:
-- Automated data ingestion
-- Model training and validation
-- Anomaly detection and analysis
-- Result visualization and export
-
-The pipeline supports:
-- **Batch Processing**: Historical data analysis
-- **Streaming Mode**: Real-time anomaly detection
-- **Distributed Computing**: Large-scale data processing
-- **Checkpoint Recovery**: Robust fault tolerance
+- **main_intesa.py**: analysis pipelines for Intesa Sanpaolo data
 
 ## Usage
 
@@ -288,19 +247,6 @@ for ModelClass in models:
     results[ModelClass.__name__] = model.evaluate()
 ```
 
-#### Real-time Processing
-```python
-# Stream processing setup
-from pipelines.pipeline import get_inputs_outputs_df
-
-for data_batch in data_stream:
-    df = get_inputs_outputs_df(data_batch)
-    predictions = model.predict(df)
-    anomalies = trigger.run(predictions)
-    if anomalies:
-        send_alert(anomalies)
-```
-
 ## Data Structure
 
 ### Required Directory Layout
@@ -319,48 +265,7 @@ TSLies/
 
 ## Contributing
 
-We welcome contributions to this Time Series Anomaly Detection Framework! This project benefits from:
-
-### Areas for Contribution
-- **New ML Architectures**: Transformer models, Graph Neural Networks
-- **Improved Uncertainty Quantification**: Advanced Bayesian techniques
-- **Real-time Optimization**: Performance improvements for streaming data
-- **Domain-specific Applications**: Adaptations for specific time series domains
-- **Documentation**: Tutorials, examples, and API documentation
-
-### Development Priorities
-
-#### Recently Completed ✅
-- **Modular Architecture**: Separated ML models into individual files for better maintainability
-- **Background Model Organization**: Each predictor type now has its dedicated module
-- **Import System**: Flexible imports from both individual files and centralized package
-
-#### High Priority
-- **Autoencoder Background Models**: Unsupervised anomaly detection
-- **Distributed Computing**: Scalability for large datasets  
-- **Model Interpretability**: SHAP/LIME integration for feature importance
-- **Standardized Evaluation**: Consistent benchmarking across models
-
-#### Medium Priority  
-- **Synthetic Data Generation**: Controlled testing environments
-- **Non-parametric FOCuS**: Extended change point detection
-- **Cloud Deployment**: Docker containers and cloud infrastructure
-- **Advanced Data Generators**: TensorFlow/PyTorch data pipelines
-
-#### Future Directions
-- **Multi-domain Integration**: Support for various time series applications (Science, finance, healthcare, etc.)
-- **Real-time Dashboard**: Web-based monitoring and alerting
-- **Federated Learning**: Distributed model training across institutions
-- **Physics-Informed Neural Networks**: Incorporating domain-specific knowledge
-
-### Development Guidelines
-1. **Code Quality**: Follow PEP 8, include type hints, comprehensive docstrings
-2. **Testing**: Unit tests for all new functionality
-3. **Documentation**: Update README and inline documentation
-4. **Performance**: Profile code for computational efficiency
-5. **Reproducibility**: Ensure deterministic results with random seeds
-
-
+We welcome contributions to this Time Series Anomaly Detection Framework!
 ## Contact
 
 **Lead Developer**: Andrea Adelfio  
@@ -369,12 +274,10 @@ We welcome contributions to this Time Series Anomaly Detection Framework! This p
 - <and.adelfio@gmail.com>
 - <andrea.adelfio@pg.infn.it>
 
-**Project Status**: Active development  
-**License**: [Specify license]  
-**DOI**: [Add DOI when available]
+**Project Status**: Active development
 
 ### Acknowledgments
-- **FOCuS Algorithm**: Kester Ward (2021) - Original Python implementation
+- **FOCuS Algorithm**: Ward (2021)
 - **Research Community**: Open-source machine learning libraries and frameworks
 - **Computing Resources**: High-performance computing support
 
