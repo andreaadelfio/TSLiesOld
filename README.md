@@ -175,29 +175,29 @@ ACD (Anti-Coincidence Detector) specific modules:
 
 ### Main Scripts
 
-#### **scripts/main_ml.py**
-Comprehensive ML training pipeline:
+#### **applications/acd/main_ml.py**
+Comprehensive ML training pipeline for ACD data:
 - Model comparison and selection
 - Hyperparameter grid search
 - Cross-validation and performance metrics
 - Model persistence and checkpointing
 
-#### **scripts/main_trigger.py** 
-Anomaly detection execution:
-- Real-time triggering on data streams
+#### **applications/acd/main_trigger.py** 
+ACD-specific anomaly detection execution:
+- Real-time triggering on ACD data streams
 - Multi-model ensemble predictions
-- Catalog cross-referencing
+- Catalog cross-referencing with astronomical events
 - Performance evaluation and reporting
 
-#### **scripts/main_dataset.py**
-Data preparation and preprocessing:
-- Multi-source data integration
+#### **applications/acd/main_dataset.py**
+ACD data preparation and preprocessing:
+- Multi-source ACD data integration
 - Feature engineering and selection
 - Data quality control and validation
 
-#### **scripts/main_acd.py**
-Raw data processing:
-- Data file parsing and conversion
+#### **applications/acd/main_acd.py**
+Raw ACD data processing:
+- ACD data file parsing and conversion
 - Statistical preprocessing and binning
 - Data format standardization
 
@@ -305,14 +305,15 @@ for data_batch in data_stream:
 
 ### Required Directory Layout
 ```
-ACDAnomalies/
+TSLies/
 ├── results/                 # Model outputs and analysis
 │   └── YYYY-MM-DD/
 │       ├── background_prediction/
 │       └── trigger_results/
 ├── logs/                   # System logs and debugging
-├── modules/               # Core source code
-├── scripts/              # Main execution scripts
+├── modules/               # Core TSLies framework
+├── applications/         # Domain-specific applications
+│   └── acd/             # ACD-specific modules and scripts
 └── pipelines/           # End-to-end workflows
 ```
 
@@ -380,12 +381,12 @@ We welcome contributions to this Time Series Anomaly Detection Framework! This p
 ---
 
 ### Citation
-If you use ACDAnomalies in your research, please cite:
+If you use TSLies in your research, please cite:
 ```
-@software{adelfio2024acdanomalies,
+@software{adelfio2024tslies,
   author = {Adelfio, Andrea},
-  title = {ACDAnomalies},
-  url = {https://github.com/andreaadelfio/ACDAnomalies},
+  title = {TSLies: Time Series Anomaly Detection Framework},
+  url = {https://github.com/andreaadelfio/TSLies},
   year = {2024},
   institution = {INFN}
 }
