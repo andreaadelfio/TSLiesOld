@@ -27,7 +27,7 @@ from modules.plotter import Plotter
 from modules.utils import File
 from modules.config import BACKGROUND_PREDICTION_FOLDER_NAME
 
-from .main_config import y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols, x_cols_excluded, units, latex_y_cols
+from main_config import y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols, x_cols_excluded, units, latex_y_cols
 
 def run_rnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols):
     '''Runs the neural network model'''

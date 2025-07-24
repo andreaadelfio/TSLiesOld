@@ -14,8 +14,8 @@ import os
 from tqdm import tqdm
 
 # ACD-specific modules (now local)
-from .spacecraft import SpacecraftOpener
-from .solar import SunMonitor
+from spacecraft import SpacecraftOpener
+from solar import SunMonitor
 
 # Core framework modules
 from modules.dataset import DatasetReader
@@ -24,7 +24,7 @@ from modules.utils import Data, File, Time, Logger, logger_decorator
 from modules.config import INPUTS_OUTPUTS_FILE_PATH
 
 # Local config
-from .main_config import y_smooth_cols, y_cols, y_cols_raw, units, x_cols, latex_y_cols
+from main_config import y_smooth_cols, y_cols, y_cols_raw, units, x_cols, latex_y_cols
 
 logger = Logger('Main Dataset').get_logger()
 

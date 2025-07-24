@@ -25,9 +25,9 @@ from modules.plotter import Plotter
 from modules.trigger import Trigger
 
 # ACD-specific modules
-from .catalogs import CatalogsReader
+from catalogs import CatalogsReader
 
-from .main_config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded, units, y_smooth_cols, latex_y_cols, thresholds
+from main_config import y_cols, y_cols_raw, y_pred_cols, x_cols, x_cols_excluded, units, y_smooth_cols, latex_y_cols, thresholds
 import pandas as pd
 
 
