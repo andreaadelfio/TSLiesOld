@@ -1,4 +1,4 @@
-# TSLies - Time Series Anomaly Detection Framework
+# TSLies - Time Series Anomalies Detection Framework
 
 ## What is it?
 **TSLies** (Time Series anomaLIES) is an advanced anomaly detection framework using state-of-the-art Machine Learning techniques and the Poisson-FOCuS triggering algorithm for real-time anomaly detection in time series data. This framework provides a comprehensive suite of ML models, from deterministic to Bayesian approaches, for robust background modeling and anomaly detection in any time series dataset.
@@ -40,8 +40,8 @@ The framework follows a modular, three-stage pipeline architecture suitable for 
 ```mermaid
 flowchart TD
     A[Raw Time Series Data] --> B[Data Preprocessing]
-    C[External Features (if any)] --> B
-    D[Contextual Data (if any)] --> B
+    C[External Features - if any] --> B
+    D[Contextual Data - if any] --> B
     B --> E[Feature Engineering]
     E --> F[Background Modeling]
     F --> G[Anomaly Detection]
