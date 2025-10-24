@@ -1,20 +1,11 @@
 
-# import itertools
 import os
 import pandas as pd
-# import pickle
 
-# sklearn
-# from sklearn.model_selection import train_test_split
-# Keras
 # TensorFlow for Bayesian Neural Network
 import tf_keras
-import tensorflow_probability as tfp
-tfpl = tfp.layers
-tfd = tfp.distributions
 # ACDAnomalies modules
 from modules.utils import Logger, logger_decorator, File, Data
-from modules.background.losses import CustomLosses
 from modules.background.mlobject import MLObject
 
 class SpectralDomainFFNNPredictor(MLObject):
@@ -22,8 +13,8 @@ class SpectralDomainFFNNPredictor(MLObject):
     logger = Logger('SpectralDomainFFNN').get_logger()
 
     @logger_decorator(logger)
-    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, latex_y_cols=None, with_generator=False):
-        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, latex_y_cols, with_generator)
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, latex_y_cols=None, units=None, with_generator=False):
+        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, latex_y_cols=latex_y_cols, units=units, with_generator=with_generator)
 
     @logger_decorator(logger)
     def create_model(self):
@@ -34,17 +25,14 @@ class SpectralDomainFFNNPredictor(MLObject):
             self.nn_r.add(tf_keras.layers.Dense(units, activation='relu'))
         self.nn_r.add(tf_keras.layers.Dense(len(self.y_cols), activation='linear'))
 
-        self.closses = CustomLosses({'mae':1})
         self.nn_r.compile(
             optimizer=tf_keras.optimizers.Adam(learning_rate=self.lr),
-            loss=self.closses.spectral_loss,
-            metrics=[self.closses.mae]
-        )
+            loss=self.loss,
+            metrics=self.metrics)
 
     @logger_decorator(logger)
     def train(self):
         '''Trains the model.'''
-        # es = tf_keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
         mc = tf_keras.callbacks.ModelCheckpoint(self.model_path, monitor='val_loss', save_best_only=True)
 
         history = self.nn_r.fit(

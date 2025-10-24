@@ -64,8 +64,8 @@ def run_trigger_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_cols_pred, x_cols,
 
 def run_trigger_pbnn(inputs_outputs_df, y_cols, y_cols_raw, y_cols_pred, x_cols, file, catalog):
     '''Runs the model'''
-    nn = BNNPredictor(inputs_outputs_df, y_cols, x_cols, y_cols_raw, y_cols_pred, y_smooth_cols, catalog)
-    nn.set_model(model_path='results/2025-07-01/background_prediction/1224/BNNPredictor/0/model.keras', compile=False)
+    nn = BNNPredictor(inputs_outputs_df, y_cols, x_cols, y_cols_raw, y_cols_pred, y_smooth_cols, latex_y_cols, units)
+    nn.set_model(model_path='results/2025-10-24/background_prediction/1135/BNNPredictor/0/model.keras', compile=False)
     nn.load_scalers()
     # y_pred = File.read_df_from_file('results/2025-03-03/background_prediction/1644/BNNPredictor/0/pk/bkg')
     y_pred = None
@@ -81,7 +81,7 @@ def run_trigger_pbnn(inputs_outputs_df, y_cols, y_cols_raw, y_cols_pred, x_cols,
     #                                               stop='2024-06-20 23:40:00', column='datetime').reset_index(drop=True)
     # for col in y_cols_raw:
     #     Plotter().plot_tile(tiles_df, face=col, smoothing_key = 'pred', units=units)
-    # Plotter(df = tiles_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', y_cols=y_cols, excluded_cols = [col for col in inputs_outputs_df.columns if col not in y_cols_pred + y_cols_raw + ['GOES_XRSA_HARD_EARTH_OCCULTED']], show = True, smoothing_key='pred')
+    # Plotter(df = tiles_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', y_cols=y_cols, excluded_cols = [col for col in inputs_outputs_df.columns if col not in y_cols_pred + y_cols_raw + ['GOES_XRSA_HARD_EARTH_OCCULTED']], show = True, latex_y_cols=latex_y_cols, units=units, smoothing_key='pred')
 
     for face, face_pred in zip(y_cols, y_pred_cols):
         tiles_df[f'{face}_norm'] = (tiles_df[face] - tiles_df[face_pred]) / tiles_df[f'{face}_std']
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     catalog = CatalogsReader().catalog_df
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
     merge = 1
-    for i in range(816, 818, merge):
+    for i in range(862, 1000, merge):
         inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=i, stop=i+merge-1)
         # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
         #                                            start='2024-06-09 11:30:32',
@@ -167,7 +167,7 @@ if __name__ == '__main__':
             continue
         
         # Plotter(df = inputs_outputs_df, label = 'Inputs and outputs').df_plot_tiles(x_col = 'datetime', excluded_cols = [col for col in inputs_outputs_df.columns if col not in ['Xpos', 'SOLAR', 'SUN_IS_OCCULTED']], show = True, y_cols=y_cols, smoothing_key='smooth')
-        run_trigger_mean(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols, i, catalog)
-        # run_trigger_pbnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols, i, catalog)
+        # run_trigger_mean(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols, i, catalog)
+        run_trigger_pbnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols, i, catalog)
         # run_trigger_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols, i, catalog)
         gc.collect()

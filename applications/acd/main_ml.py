@@ -10,7 +10,6 @@ Modified date: 10/12/2024
 TODO:
 '''
 
-import os
 import pandas as pd
 import numpy as np
 
@@ -51,7 +50,6 @@ def run_rnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols
         history = rnn.train()
         if history.history['loss'][-1] > 0.0041:
             continue
-        Plotter().plot_history(history)
         rnn.update_summary()
         Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
         for start, end in [(35000, 43000), (50000, 62000) , (507332, 568639)]:
@@ -97,7 +95,7 @@ def run_ffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_col
 
 def run_spectralffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols):
     '''Runs the neural network model'''
-    nn = SpectralDomainFFNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols)
+    nn = SpectralDomainFFNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols, units)
     hyperparams_combinations = {
         'units_for_layers' : ([90], [90], [90], [70], [50]),
         'epochs' : [50],
@@ -107,13 +105,14 @@ def run_spectralffnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_col
         'drop' : [0],
         'opt_name' : ['Adam'],
         'lr' : [0.001],
-        'loss_type' : ['mae']
+        'metrics' : ['spectral_loss+MAE'],
+        'loss_type' : ['spectral_loss+MAE']
     }
 
     for params in nn.get_hyperparams_combinations(hyperparams_combinations, use_previous=False):
         nn.set_hyperparams(params, use_previous=False)
         nn.create_model()
-        history = nn.train()
+        nn.train()
         nn.update_summary()
         Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
         # for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
@@ -150,7 +149,6 @@ def run_pbnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_col
         nn.set_hyperparams(params)
         nn.create_model()
         history = nn.train()
-        Plotter().plot_history(history)
         nn.update_summary()
         Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
         # for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
@@ -167,24 +165,24 @@ def run_pbnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_col
 
 def run_bnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_cols):
     '''Runs the neural network model'''
-    nn = BNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols, False)
+    nn = BNNPredictor(inputs_outputs, y_cols, x_cols, y_cols_raw, cols_pred, y_smooth_cols, latex_y_cols, units, False)
     hyperparams_combinations = {
-        'units_for_layers' : ([90], [90], [90], [90], [70], [60]),
-        'epochs' : [200],
+        'units_for_layers' : ([90], [90], [90], [70], [50]),
+        'epochs' : [70],
         'bs' : [1000],
         'do' : [0.02],
         'norm' : [0],
         'drop' : [0],
         'opt_name' : ['Adam'],
-        'lr' : [0.0001],
-        'loss_type' : ['mae']
+        'lr' : [0.001],
+        'metrics' : ['negative_log_likelihood_var+mae_bnn+spectral_loss_bnn'],
+        'loss_type' : ['negative_log_likelihood_var+mae_bnn+spectral_loss_bnn']
     }
 
     for params in nn.get_hyperparams_combinations(hyperparams_combinations, use_previous=False):
         nn.set_hyperparams(params)
         nn.create_model()
-        history = nn.train()
-        Plotter().plot_history(history)
+        nn.train()
         nn.update_summary()
         Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
         # for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
@@ -221,7 +219,6 @@ def run_abnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_col
         nn.set_hyperparams(params)
         nn.create_model()
         history = nn.train()
-        Plotter().plot_history(history)
         nn.update_summary()
         Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
         # for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
@@ -258,7 +255,6 @@ def run_mcmcbnn(inputs_outputs, y_cols, y_cols_raw, cols_pred, y_smooth_cols, x_
         nn.set_hyperparams(params)
         nn.create_model()
         history = nn.train()
-        Plotter().plot_history(history)
         nn.update_summary()
         Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params)
         # for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
@@ -322,10 +318,23 @@ def run_median(inputs_outputs):
     Plotter(df = tiles_df, label = 'median').df_plot_tiles(x_col = 'datetime', excluded_cols = [], marker = ',', show = True, smoothing_key='smooth')
     Plotter().show()
 
+def plot_with_model(inputs_outputs, model_path, y_cols, x_cols):
+    '''Plots the results with a given model'''
+    nn = BNNPredictor(inputs_outputs, y_cols, x_cols, y_cols, y_pred_cols, y_smooth_cols, latex_y_cols, units)
+    nn.set_model(model_path, False)
+    nn.load_scalers()
+    for start, end in [('2024-03-10 12:08:00', '2024-03-10 12:30:00'),
+                           ('2024-03-28 20:50:00', '2024-03-28 21:10:00'),
+                           ('2024-05-08 21:00:00', '2024-05-08 23:30:00'),
+                           ('2024-05-11 01:00:00', '2024-05-11 02:00:00'),
+                           ('2024-05-15 14:15:00', '2024-05-15 15:40:00'),
+                           ('2024-06-20 23:00:00', '2024-06-20 23:30:00')]:
+                    nn.predict(start=start, end=end, mask_column='datetime', write_bkg=False, save_predictions_plot=True)
+
 ########### Main ############
 if __name__ == '__main__':
     x_cols = [col for col in x_cols if col not in x_cols_excluded]
-    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=818, cols_list=x_cols + y_cols + y_smooth_cols + ['datetime', 'MET'], y_cols=y_cols, resample_skip=2)
+    inputs_outputs_df = File().read_dfs_from_weekly_pk_folder(start=0, stop=1000, cols_list=x_cols + y_cols + y_smooth_cols + ['datetime', 'MET'], y_cols=y_cols, resample_skip=3)
     # only take values different from 0
     # Plotter(df=inputs_outputs_df).plot_correlation_matrix(show=False, save=True)
     # inputs_outputs_df = Data.get_masked_dataframe(data=inputs_outputs_df,
@@ -345,11 +354,15 @@ if __name__ == '__main__':
 
     # run_mcmcbnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_abnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
-    # run_bnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_spectralffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
+    run_bnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_pbnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_rnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, x_cols)
-    run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
+    # run_ffnn(inputs_outputs_df, y_cols, y_cols_raw, y_pred_cols, y_smooth_cols, x_cols)
     # run_multimean_knn(inputs_outputs_df, y_cols, x_cols)
     # run_multimedian_knn(inputs_outputs_df, y_cols, x_cols)
     # run_median(inputs_outputs_df, y_cols)
+
+    # model_path = '/home/andrea-adelfio/OneDrive/Workspace INFN/ACDAnomalies/results/2025-10-16/background_prediction/1141/SpectralDomainFFNNPredictor/0/model.keras'
+    # model_path = '/home/andrea-adelfio/OneDrive/Workspace INFN/ACDAnomalies/results/2025-10-13/background_prediction/1746/BNNPredictor/0/model.keras'
+    # plot_with_model(inputs_outputs_df, model_path, y_cols, x_cols)

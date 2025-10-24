@@ -153,6 +153,6 @@ class FFNNPredictor(MLObject):
                 File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
         if save_predictions_plot:
             y_pred = y_pred.assign(**{col: y_pred[cols_init] for col, cols_init in zip(self.y_pred_cols, self.y_cols)}).drop(columns=self.y_cols)
-            tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime'] + support_variables], y_pred)
+            tiles_df = Data.merge_dfs(df_data[['Xpos_middle'] + ['datetime'] + support_variables], y_pred)
             self.save_predictions_plots(tiles_df, start, end, self.params)
         return df_ori, y_pred

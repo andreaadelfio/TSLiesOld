@@ -5,7 +5,9 @@
 /lectures
 /m_check
 /modules/lime
-/modules/__pycache__
+/__pycache__
+/*/__pycache__
+/*/*/__pycache__
 /utils/*
 /best
 /catalogs

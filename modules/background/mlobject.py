@@ -18,7 +18,7 @@ class MLObject(ABC):
     '''Abstract base class for Machine Learning models with standardized interface.'''
     def __init__(self, df_data: pd.DataFrame, y_cols: List[str], x_cols: List[str], 
                  y_cols_raw: List[str], y_pred_cols: List[str], y_smooth_cols: List[str], 
-                 latex_y_cols: Optional[List[str]] = None, with_generator: bool = False):
+                 latex_y_cols: Optional[List[str]] = None, units: Optional[List[int]] = None, with_generator: bool = False):
         self.model_name = self.__class__.__name__
         self.training_date = pd.Timestamp.time(pd.Timestamp.now()).strftime('%H%M')
         print(f'{self.model_name} - {self.training_date}')
@@ -31,6 +31,7 @@ class MLObject(ABC):
         self.y_pred_cols = y_pred_cols
         self.y_smooth_cols = y_smooth_cols
         self.latex_y_cols = latex_y_cols or y_cols
+        self.units = units or {}
 
         if with_generator: # if the data is too large, use tensorflow DataGenerator
             # to be implemented
@@ -44,8 +45,8 @@ class MLObject(ABC):
         self.y = self.scaler_y.transform(self.y)
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.25, random_state=42, shuffle=True)
 
-        self.closses = CustomLosses({'mae': np.mean(np.abs(self.df_data[self.y_cols].values - self.df_data[self.y_smooth_cols].values)),
-                                     'mse': np.mean(np.square(self.df_data[self.y_cols].values - self.df_data[self.y_smooth_cols].values))})
+        self.closses = CustomLosses({'mae': 1,
+                                     'mse': 1})
 
         self.model_path = os.path.join(BACKGROUND_PREDICTION_FOLDER_NAME, self.training_date, self.model_name)
         if not os.path.exists(self.model_path):
@@ -54,7 +55,7 @@ class MLObject(ABC):
         self.nn_r = None
         self.text = None
         self.model_id = None
-        self.params = None
+        self.params = {}
         self.norm = None
         self.drop = None
         self.units_for_layers = None
@@ -63,6 +64,8 @@ class MLObject(ABC):
         self.opt_name = None
         self.lr = None
         self.loss_type = None
+        self.loss = None
+        self.metrics = None
         self.epochs = None
         self.mae_tr_list = None
 
@@ -151,6 +154,9 @@ class MLObject(ABC):
         self.drop = params['drop']
         self.mae_tr_list = []
 
+        self.set_loss()
+        self.set_metrics()
+
     def set_model(self, model_path: str, compile: bool = True):
         '''Sets the model from the model path.
         
@@ -163,7 +169,7 @@ class MLObject(ABC):
             Model: The model.'''
         self.model_path = os.path.join(DIR, model_path)
         self.nn_r = load_model(self.model_path, compile=compile)
-
+        self.params['model_path'] = os.path.dirname(self.model_path)
         return self.nn_r
 
     def set_scalers(self, train_x: pd.DataFrame = None, train_y: pd.DataFrame = None):
@@ -201,6 +207,36 @@ class MLObject(ABC):
         self.scaler_y.mean_ = np.array(self.scalers_params_dict['y_mean'])
         self.scaler_y.scale_ = np.array(self.scalers_params_dict['y_scale'])
 
+    def set_loss(self):
+        '''Sets a loss function or a combination of loss functions for the model.
+        Parameters:
+        ----------
+            loss_type_list (list[str]): A list of loss function names.
+        '''
+        self.loss_type_list = self.params['loss_type'].split('+')
+        loss_functions = self.closses.get_loss_list()
+
+        if len(self.loss_type_list) == 1:
+            self.loss = loss_functions[self.loss_type_list[0]]
+        else:
+            def combined_loss(y_true, y_pred):
+                total_loss = 0
+                for loss_type in self.loss_type_list:
+                    total_loss += loss_functions[loss_type](y_true, y_pred)
+                return total_loss
+            self.loss = combined_loss
+
+    def set_metrics(self):
+        '''Sets the metrics for the model.'''
+        self.metrics_list = self.params['metrics'].split('+')
+        metrics_functions = self.closses.get_metrics_list()
+
+        metrics_list = []
+        for metric in self.metrics_list:
+            if metric in metrics_functions:
+                metrics_list.append(metrics_functions[metric])
+        self.metrics = metrics_list
+
     def scheduler(self, epoch, lr_actual):
         '''The learning rate scheduler.'''
         if epoch < 0.06 * self.epochs:
@@ -223,13 +259,28 @@ class MLObject(ABC):
             super().__init__()
             self.predictor = predictor
             self.interval = interval
-            self.history = {'history': {'loss': [], 'mae': [], 'val_loss': [], 'val_mae': []}}
+            self.history = {'history': {'loss': [], 'val_loss': []}}
+            for metric in self.predictor.metrics_list:
+                self.history['history'][metric] = []
+                self.history['history'][f'val_{metric}'] = []
 
+        def _implements_train_batch_hooks(self):
+            """Required method for TensorFlow compatibility."""
+            return False
+
+        def _implements_test_batch_hooks(self):
+            """Required method for TensorFlow compatibility."""
+            return False
+
+        def _implements_predict_batch_hooks(self):
+            """Required method for TensorFlow compatibility."""
+            return False
 
         def on_epoch_end(self, epoch, logs={}):
             for key in logs.keys():
-                if key in self.history['history']:
-                    self.history['history'][key].append(logs[key])
+                if not key in self.history['history']:
+                    self.history['history'][key] = []
+                self.history['history'][key].append(logs[key])
             Plotter().plot_history(self.history)
             Plotter.save(BACKGROUND_PREDICTION_FOLDER_NAME, params={'model_path': self.predictor.params['model_path']})
             if (epoch + 1) % self.interval == 0:
@@ -249,7 +300,7 @@ class MLObject(ABC):
         '''Saves the prediction plots.'''
         title = os.path.join(os.path.dirname(params['model_path']), f'tiles_{start}_{end}.png')
         Plotter(df=tiles_df, label=title).df_plot_tiles(self.y_cols, x_col='datetime', latex_y_cols=self.latex_y_cols, init_marker=',',
-                                                        show=False, smoothing_key='pred', save=True, show_std=True)
+                                                        show=False, smoothing_key='pred', save=True, show_std=True, units=self.units, figsize=(5, 3))
 
     # Abstract methods that must be implemented by subclasses
     @abstractmethod

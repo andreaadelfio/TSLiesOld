@@ -46,7 +46,7 @@ class Plotter:
                 "text.usetex": True,
                 "font.family": "sans.serif",
                 "font.sans-serif": ["Helvetica"],
-                "font.size": 25
+                "font.size": 35
             })
 
     # @logger_decorator(logger)
@@ -123,7 +123,7 @@ class Plotter:
             plt.show()
 
     @logger_decorator(logger)
-    def df_plot_tiles(self, y_cols, x_col, latex_y_cols, top_x_col = None, excluded_cols = None, init_marker = ',', lw = 0.1, smoothing_key = 'smooth', show = True, save = False, units = None, show_std=True):
+    def df_plot_tiles(self, y_cols, x_col, latex_y_cols, top_x_col = None, excluded_cols = None, init_marker = ',', lw = 0.1, smoothing_key = 'smooth', show = True, save = False, units = None, show_std=True, figsize=(12, 6)):
         '''
         Plot multiple curves as tiles.
 
@@ -140,7 +140,7 @@ class Plotter:
         n_plots = len(df_columns)
         n_cols = int(np.ceil(np.sqrt(n_plots)))
         n_rows = int(np.ceil(n_plots / n_cols))
-        fig = plt.figure(figsize=(12, 6), num=self.label)
+        fig = plt.figure(figsize=figsize, num=self.label)
         x = self.df[x_col]
         axs = [fig.add_subplot(n_rows, n_cols, 1)]
         for i in range(1, n_plots):
@@ -152,26 +152,27 @@ class Plotter:
             if column in y_cols:
                 fmt = 'k-.'
                 plot_lw = None
-            label = f"${latex_y_cols[column]}$ [${units[column] if column in units else 'NA'}$]" if column in latex_y_cols else f'{column} [{units[column] if column in units else "NA"}]'
+            label = f"${latex_y_cols[column]}$" if column in latex_y_cols else f'{column}'
+            label += f' [${units[column]}$]' if column in units else ' [NA]'
             axs[i].plot(x.values, self.df[column], fmt, lw=plot_lw, label=label)
 
             if smoothing_key and f'{column}_{smoothing_key}' in self.df.columns:
                 label = f'${latex_y_cols[column]}$ {smoothing_key}' if column in latex_y_cols else f'{column} {smoothing_key}'
                 axs[i].plot(x.values, self.df[f'{column}_{smoothing_key}'], 'r-', ms=0.2, label=label)
                 if f'{column}_std' in self.df.columns and show_std:
-                    axs[i].fill_between(x.values, self.df[f'{column}_{smoothing_key}']-self.df[f'{column}_std'], self.df[f'{column}_{smoothing_key}']+self.df[f'{column}_std'], label='prediction error')
+                    axs[i].fill_between(x.values, self.df[f'{column}_{smoothing_key}']-self.df[f'{column}_std'], self.df[f'{column}_{smoothing_key}']+self.df[f'{column}_std'], label='error')
             
             if i >= n_cols * (n_rows - 1) - (n_cols * n_rows - n_plots):
                 axs[i].tick_params(axis="x", labelrotation=30)
                 plt.setp(axs[i].get_xticklabels(), visible=True)
                 offset_text = axs[i].get_xaxis().get_offset_text().get_text()
-                xlabel = f'{x_col} ({offset_text})' if offset_text else f'{x_col} ({x.iloc[0]})'
+                xlabel = f'{x_col} ({offset_text})' if offset_text else f'{x_col} ({str(x.iloc[0]).split("+")[0]})'
                 axs[i].set_xlabel(xlabel)
             else:
                 plt.setp(axs[i].get_xticklabels(), visible=False)
             axs[i].get_xaxis().get_offset_text().set_visible(False)
             
-            axs[i].legend(loc='upper right', fontsize=13)
+            # axs[i].legend(loc='upper right', fontsize=13)
             axs[i].grid()
             axs[i].set_xlim(x.iloc[0], x.iloc[-1])
             axs[i].tick_params(axis="y", labelrotation=30)
@@ -252,11 +253,12 @@ class Plotter:
     @logger_decorator(logger)
     def plot_history(self, history):
         for feature in history['history'].keys():
-            if 'val' in feature or feature == 'lr':
+            if 'val' in feature:
                 continue
             plt.figure(f"history_{feature}", layout="tight")
             plt.plot(history['history'][feature][1:])
-            plt.plot(history['history'][f'val_{feature}'][1:])
+            if f'val_{feature}' in history['history']:
+                plt.plot(history['history'][f'val_{feature}'][1:])
             plt.ylabel(feature)
             plt.xlabel('epoch')
             plt.legend(['train', 'validation'], loc='upper left')
@@ -320,6 +322,17 @@ class Plotter:
 
         for an_time, anomalies in tqdm(self.df.items(), desc=f'Plotting anomalies with {trigger_algo_type}'):
             faces = list(anomalies.keys())
+
+            anomaly_end = -1
+            anomaly_start = tiles_df.index[-1]
+            for anomaly in anomalies.values():
+                if anomaly['stop_index'] > anomaly_end:
+                    anomaly_end = anomaly['stop_index']
+                if anomaly['start_index'] < anomaly_start:
+                    anomaly_start = anomaly['start_index']
+            in_catalog = tiles_df['datetime'][anomaly_start].strftime('%Y-%m-%d %H:%M:%S') in results
+            if not in_catalog and only_in_catalog:
+                continue
             
             num_signal_residual_pairs = len(y_cols)
             num_support_vars = len(support_vars)
@@ -333,18 +346,6 @@ class Plotter:
             gss.append(GridSpecFromSubplotSpec(1, 1, subplot_spec=gs0[-1], hspace=0.))
 
             axs = []
-
-            anomaly_end = -1
-            anomaly_start = tiles_df.index[-1]
-            for anomaly in anomalies.values():
-                if anomaly['stop_index'] > anomaly_end:
-                    anomaly_end = anomaly['stop_index']
-                if anomaly['start_index'] < anomaly_start:
-                    anomaly_start = anomaly['start_index']
-            in_catalog = tiles_df['datetime'][anomaly_start].strftime('%Y-%m-%d %H:%M:%S') in results
-            if not in_catalog and only_in_catalog:
-                plt.close(fig)
-                continue
             if in_catalog:
                 cat_event = results[tiles_df['datetime'][anomaly_start].strftime('%Y-%m-%d %H:%M:%S')]['catalog_triggers'][0]
             anomaly_duration = anomaly_end - int(anomaly_start)

@@ -7,10 +7,10 @@ h_names = ['hist_top', 'hist_Xpos', 'hist_Xneg', 'hist_Ypos', 'hist_Yneg']
 # h_names = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
 
 y_cols_raw = ['top', 'Xpos', 'Xneg', 'Ypos', 'Yneg']
-# y_cols_raw = ['top_low']
 y_cols_raw = ['top_low', 'top_middle', 'top_high', 'Xpos_low', 'Xpos_middle', 'Xpos_high', 'Xneg_low', 'Xneg_middle', 'Xneg_high', 'Ypos_low', 'Ypos_middle', 'Ypos_high', 'Yneg_low', 'Yneg_middle', 'Yneg_high']
+# y_cols_raw = ['top_low']
 # y_cols_raw = ['top_middle', 'top_high', 'Xpos_middle', 'Xpos_high', 'Xneg_middle', 'Xneg_high', 'Ypos_middle', 'Ypos_high', 'Yneg_middle', 'Yneg_high']
-# y_cols_raw = ['Xpos_low', 'Xpos_middle', 'Xpos_high']
+# y_cols_raw = ['Xpos_middle']
 # y_cols_raw = [f'{col}_middle' for col in y_cols_raw]
 y_smooth_cols = [f'{col}_smooth' for col in y_cols_raw]
 # y_cols_raw = ['histNorm_top', 'histNorm_Xpos', 'histNorm_Xneg', 'histNorm_Ypos', 'histNorm_Yneg']
@@ -20,7 +20,7 @@ y_pred_cols = [col + '_pred' for col in y_cols_raw]
 
 # thresholds = {'top': 7, 'Xpos': 10, 'Ypos': 7, 'Xneg': 7, 'Yneg': 7}
 # thresholds = {'top_low': 5, 'top_middle': 7, 'top_high': 7, 'Xpos_low': 5, 'Xpos_middle': 7, 'Xpos_high': 7, 'Xneg_low': 5, 'Xneg_middle': 7, 'Xneg_high': 7, 'Ypos_low': 5, 'Ypos_middle': 7, 'Ypos_high': 7, 'Yneg_low': 5, 'Yneg_middle': 7, 'Yneg_high': 7}
-thresholds = {'top_low': 7, 'top_middle': 7, 'top_high': 7, 'Xpos_low': 7, 'Xpos_middle': 7, 'Xpos_high': 7, 'Xneg_low': 7, 'Xneg_middle': 7, 'Xneg_high': 7, 'Ypos_low': 7, 'Ypos_middle': 7, 'Ypos_high': 7, 'Yneg_low': 7, 'Yneg_middle': 7, 'Yneg_high': 7}
+thresholds = {'top_low': 5, 'top_middle': 5, 'top_high': 5, 'Xpos_low': 5, 'Xpos_middle': 5, 'Xpos_high': 5, 'Xneg_low': 5, 'Xneg_middle': 5, 'Xneg_high': 5, 'Ypos_low': 5, 'Ypos_middle': 5, 'Ypos_high': 5, 'Yneg_low': 5, 'Yneg_middle': 5, 'Yneg_high': 5}
 
 
 x_cols = ['SC_POSITION_0', 'SC_POSITION_1', 'SC_POSITION_2', 'LAT_GEO', 'LON_GEO',

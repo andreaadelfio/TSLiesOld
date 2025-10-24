@@ -278,7 +278,7 @@ class Trigger:
                     new_stop_index = index + 1
                     new_stop_datetime = str(row['datetime'] + timedelta(seconds=1))
 
-                    if index == old_stopping_time[face] + 1 or new_start_index <= old_stopping_time[face] + 60:
+                    if index == old_stopping_time[face] + 1 or new_start_index <= old_stopping_time[face] + 60 and anomalies_faces[face]:
                         last_anomaly = anomalies_faces[face].pop()
                         old_start_index = last_anomaly[1]
                         old_start_datetime = last_anomaly[3]
@@ -321,14 +321,14 @@ class Trigger:
                         anomaly_start = face['start_index']
                 triggered_faces = [face for face in anomaly.keys()]
                 inputs_outputs_df_tmp = self.tiles_df[anomaly_start:anomaly_end + 1]
-                print(self.tiles_df[anomaly_start:anomaly_end + 1][self.y_cols + self.y_cols_pred])
-                print(inputs_outputs_df_tmp[triggered_faces])
+                # print(self.tiles_df[anomaly_start:anomaly_end + 1][self.y_cols + self.y_cols_pred])
+                # print(inputs_outputs_df_tmp[triggered_faces])
                 max_indices = inputs_outputs_df_tmp[triggered_faces].idxmax().values[0]
                 values_dict = {}
                 for face, face_pred in zip(self.y_cols, self.y_cols_pred):
                     values_dict[face] = (inputs_outputs_df_tmp.loc[max_indices, face] - inputs_outputs_df_tmp.loc[max_indices, face_pred])
 
-                print(self.tiles_df['datetime'][int(anomaly_start)], self.tiles_df['datetime'][int(anomaly_end)], self.compute_direction(values_dict))
+                # print(self.tiles_df['datetime'][int(anomaly_start)], self.tiles_df['datetime'][int(anomaly_end)], self.compute_direction(values_dict))
 
                 f.write(f"{self.tiles_df['datetime'][int(anomaly_start)]},{self.tiles_df['datetime'][int(anomaly_end)]},{self.tiles_df['MET'][int(anomaly_start)]},{self.tiles_df['MET'][int(anomaly_end)]},{'/'.join(triggered_faces)}\n")
 

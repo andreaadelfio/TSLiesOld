@@ -13,7 +13,6 @@ tfpl = tfp.layers
 tfd = tfp.distributions
 # ACDAnomalies modules
 from modules.utils import Logger, logger_decorator, File, Data
-from modules.background.losses import CustomLosses
 from modules.background.mlobject import MLObject
 
 
@@ -22,8 +21,8 @@ class BNNPredictor(MLObject):
     logger = Logger('BNNPredictor').get_logger()
 
     @logger_decorator(logger)
-    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, latex_y_cols=None, with_generator=False):
-        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, latex_y_cols, with_generator)
+    def __init__(self, df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, latex_y_cols=None, units=None, with_generator=False):
+        super().__init__(df_data, y_cols, x_cols, y_cols_raw, y_pred_cols, y_smooth_cols, latex_y_cols=latex_y_cols, units=units, with_generator=with_generator)
 
     @logger_decorator(logger)
     def create_model(self):
@@ -34,13 +33,13 @@ class BNNPredictor(MLObject):
         ])
 
         for units in list(self.units_for_layers):
-            self.nn_r.add(tf_keras.layers.Dense(units, activation='relu'))
+            self.nn_r.add(tf_keras.layers.Dense(units, activation='relu'))#, kernel_regularizer=tf_keras.regularizers.l2(1e-4)))
+            # self.nn_r.add(tf_keras.layers.Dropout(0.1))
         self.nn_r.add(tf_keras.layers.Dense(2*len(self.y_cols), activation='linear'))
 
-        self.closses = CustomLosses({'mae':1})
         self.nn_r.compile(optimizer=tf_keras.optimizers.Adam(),
-                  loss=self.closses.negative_log_likelihood_var,
-                  metrics=[self.closses.mae_bnn])
+            loss=self.loss,
+            metrics=self.metrics)
     
     @logger_decorator(logger)
     def train(self):
@@ -54,7 +53,7 @@ class BNNPredictor(MLObject):
             callbacks = [self.custom_callback(self)]
         else:
             call_lr = LearningRateScheduler(self.scheduler)
-        callbacks = [mc, self.custom_callback(self, 3)]
+        callbacks = [mc, self.custom_callback(self, 5)]
 
         if self.with_generator:
             history = self.nn_r.fit(self.df_data, epochs=self.epochs, batch_size=32, validation_split=0.3)
@@ -88,8 +87,6 @@ class BNNPredictor(MLObject):
         mean_pred = self.scaler_y.inverse_transform(y_pred[:, :len(self.y_cols)])
         log_var_pred = y_pred[:, len(self.y_cols):] + 2 * np.log(self.scaler_y.scale_)
 
-        # mean_pred = y_pred[:, :len(self.y_cols)]
-        # log_var_pred = y_pred[:, len(self.y_cols):]
         std_pred = np.sqrt(np.exp(log_var_pred))
         y_pred = pd.DataFrame(mean_pred, columns=self.y_cols)
         y_std = pd.DataFrame(std_pred, columns=[f'{col}_std' for col in self.y_cols])
@@ -113,7 +110,7 @@ class BNNPredictor(MLObject):
                     path = os.path.dirname(self.model_path)
                 File.write_df_on_file(df_ori, os.path.join(path, 'frg'))
         if save_predictions_plot:
-            tiles_df = Data.merge_dfs(df_data[self.y_cols_raw + ['datetime'] + support_variables], y_pred)
+            tiles_df = Data.merge_dfs(df_data[['Xpos_middle'] + ['datetime'] + support_variables], y_pred)
             self.save_predictions_plots(tiles_df, start, end, self.params)
         return df_ori, y_pred
     
